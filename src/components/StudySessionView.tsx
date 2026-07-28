@@ -258,29 +258,22 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
         </div>
       </div>
 
-      {/* 3D Flip Card */}
+      {/* Card */}
       <div
         id="flashcard-flip-container"
         onClick={handleFlip}
-        className="perspective-1000 min-h-[320px] sm:min-h-[380px] cursor-pointer group select-none"
+        className="min-h-[320px] sm:min-h-[380px] cursor-pointer select-none"
       >
-        <div
-          className={`relative w-full h-full min-h-[320px] sm:min-h-[380px] rounded-3xl transition-transform duration-500 preserve-3d glass-card overflow-hidden border-2 ${
-            isFlipped ? 'rotate-y-180 border-[#60a5fa]/50' : 'border-[#adc6ff]/20 hover:border-[#adc6ff]/40'
-          }`}
-        >
-          {/* FRONT */}
-          <div className="absolute inset-0 p-6 sm:p-8 backface-hidden flex flex-col justify-between h-full space-y-6">
+        {!isFlipped ? (
+          /* FRONT */
+          <div className="w-full min-h-[320px] sm:min-h-[380px] p-6 sm:p-8 flex flex-col justify-between glass-card rounded-3xl border-2 border-[#adc6ff]/20 hover:border-[#adc6ff]/40 transition-colors">
             <div className="flex items-center justify-between">
               <span className="px-3 py-1 rounded-full bg-[#122131] text-[#adc6ff] text-xs font-mono border border-[#adc6ff]/20">
                 {currentCard.topic || deck.category}
               </span>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSpeakText(currentCard.front);
-                }}
+                onClick={(e) => { e.stopPropagation(); handleSpeakText(currentCard.front); }}
                 className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
                 title="Ouvir pergunta"
               >
@@ -299,19 +292,16 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
               <RotateCw className="w-4 h-4 text-[#60a5fa]" /> Clique para ver a resposta
             </div>
           </div>
-
-          {/* BACK */}
-          <div className="absolute inset-0 p-6 sm:p-8 rotate-y-180 backface-hidden flex flex-col justify-between h-full space-y-6 bg-[#0c1e30] rounded-3xl">
+        ) : (
+          /* BACK */
+          <div className="w-full min-h-[320px] sm:min-h-[380px] p-6 sm:p-8 flex flex-col justify-between rounded-3xl border-2 border-[#60a5fa]/50 bg-[#0c1e30] transition-colors">
             <div className="flex items-center justify-between">
               <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-mono border border-emerald-500/20 font-bold">
                 Resposta & Explicação
               </span>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSpeakText(currentCard.back);
-                }}
+                onClick={(e) => { e.stopPropagation(); handleSpeakText(currentCard.back); }}
                 className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
                 title="Ouvir resposta"
               >
@@ -329,7 +319,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
               Avalie sua facilidade para calcular o intervalo SRS
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* AI Assistance Toolbar */}

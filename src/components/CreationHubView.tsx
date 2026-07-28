@@ -321,17 +321,8 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-24 animate-fade-in">
-      {/* Top Header & Mode Toggle */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[#424754]/30 pb-4">
-        <div>
-          <h2 className="text-2xl font-extrabold text-white flex items-center gap-2.5">
-            <Sparkles className="w-6 h-6 text-[#60a5fa] animate-pulse" /> Central de Criação de Decks
-          </h2>
-          <p className="text-xs text-[#8c91a0] mt-0.5">
-            Gere decks com Tópicos de Estudo, Níveis de Dificuldade ou Quiz Diagnóstico com IA.
-          </p>
-        </div>
-
+      {/* Mode Toggle - centered */}
+      <div className="flex justify-center">
         <div className="flex bg-[#0b1a2a] p-1 rounded-2xl border border-[#424754]/40 shadow-inner">
           <button
             onClick={() => setActiveMode('ai')}
@@ -518,20 +509,6 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
                 );
               })}
             </div>
-          </div>
-
-          {/* Additional Notes / Content Input */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-[#8c91a0] uppercase flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-[#60a5fa]" /> Texto/Resumo Adicional (Opcional)
-            </label>
-            <textarea
-              rows={3}
-              value={promptText}
-              onChange={(e) => setPromptText(e.target.value)}
-              placeholder="Cole aqui transcrições, artigos ou anotações para complementar a IA..."
-              className="w-full bg-[#0b1a2a] border border-[#424754]/40 rounded-2xl p-3.5 text-xs text-white focus:outline-none focus:border-[#60a5fa]"
-            />
           </div>
 
           {/* Quantity options */}

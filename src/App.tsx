@@ -12,6 +12,7 @@ import { StudySessionView } from './components/StudySessionView';
 // >1MB num único arquivo). DashboardView/StudySessionView ficam eager porque
 // aparecem imediatamente na tela inicial.
 // ----------------------------------------------------------------------------
+const DecksExploreView = lazy(() => import('./components/DecksExploreView').then((m) => ({ default: m.DecksExploreView })));
 const VoiceTutorView = lazy(() => import('./components/VoiceTutorView').then((m) => ({ default: m.VoiceTutorView })));
 const VoiceSettingsModal = lazy(() =>
   import('./components/VoiceSettingsModal').then((m) => ({ default: m.VoiceSettingsModal }))
@@ -422,18 +423,14 @@ export function App() {
             )}
 
             {activeTab === 'explore' && (
-              <DashboardView
-                stats={stats}
+              <DecksExploreView
                 decks={decks}
+                stats={stats}
                 currentLanguage={currentLanguage}
-                onOpenLanguageSelector={() => setShowLanguageModal(true)}
                 setActiveTab={setActiveTab}
                 onStartStudySession={handleStartStudySession}
                 onManageDeck={(deck) => setManagedDeck(deck)}
                 onOpenQuickCreate={() => setActiveTab('create')}
-                onOpenAdMob={() => setShowAdMobModal(true)}
-                onOpenSubscription={() => setShowSubscriptionModal(true)}
-                onOpenReferral={() => setShowReferralModal(true)}
               />
             )}
 
