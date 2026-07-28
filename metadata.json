@@ -1,0 +1,6 @@
+{
+  "name": "FlashMind AI",
+  "description": "Plataforma Inteligente de Estudos com Flashcards IA, Repetição Espaçada (SRS), Assistente de Voz, Arena de Duelos e Análises.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

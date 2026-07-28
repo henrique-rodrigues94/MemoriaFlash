@@ -1,0 +1,72 @@
+rules_version = '2';
+
+// ============================================================================
+// REGRAS DE SEGURANÇA DO FIRESTORE — FlashMind AI
+// ----------------------------------------------------------------------------
+// ATENÇÃO: as regras originais deste projeto eram `allow read, write: if true`
+// em TODAS as coleções — ou seja, qualquer pessoa na internet, autenticada ou
+// não, podia ler, sobrescrever ou apagar os decks, estatísticas e turmas de
+// QUALQUER usuário. Isso foi corrigido abaixo.
+//
+// Para que a sincronização na nuvem funcione com estas regras, é necessário
+// habilitar "Autenticação Anônima" no Console do Firebase
+// (Authentication > Sign-in method > Anonymous > Ativar). Veja FIREBASE_SETUP.md.
+// Sem isso, o app continua funcionando 100% localmente (localStorage), só não
+// sincroniza entre dispositivos nem processa recompensas de indicação.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Decks: leitura pública (permite marketplace/decks públicos da comunidade),
+    // mas só o dono (userId == uid autenticado) pode criar, editar ou apagar.
+    match /decks/{deckId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // Estatísticas do usuário: o ID do documento É o uid, então só o próprio
+    // dono pode ler ou escrever. Créditos ganhos por indicação são escritos
+    // pelo backend via Firebase Admin SDK, que ignora estas regras.
+    match /userStats/{statsId} {
+      allow read, write: if isOwner(statsId);
+    }
+
+    // Turmas de professores: leitura pública (alunos precisam encontrar/
+    // entrar em turmas pelo código), escrita restrita ao professor dono.
+    match /classes/{classId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.teacherId == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.teacherId == request.auth.uid;
+    }
+
+    // Preferências de notificação push: cada usuário lê/escreve apenas o
+    // próprio documento (contém tokens FCM do dispositivo + horário
+    // preferido de lembrete). O ENVIO da notificação em si é feito pelo
+    // backend via Firebase Admin SDK (que ignora estas regras).
+    match /notificationPrefs/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // Programa de indicação: acesso do cliente NEGADO por padrão. Todo o
+    // resgate de código e crédito de recompensa passa pelo endpoint
+    // /api/referral/* no backend (Firebase Admin SDK, que ignora estas
+    // regras). Isso impede que um usuário mal-intencionado escreva
+    // diretamente nessas coleções para se autocreditar créditos infinitos.
+    match /referralCodes/{code} {
+      allow read, write: if false;
+    }
+    match /referrals/{uid} {
+      allow read, write: if false;
+    }
+  }
+}

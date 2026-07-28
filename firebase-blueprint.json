@@ -1,0 +1,79 @@
+{
+  "entities": {
+    "decks": {
+      "title": "Flashcard Decks",
+      "description": "User created or public study decks",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "bgImageUrl": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "cards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "front": { "type": "string" },
+              "back": { "type": "string" },
+              "topic": { "type": "string" },
+              "difficulty": { "type": "string" },
+              "reps": { "type": "number" },
+              "interval": { "type": "number" },
+              "efactor": { "type": "number" },
+              "dueDate": { "type": "string" }
+            }
+          }
+        }
+      },
+      "required": ["userId", "title", "category"]
+    },
+    "userStats": {
+      "title": "User SRS Statistics",
+      "description": "User learning statistics and progress",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "streakDays": { "type": "number" },
+        "dailyGoalCards": { "type": "number" },
+        "dailyGoalCompleted": { "type": "number" },
+        "totalCardsMastered": { "type": "number" },
+        "retentionRate": { "type": "number" },
+        "timeStudiedHours": { "type": "number" },
+        "xp": { "type": "number" }
+      },
+      "required": ["userId"]
+    },
+    "classes": {
+      "title": "Teacher Classes",
+      "description": "Classes created by teachers for students",
+      "type": "object",
+      "properties": {
+        "teacherId": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "studentCount": { "type": "number" },
+        "averageMasteryPercent": { "type": "number" },
+        "bgImageUrl": { "type": "string" },
+        "code": { "type": "string" },
+        "students": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "email": { "type": "string" },
+              "masteryPercent": { "type": "number" },
+              "studyTimeFormatted": { "type": "string" },
+              "lastActive": { "type": "string" }
+            }
+          }
+        }
+      },
+      "required": ["teacherId", "name", "code"]
+    }
+  }
+}
