@@ -12,10 +12,14 @@ import { StudySessionView } from './components/StudySessionView';
 // >1MB num único arquivo). DashboardView/StudySessionView ficam eager porque
 // aparecem imediatamente na tela inicial.
 // ----------------------------------------------------------------------------
-const DecksExploreView = lazy(() => import('./components/DecksExploreView').then((m) => ({ default: m.DecksExploreView })));
 const VoiceTutorView = lazy(() => import('./components/VoiceTutorView').then((m) => ({ default: m.VoiceTutorView })));
 const VoiceSettingsModal = lazy(() =>
   import('./components/VoiceSettingsModal').then((m) => ({ default: m.VoiceSettingsModal }))
+);
+const DuelLobbyView = lazy(() => import('./components/DuelLobbyView').then((m) => ({ default: m.DuelLobbyView })));
+const DuelArenaView = lazy(() => import('./components/DuelArenaView').then((m) => ({ default: m.DuelArenaView })));
+const DuelResultsView = lazy(() =>
+  import('./components/DuelResultsView').then((m) => ({ default: m.DuelResultsView }))
 );
 const CreationHubView = lazy(() =>
   import('./components/CreationHubView').then((m) => ({ default: m.CreationHubView }))
@@ -27,12 +31,14 @@ const TeacherOverviewView = lazy(() =>
 const DeckManagerModal = lazy(() =>
   import('./components/DeckManagerModal').then((m) => ({ default: m.DeckManagerModal }))
 );
+const DecksLibraryView = lazy(() =>
+  import('./components/DecksLibraryView').then((m) => ({ default: m.DecksLibraryView }))
+);
 import { TabLoadingFallback } from './components/TabLoadingFallback';
 
 import {
   Deck,
   UserStats,
-  DailyActivity,
   VoiceSettings,
   VoiceHistoryItem,
   TeacherClass,
@@ -135,6 +141,15 @@ export function App() {
   const [activeStudyDeck, setActiveStudyDeck] = useState<Deck | null>(null);
   const [managedDeck, setManagedDeck] = useState<Deck | null>(null);
 
+  // Duel State
+  const [duelStage, setDuelStage] = useState<'lobby' | 'arena' | 'results'>('lobby');
+  const [duelOpponent, setDuelOpponent] = useState({ name: 'Bot Alex (IA)', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80' });
+  const [duelQuestions, setDuelQuestions] = useState<QuizQuestion[]>([]);
+  const [duelResults, setDuelResults] = useState<{
+    userPoints: number;
+    opponentPoints: number;
+    wrongQuestions: QuizQuestion[];
+  }>({ userPoints: 0, opponentPoints: 0, wrongQuestions: [] });
 
   // Persistence & Firestore Effects
   useEffect(() => {
@@ -261,11 +276,7 @@ export function App() {
     setShowOnboarding(false);
   };
 
-  // Timestamp do início da sessão — usado para calcular minutos estudados reais.
-  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
-
   const handleStartStudySession = (deck: Deck) => {
-    setSessionStartTime(Date.now());
     setActiveStudyDeck(deck);
   };
 
@@ -274,58 +285,12 @@ export function App() {
     setDecks(updatedDecks);
     saveDeckToFirestore(updatedDeck);
 
-    // Calcula minutos reais de estudo desta sessão
-    const minutesThisSession = sessionStartTime
-      ? Math.max(1, Math.round((Date.now() - sessionStartTime) / 60000))
-      : Math.max(1, Math.round(cardsReviewedCount * 0.5));
-    setSessionStartTime(null);
-
-    // Atualiza activityLog (últimos 90 dias)
-    const todayKey = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD em fuso local
-    const xpEarned = cardsReviewedCount * 25;
-    const prevLog: DailyActivity[] = stats.activityLog || [];
-    const existingIdx = prevLog.findIndex((d) => d.dateKey === todayKey);
-    let updatedLog: DailyActivity[];
-    if (existingIdx >= 0) {
-      updatedLog = prevLog.map((d, i) =>
-        i === existingIdx
-          ? {
-              ...d,
-              cardsReviewed: d.cardsReviewed + cardsReviewedCount,
-              xpEarned: d.xpEarned + xpEarned,
-              minutesStudied: d.minutesStudied + minutesThisSession,
-            }
-          : d
-      );
-    } else {
-      updatedLog = [
-        ...prevLog,
-        { dateKey: todayKey, cardsReviewed: cardsReviewedCount, xpEarned, minutesStudied: minutesThisSession },
-      ];
-    }
-    // Mantém apenas os últimos 90 dias
-    updatedLog = updatedLog.slice(-90);
-
-    // Calcula retentionRate real: percentual de cards com reps >= 1 no deck atualizado
-    const allCards = updatedDecks.flatMap((d) => d.cards);
-    const retentionRate =
-      allCards.length > 0
-        ? Math.round((allCards.filter((c) => (c.reps || 0) >= 1).length / allCards.length) * 100)
-        : 100;
-
     // Update user stats (streak e meta diária calculados corretamente por dia — ver src/services/studyStreak.ts)
     const streakUpdatedStats = applyStudySessionCompleted(stats, cardsReviewedCount);
-    const newStreak = streakUpdatedStats.streakDays;
     const newStats: UserStats = {
       ...streakUpdatedStats,
       totalCardsMastered: stats.totalCardsMastered + Math.floor(cardsReviewedCount / 2),
-      xp: stats.xp + xpEarned,
-      timeStudiedHours: parseFloat(
-        ((stats.timeStudiedHours || 0) + minutesThisSession / 60).toFixed(1)
-      ),
-      retentionRate,
-      bestStreakDays: Math.max(stats.bestStreakDays || 0, newStreak),
-      activityLog: updatedLog,
+      xp: stats.xp + cardsReviewedCount * 25,
     };
     setStats(newStats);
     saveStatsToFirestore(newStats);
@@ -373,7 +338,66 @@ export function App() {
     handleSaveDeck(updatedDeck);
   };
 
+  const handleStartDuel = async (opponentType: 'ai' | 'player', topic: string) => {
+    if (opponentType === 'ai') {
+      setDuelOpponent({
+        name: 'Bot Gemini IA',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+      });
+    } else {
+      setDuelOpponent({
+        name: 'Gabriel Santos (Online)',
+        avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&q=80',
+      });
+    }
 
+    try {
+      const qList = await apiGenerateQuiz(topic, 5, currentLanguage);
+      setDuelQuestions(qList);
+    } catch {
+      // Fallback questions if offline
+      setDuelQuestions([
+        {
+          question: 'O que caracteriza o mecanismo de repetição espaçada no algoritmo SM-2?',
+          options: [
+            'Revisar todos os cards diariamente sem distinção',
+            'Ajustar os intervalos baseando-se na facilidade de lembrança do usuário',
+            'Aleatorizar o tempo entre revisões para surpreender o cérebro',
+            'Eliminar cartões que foram errados mais de 3 vezes',
+          ],
+          correctIndex: 1,
+          explanation: 'O SM-2 calcula um Fator de Facilidade (EF) dinâmico que expande os dias entre as revisões conforme a retenção aumenta.',
+        },
+        {
+          question: 'Qual remetente tem garantia constitucional via Mandado de Segurança?',
+          options: [
+            'Qualquer cidadão sem necessidade de advogado',
+            'Direito líquido e certo não amparado por Habeas Corpus ou Habeas Data',
+            'Apenas crimes ambientais em zonas rurais',
+            'Processos trabalhistas de menor complexidade',
+          ],
+          correctIndex: 1,
+          explanation: 'O Mandado de Segurança protege direito líquido e certo contra ilegalidade de autoridade pública.',
+        },
+      ]);
+    }
+    setDuelStage('arena');
+  };
+
+  const handleFinishDuel = (
+    userPoints: number,
+    opponentPoints: number,
+    wrongQuestions: QuizQuestion[]
+  ) => {
+    setDuelResults({ userPoints, opponentPoints, wrongQuestions });
+    setDuelStage('results');
+
+    // Grant XP
+    const gained = userPoints >= opponentPoints ? 250 : 100;
+    const newStats = { ...stats, xp: stats.xp + gained };
+    setStats(newStats);
+    maybeShowInterstitial(newStats);
+  };
 
   return (
     <div className="min-h-screen bg-[#051424] text-[#d4e4fa] font-sans antialiased selection:bg-[#adc6ff]/30 selection:text-white">
@@ -423,9 +447,8 @@ export function App() {
             )}
 
             {activeTab === 'explore' && (
-              <DecksExploreView
+              <DecksLibraryView
                 decks={decks}
-                stats={stats}
                 currentLanguage={currentLanguage}
                 setActiveTab={setActiveTab}
                 onStartStudySession={handleStartStudySession}
@@ -465,6 +488,31 @@ export function App() {
               />
             )}
 
+            {activeTab === 'duel' && (
+              <>
+                {duelStage === 'lobby' && (
+                  <DuelLobbyView stats={stats} onStartDuel={handleStartDuel} />
+                )}
+                {duelStage === 'arena' && (
+                  <DuelArenaView
+                    stats={stats}
+                    opponentName={duelOpponent.name}
+                    opponentAvatar={duelOpponent.avatar}
+                    questions={duelQuestions}
+                    onFinishDuel={handleFinishDuel}
+                  />
+                )}
+                {duelStage === 'results' && (
+                  <DuelResultsView
+                    userPoints={duelResults.userPoints}
+                    opponentPoints={duelResults.opponentPoints}
+                    opponentName={duelOpponent.name}
+                    wrongQuestions={duelResults.wrongQuestions}
+                    onReturnToLobby={() => setDuelStage('lobby')}
+                  />
+                )}
+              </>
+            )}
 
             {activeTab === 'stats' && <StatsView stats={stats} decks={decks} />}
 
