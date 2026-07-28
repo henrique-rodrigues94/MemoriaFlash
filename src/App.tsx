@@ -1,30 +1,36 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
+
+// Componentes carregados de forma síncrona (críticos para a primeira renderização)
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { OnboardingModal } from './components/OnboardingModal';
 import { DashboardView } from './components/DashboardView';
 import { StudySessionView } from './components/StudySessionView';
+import { TabLoadingFallback } from './components/TabLoadingFallback';
+import { ConsentBanner } from './components/ConsentBanner';
 
-// ----------------------------------------------------------------------------
-// Code-splitting: telas/modais que não são necessários no primeiro carregamento
-// (abas que não são "home", ou modais abertos sob demanda) viram chunks
-// separados via React.lazy — isso reduz o bundle inicial (o build acusava
-// >1MB num único arquivo). DashboardView/StudySessionView ficam eager porque
-// aparecem imediatamente na tela inicial.
-// ----------------------------------------------------------------------------
-const VoiceTutorView = lazy(() => import('./components/VoiceTutorView').then((m) => ({ default: m.VoiceTutorView })));
+// Componentes carregados sob demanda (lazy) – cada um vira um chunk separado
+const VoiceTutorView = lazy(() =>
+  import('./components/VoiceTutorView').then((m) => ({ default: m.VoiceTutorView }))
+);
 const VoiceSettingsModal = lazy(() =>
   import('./components/VoiceSettingsModal').then((m) => ({ default: m.VoiceSettingsModal }))
 );
-const DuelLobbyView = lazy(() => import('./components/DuelLobbyView').then((m) => ({ default: m.DuelLobbyView })));
-const DuelArenaView = lazy(() => import('./components/DuelArenaView').then((m) => ({ default: m.DuelArenaView })));
+const DuelLobbyView = lazy(() =>
+  import('./components/DuelLobbyView').then((m) => ({ default: m.DuelLobbyView }))
+);
+const DuelArenaView = lazy(() =>
+  import('./components/DuelArenaView').then((m) => ({ default: m.DuelArenaView }))
+);
 const DuelResultsView = lazy(() =>
   import('./components/DuelResultsView').then((m) => ({ default: m.DuelResultsView }))
 );
 const CreationHubView = lazy(() =>
   import('./components/CreationHubView').then((m) => ({ default: m.CreationHubView }))
 );
-const StatsView = lazy(() => import('./components/StatsView').then((m) => ({ default: m.StatsView })));
+const StatsView = lazy(() =>
+  import('./components/StatsView').then((m) => ({ default: m.StatsView }))
+);
 const TeacherOverviewView = lazy(() =>
   import('./components/TeacherOverviewView').then((m) => ({ default: m.TeacherOverviewView }))
 );
@@ -34,8 +40,29 @@ const DeckManagerModal = lazy(() =>
 const DecksLibraryView = lazy(() =>
   import('./components/DecksLibraryView').then((m) => ({ default: m.DecksLibraryView }))
 );
-import { TabLoadingFallback } from './components/TabLoadingFallback';
+const AdMobRewardedModal = lazy(() =>
+  import('./components/AdMobRewardedModal').then((m) => ({ default: m.AdMobRewardedModal }))
+);
+const AdMobInterstitialModal = lazy(() =>
+  import('./components/AdMobInterstitialModal').then((m) => ({ default: m.AdMobInterstitialModal }))
+);
+const SubscriptionModal = lazy(() =>
+  import('./components/SubscriptionModal').then((m) => ({ default: m.SubscriptionModal }))
+);
+const AuthModal = lazy(() =>
+  import('./components/AuthModal').then((m) => ({ default: m.AuthModal }))
+);
+const ReferralModal = lazy(() =>
+  import('./components/ReferralModal').then((m) => ({ default: m.ReferralModal }))
+);
+const NotificationSettingsModal = lazy(() =>
+  import('./components/NotificationSettingsModal').then((m) => ({ default: m.NotificationSettingsModal }))
+);
+const LanguageSelectorModal = lazy(() =>
+  import('./components/LanguageSelectorModal').then((m) => ({ default: m.LanguageSelectorModal }))
+);
 
+// Tipos e serviços
 import {
   Deck,
   UserStats,
@@ -71,27 +98,6 @@ import {
   saveClassToFirestore,
 } from './services/firebaseStorage';
 
-const AdMobRewardedModal = lazy(() =>
-  import('./components/AdMobRewardedModal').then((m) => ({ default: m.AdMobRewardedModal }))
-);
-const AdMobInterstitialModal = lazy(() =>
-  import('./components/AdMobInterstitialModal').then((m) => ({ default: m.AdMobInterstitialModal }))
-);
-const SubscriptionModal = lazy(() =>
-  import('./components/SubscriptionModal').then((m) => ({ default: m.SubscriptionModal }))
-);
-const AuthModal = lazy(() => import('./components/AuthModal').then((m) => ({ default: m.AuthModal })));
-const ReferralModal = lazy(() => import('./components/ReferralModal').then((m) => ({ default: m.ReferralModal })));
-const NotificationSettingsModal = lazy(() =>
-  import('./components/NotificationSettingsModal').then((m) => ({ default: m.NotificationSettingsModal }))
-);
-const LanguageSelectorModal = lazy(() =>
-  import('./components/LanguageSelectorModal').then((m) => ({ default: m.LanguageSelectorModal }))
-);
-import { ConsentBanner } from './components/ConsentBanner';
-import { detectBrowserLanguage, SupportedLanguage } from './lib/i18n';
-import { apiGenerateQuiz } from './services/api';
-import { auth, onAuthStateChanged, ensureAuthenticated } from './lib/firebase';
 import {
   applyRewardedAdWatched,
   applyDailyFreeGrantIfNeeded,
@@ -99,15 +105,23 @@ import {
   canShowInterstitial,
   applyInterstitialShown,
 } from './services/economy/creditsEngine';
-import { deriveReferralCode } from './shared/referralCode';
+
 import { applyStudySessionCompleted } from './services/studyStreak';
+import { apiGenerateQuiz } from './services/api';
+import { detectBrowserLanguage, SupportedLanguage } from './lib/i18n';
+import { auth, onAuthStateChanged, ensureAuthenticated } from './lib/firebase';
+import { deriveReferralCode } from './shared/referralCode';
 import {
   capturePendingReferralFromURL,
   ensureOwnReferralCodeRegistered,
   tryClaimPendingReferral,
 } from './services/referral/referralClient';
 
+// ============================================================================
+// APP PRINCIPAL
+// ============================================================================
 export function App() {
+  // -------------------- Estados de navegação e UI --------------------
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');
   const [showOnboarding, setShowOnboarding] = useState(!isOnboardingDone());
   const [showVoiceSettings, setShowVoiceSettings] = useState(false);
@@ -119,31 +133,36 @@ export function App() {
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
 
-  // Auto-detected or saved language
-  const [currentLanguage, setCurrentLanguage] = useState<SupportedLanguage>(detectBrowserLanguage());
+  // -------------------- Idioma --------------------
+  const [currentLanguage, setCurrentLanguage] = useState<SupportedLanguage>(
+    detectBrowserLanguage()
+  );
 
   const handleSelectLanguage = (lang: SupportedLanguage) => {
     setCurrentLanguage(lang);
-    // Sync with voice tutor settings language
     const updatedVoice = { ...voiceSettings, language: lang };
     setVoiceSettingsState(updatedVoice);
     saveVoiceSettings(updatedVoice);
   };
 
-  // Storage states
+  // -------------------- Estados de dados --------------------
   const [decks, setDecks] = useState<Deck[]>(getStoredDecks());
   const [stats, setStats] = useState<UserStats>(getStoredStats());
   const [voiceSettings, setVoiceSettingsState] = useState<VoiceSettings>(getVoiceSettings());
   const [voiceHistory, setVoiceHistoryState] = useState<VoiceHistoryItem[]>(getVoiceHistory());
   const [teacherClasses, setTeacherClassesState] = useState<TeacherClass[]>(getStoredClasses());
 
-  // Active Session / Modal States
+  // -------------------- Sessão ativa / modais --------------------
   const [activeStudyDeck, setActiveStudyDeck] = useState<Deck | null>(null);
   const [managedDeck, setManagedDeck] = useState<Deck | null>(null);
 
-  // Duel State
+  // -------------------- Estado do Duelo --------------------
   const [duelStage, setDuelStage] = useState<'lobby' | 'arena' | 'results'>('lobby');
-  const [duelOpponent, setDuelOpponent] = useState({ name: 'Bot Alex (IA)', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80' });
+  const [duelOpponent, setDuelOpponent] = useState({
+    name: 'Bot Alex (IA)',
+    avatar:
+      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+  });
   const [duelQuestions, setDuelQuestions] = useState<QuizQuestion[]>([]);
   const [duelResults, setDuelResults] = useState<{
     userPoints: number;
@@ -151,7 +170,11 @@ export function App() {
     wrongQuestions: QuizQuestion[];
   }>({ userPoints: 0, opponentPoints: 0, wrongQuestions: [] });
 
-  // Persistence & Firestore Effects
+  // ==========================================================================
+  // EFEITOS COLATERAIS
+  // ==========================================================================
+
+  // Persistência local: salvar decks e estatísticas sempre que mudarem
   useEffect(() => {
     saveStoredDecks(decks);
   }, [decks]);
@@ -160,25 +183,20 @@ export function App() {
     saveStoredStats(stats);
   }, [stats]);
 
-  // Captura ?ref=CODE da URL assim que o app abre (indicação de amigo).
+  // Captura o parâmetro ?ref=CODE da URL (indicação de amigo)
   useEffect(() => {
     capturePendingReferralFromURL();
   }, []);
 
-  // Concede o crédito diário gratuito 1x por dia (independente de anúncios).
+  // Concede o crédito diário gratuito (1x por dia)
   useEffect(() => {
     setStats((prev) => applyDailyFreeGrantIfNeeded(prev));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Garante um código de indicação local (funciona mesmo em modo "guest" sem
-  // Firebase Auth real habilitado). Assim que houver um usuário Firebase
-  // real (login Google ou Auth Anônima ativada no console), registra o
-  // código no servidor e tenta resgatar uma indicação pendente com segurança
-  // via backend (Admin SDK) — ver src/server/routes/referral.ts.
+  // Garante código de indicação local e, se autenticado, registra no servidor
   useEffect(() => {
     ensureAuthenticated().then((user) => {
-      const code = deriveReferralCode(user.uid);
+      const code = deriveReferralCode(user?.uid || '');
       setStats((prev) => (prev.referralCode === code ? prev : { ...prev, referralCode: code }));
     });
 
@@ -199,7 +217,7 @@ export function App() {
     return () => unsubscribe();
   }, []);
 
-  // Real-time Firestore Listeners
+  // Sincronização em tempo real com o Firestore
   useEffect(() => {
     let unsubDecks: (() => void) | undefined;
     let unsubStats: (() => void) | undefined;
@@ -235,6 +253,10 @@ export function App() {
       if (unsubClasses) unsubClasses();
     };
   }, []);
+
+  // ==========================================================================
+  // HANDLERS
+  // ==========================================================================
 
   const handleDeductCredit = (amount: number = 1) => {
     const updatedStats = applySpendCredits(stats, amount);
@@ -285,7 +307,6 @@ export function App() {
     setDecks(updatedDecks);
     saveDeckToFirestore(updatedDeck);
 
-    // Update user stats (streak e meta diária calculados corretamente por dia — ver src/services/studyStreak.ts)
     const streakUpdatedStats = applyStudySessionCompleted(stats, cardsReviewedCount);
     const newStats: UserStats = {
       ...streakUpdatedStats,
@@ -342,12 +363,14 @@ export function App() {
     if (opponentType === 'ai') {
       setDuelOpponent({
         name: 'Bot Gemini IA',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+        avatar:
+          'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
       });
     } else {
       setDuelOpponent({
         name: 'Gabriel Santos (Online)',
-        avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&q=80',
+        avatar:
+          'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&q=80',
       });
     }
 
@@ -366,7 +389,8 @@ export function App() {
             'Eliminar cartões que foram errados mais de 3 vezes',
           ],
           correctIndex: 1,
-          explanation: 'O SM-2 calcula um Fator de Facilidade (EF) dinâmico que expande os dias entre as revisões conforme a retenção aumenta.',
+          explanation:
+            'O SM-2 calcula um Fator de Facilidade (EF) dinâmico que expande os dias entre as revisões conforme a retenção aumenta.',
         },
         {
           question: 'Qual remetente tem garantia constitucional via Mandado de Segurança?',
@@ -377,7 +401,8 @@ export function App() {
             'Processos trabalhistas de menor complexidade',
           ],
           correctIndex: 1,
-          explanation: 'O Mandado de Segurança protege direito líquido e certo contra ilegalidade de autoridade pública.',
+          explanation:
+            'O Mandado de Segurança protege direito líquido e certo contra ilegalidade de autoridade pública.',
         },
       ]);
     }
@@ -392,16 +417,19 @@ export function App() {
     setDuelResults({ userPoints, opponentPoints, wrongQuestions });
     setDuelStage('results');
 
-    // Grant XP
     const gained = userPoints >= opponentPoints ? 250 : 100;
     const newStats = { ...stats, xp: stats.xp + gained };
     setStats(newStats);
     maybeShowInterstitial(newStats);
   };
 
+  // ==========================================================================
+  // RENDERIZAÇÃO
+  // ==========================================================================
+
   return (
     <div className="min-h-screen bg-[#051424] text-[#d4e4fa] font-sans antialiased selection:bg-[#adc6ff]/30 selection:text-white">
-      {/* App Header */}
+      {/* Cabeçalho fixo */}
       <Header
         stats={stats}
         activeTab={activeTab}
@@ -417,9 +445,8 @@ export function App() {
         onOpenNotifications={() => setShowNotificationsModal(true)}
       />
 
-      {/* Main Content Viewport */}
+      {/* Conteúdo principal */}
       <main className="pt-20 px-4 sm:px-6 max-w-6xl mx-auto">
-        {/* If Active Study Session */}
         {activeStudyDeck ? (
           <StudySessionView
             deck={activeStudyDeck}
@@ -428,9 +455,9 @@ export function App() {
             onBack={() => setActiveStudyDeck(null)}
           />
         ) : (
+          /* Suspense único para todas as seções carregadas sob demanda */
           <Suspense fallback={<TabLoadingFallback />}>
-            <>
-              {activeTab === 'home' && (
+            {activeTab === 'home' && (
               <DashboardView
                 stats={stats}
                 decks={decks}
@@ -527,29 +554,24 @@ export function App() {
                 }}
               />
             )}
-          </>
           </Suspense>
         )}
       </main>
 
-      {/* Bottom Mobile Shell Nav */}
+      {/* Rodapé de navegação (mobile) */}
       {!activeStudyDeck && (
         <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} currentLanguage={currentLanguage} />
       )}
 
-      {/* Onboarding Intro Modal */}
-      {showOnboarding && (
-        <OnboardingModal
-          onClose={handleCloseOnboarding}
-          onOpenAuth={() => setShowAuthModal(true)}
-        />
-      )}
-
-      {/* Modais sob demanda (code-split via React.lazy) — fallback nulo pois o
-          carregamento é quase instantâneo (poucos KB) e o usuário acabou de
-          clicar em algo, então uma tela em branco por ~alguns ms passa despercebido. */}
+      {/* -------------------- MODAIS (todos lazy) -------------------- */}
       <Suspense fallback={null}>
-        {/* Voice Assistant Settings Modal */}
+        {showOnboarding && (
+          <OnboardingModal
+            onClose={handleCloseOnboarding}
+            onOpenAuth={() => setShowAuthModal(true)}
+          />
+        )}
+
         {showVoiceSettings && (
           <VoiceSettingsModal
             settings={voiceSettings}
@@ -561,7 +583,6 @@ export function App() {
           />
         )}
 
-        {/* Deck Manager Modal */}
         {managedDeck && (
           <DeckManagerModal
             deck={managedDeck}
@@ -571,7 +592,6 @@ export function App() {
           />
         )}
 
-        {/* AdMob Rewarded Video Ad Modal */}
         {showAdMobModal && (
           <AdMobRewardedModal
             stats={stats}
@@ -581,16 +601,18 @@ export function App() {
           />
         )}
 
-        {/* AdMob Interstitial (frequency-capped, shown after study/duel sessions) */}
-        {showInterstitial && <AdMobInterstitialModal onClose={() => setShowInterstitial(false)} />}
+        {showInterstitial && (
+          <AdMobInterstitialModal onClose={() => setShowInterstitial(false)} />
+        )}
 
-        {/* Referral / Indique e Ganhe Modal */}
-        {showReferralModal && <ReferralModal stats={stats} onClose={() => setShowReferralModal(false)} />}
+        {showReferralModal && (
+          <ReferralModal stats={stats} onClose={() => setShowReferralModal(false)} />
+        )}
 
-        {/* Lembretes de Revisão (Push Notifications) Modal */}
-        {showNotificationsModal && <NotificationSettingsModal onClose={() => setShowNotificationsModal(false)} />}
+        {showNotificationsModal && (
+          <NotificationSettingsModal onClose={() => setShowNotificationsModal(false)} />
+        )}
 
-        {/* Subscription Plans Modal */}
         {showSubscriptionModal && (
           <SubscriptionModal
             stats={stats}
@@ -603,7 +625,6 @@ export function App() {
           />
         )}
 
-        {/* Google Login / Auth Modal */}
         {showAuthModal && (
           <AuthModal
             stats={stats}
@@ -617,7 +638,6 @@ export function App() {
           />
         )}
 
-        {/* Language Selector Modal */}
         {showLanguageModal && (
           <LanguageSelectorModal
             currentLanguage={currentLanguage}
@@ -627,7 +647,7 @@ export function App() {
         )}
       </Suspense>
 
-      {/* LGPD/GDPR Consent Banner — exibido antes de qualquer coleta não essencial */}
+      {/* Banner de consentimento LGPD/GDPR */}
       <ConsentBanner />
     </div>
   );
