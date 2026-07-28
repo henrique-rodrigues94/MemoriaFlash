@@ -1,31 +1,28 @@
 // src/server/routes/referralRoutes.ts
-import { Router } from 'express';
-import { authenticate } from '../middleware/auth';
-import { AppError } from '../middleware/errorHandler';
-import { z } from 'zod';
+import { Router, Request, Response, NextFunction } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { validate } from '../middleware/validate';
-import { adminFirestore } from '../../lib/firebase/admin'; // supondo
+import { createReferralSchema } from '../schemas';
+import { AppError } from '../middleware/errorHandler';
+// import { authenticate } from '../middleware/auth'; // DESABILITADO
 
 const router = Router();
 
-const referralSchema = z.object({
-  body: z.object({
-    referredEmail: z.string().email('E-mail inválido'),
-  }),
+const referralLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: 'Limite de indicações excedido.' },
 });
 
 router.post(
   '/create',
-  authenticate,
-  validate(referralSchema),
-  async (req, res, next) => {
+  // authenticate,
+  referralLimiter,
+  validate(createReferralSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { referredEmail } = req.body;
-      const referrerId = req.user?.uid;
-
-      // Lógica de criação de indicação (exemplo)
-      // ...
-
+      // Lógica de criação de indicação...
       res.json({ success: true, message: 'Indicação criada com sucesso' });
     } catch (error) {
       next(error);

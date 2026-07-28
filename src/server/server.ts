@@ -1,100 +1,64 @@
-// src/server/server.ts (versão simplificada e funcional)
+// src/server/server.ts
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import { createServer } from 'http';
 import { config } from 'dotenv';
 import { rateLimit } from 'express-rate-limit';
-import { z } from 'zod';
-import { aiOrchestrator } from '../lib/ai/orchestrator';
+import { errorHandler } from './middleware/errorHandler';
+import { aiRouter } from './routes/aiRoutes';
+import { referralRouter } from './routes/referralRoutes';
+import { healthRouter } from './routes/healthRoutes';
+import { logger } from './utils/logger';
+import path from 'path';
 
 config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// Middlewares globais
+app.use(helmet());
+app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json({ limit: '10mb' }));
 
-// Rate limiting
-const limiter = rateLimit({
+// Rate limiting global
+const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { error: 'Muitas requisições, tente novamente mais tarde.' },
 });
-app.use(limiter);
+app.use(globalLimiter);
 
-// Middleware de erro global
-app.use((err: any, req: any, res: any, next: any) => {
-  console.error('Erro:', err.message);
-  if (err instanceof z.ZodError) {
-    return res.status(400).json({ error: 'Dados inválidos', details: err.errors });
-  }
-  res.status(500).json({ error: 'Erro interno do servidor' });
-});
+// Rotas
+app.use('/api/ai', aiRouter);
+app.use('/api/referral', referralRouter);
+app.use('/api/health', healthRouter);
 
-// Rota de saúde
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// Servir frontend em produção
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(__dirname, '../../dist');
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
-// Rota de status da IA
-app.get('/api/ai/status', async (req, res) => {
-  try {
-    const status = await aiOrchestrator.getStatus();
-    res.json(status);
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao obter status' });
-  }
-});
-
-// Rota para gerar flashcards (com validação Zod)
-app.post('/api/ai/generate-flashcards', async (req, res, next) => {
-  try {
-    const schema = z.object({
-      prompt: z.string().min(10),
-      topic: z.string().optional(),
-      numberOfCards: z.number().int().min(1).max(50).default(10),
-    });
-    const { prompt, topic, numberOfCards } = schema.parse(req.body);
-
-    const result = await aiOrchestrator.generateFlashcards({
-      prompt,
-      topic,
-      numberOfCards,
-      userId: 'test-user',
-    });
-
-    if (!result.success) {
-      return res.status(503).json({ error: result.error || 'Falha ao gerar flashcards' });
-    }
-    res.json({ success: true, data: result.data });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Rota para sugerir tópicos (com validação Zod)
-app.post('/api/ai/suggest-topics', async (req, res, next) => {
-  try {
-    const schema = z.object({
-      subject: z.string().min(3),
-    });
-    const { subject } = schema.parse(req.body);
-
-    const result = await aiOrchestrator.suggestTopics({
-      subject,
-      userId: 'test-user',
-    });
-
-    if (!result.success) {
-      return res.status(503).json({ error: result.error || 'Falha ao sugerir tópicos' });
-    }
-    res.json({ success: true, data: result.data });
-  } catch (error) {
-    next(error);
-  }
-});
+// Middleware de erro global (último)
+app.use(errorHandler);
 
 // Inicialização
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT} em modo ${process.env.NODE_ENV || 'development'}`);
+const server = createServer(app);
+server.listen(PORT, () => {
+  logger.info(`🚀 Servidor rodando na porta ${PORT} em modo ${process.env.NODE_ENV || 'development'}`);
+});
+
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM recebido, encerrando servidor...');
+  server.close(() => {
+    logger.info('Servidor encerrado.');
+    process.exit(0);
+  });
 });

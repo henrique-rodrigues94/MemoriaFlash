@@ -1,7 +1,7 @@
 // src/server/middleware/errorHandler.ts
 import { Request, Response, NextFunction } from 'express';
-import { logger } from '../utils/logger';
 import { ZodError } from 'zod';
+import { logger } from '../utils/logger';
 
 export class AppError extends Error {
   statusCode: number;
@@ -20,7 +20,6 @@ export function errorHandler(
   res: Response,
   next: NextFunction
 ) {
-  // Log do erro
   logger.error({
     message: err.message,
     stack: err.stack,
@@ -29,7 +28,6 @@ export function errorHandler(
     ip: req.ip,
   });
 
-  // Erro do Zod (validação)
   if (err instanceof ZodError) {
     return res.status(400).json({
       error: 'Dados inválidos',
@@ -37,7 +35,6 @@ export function errorHandler(
     });
   }
 
-  // Erro personalizado
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       error: err.message,
@@ -45,7 +42,6 @@ export function errorHandler(
     });
   }
 
-  // Erro genérico
   return res.status(500).json({
     error: 'Erro interno do servidor',
     code: 'INTERNAL_SERVER_ERROR',
