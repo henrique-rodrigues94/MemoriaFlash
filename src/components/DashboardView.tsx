@@ -243,10 +243,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 className="glass-card rounded-2xl p-5 border border-[#424754]/20 hover:border-[#adc6ff]/40 transition-all flex flex-col justify-between group shadow-lg"
               >
                 <div>
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <span className="px-2.5 py-0.5 rounded-md bg-[#122131] text-[#adc6ff] text-[10px] font-mono border border-[#adc6ff]/20">
-                      {deck.category}
-                    </span>
+                  <div className="flex items-start justify-end gap-3 mb-2">
                     {dueCount > 0 ? (
                       <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-extrabold animate-pulse">
                         {dueCount} Pendentes
@@ -264,9 +261,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   >
                     {deck.title}
                   </h3>
-                  <p className="text-xs text-[#8c91a0] line-clamp-2 mt-1">
-                    {deck.description}
-                  </p>
+
                 </div>
 
                 <div className="mt-5 pt-4 border-t border-[#424754]/20 space-y-3">

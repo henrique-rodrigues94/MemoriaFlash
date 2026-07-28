@@ -6,24 +6,73 @@ import {
   Zap,
   Calendar,
   BarChart2,
-  PieChart,
   CheckCircle2,
+  Clock,
 } from 'lucide-react';
-import { UserStats, Deck } from '../types';
+import { UserStats, Deck, DailyActivity } from '../types';
+import { getDueCardCount } from '../services/srsEngine';
 
 interface StatsViewProps {
   stats: UserStats;
   decks: Deck[];
 }
 
+/** Retorna a chave YYYY-MM-DD de N dias atrás (fuso local). */
+function dateKeyDaysAgo(daysAgo: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return d.toLocaleDateString('sv-SE');
+}
+
+/** Soma cardsReviewed dos últimos N dias com base no activityLog. */
+function sumActivity(log: DailyActivity[], days: number): number {
+  const cutoff = dateKeyDaysAgo(days - 1);
+  return log.filter((d) => d.dateKey >= cutoff).reduce((s, d) => s + d.cardsReviewed, 0);
+}
+
+/** Soma XP dos últimos 7 dias. */
+function weeklyXP(log: DailyActivity[]): number {
+  const cutoff = dateKeyDaysAgo(6);
+  return log.filter((d) => d.dateKey >= cutoff).reduce((s, d) => s + d.xpEarned, 0);
+}
+
 export const StatsView: React.FC<StatsViewProps> = ({ stats, decks }) => {
   const totalCardsAllDecks = decks.reduce((sum, d) => sum + d.cards.length, 0);
+  const activityLog: DailyActivity[] = stats.activityLog || [];
 
-  // Generate 28-day heatmap squares
+  // Heatmap: últimos 28 dias (do mais antigo para o mais recente)
   const heatmapDays = Array.from({ length: 28 }, (_, i) => {
-    const intensity = Math.floor(Math.sin(i * 0.4) * 3) + 2;
-    return { day: i + 1, count: Math.max(0, intensity * 5) };
+    const daysAgo = 27 - i;
+    const key = dateKeyDaysAgo(daysAgo);
+    const entry = activityLog.find((d) => d.dateKey === key);
+    return { key, count: entry?.cardsReviewed || 0, daysAgo };
   });
+
+  const maxHeatmapCount = Math.max(1, ...heatmapDays.map((d) => d.count));
+
+  // Previsão SM-2 real: conta cards com dueDate nos próximos N dias
+  const now = new Date();
+  function dueInDays(days: number): number {
+    const target = new Date(now);
+    target.setDate(target.getDate() + days);
+    const targetStr = target.toLocaleDateString('sv-SE');
+    return decks
+      .flatMap((d) => d.cards)
+      .filter((c) => {
+        if (!c.dueDate) return false;
+        const due = new Date(c.dueDate).toLocaleDateString('sv-SE');
+        return due === targetStr;
+      }).length;
+  }
+
+  const dueToday = decks.reduce((s, d) => s + getDueCardCount(d.cards), 0);
+  const dueTomorrow = dueInDays(1);
+  const dueIn3Days = dueInDays(3);
+  const dueIn7Days = dueInDays(7);
+
+  const xpThisWeek = weeklyXP(activityLog);
+  const bestStreak = Math.max(stats.bestStreakDays || 0, stats.streakDays);
+  const uniqueCategories = new Set(decks.map((d) => d.category)).size;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-24 animate-fade-in">
@@ -59,19 +108,27 @@ export const StatsView: React.FC<StatsViewProps> = ({ stats, decks }) => {
           <div className="p-4 rounded-2xl bg-[#0b1a2a] border border-[#424754]/30 space-y-1">
             <div className="text-[10px] font-mono text-[#8c91a0] uppercase">Ofensiva Atual</div>
             <div className="text-2xl font-extrabold text-[#ffb786]">{stats.streakDays} Dias</div>
-            <div className="text-[10px] text-[#ffb786] font-medium">Recorde pessoal: 14d</div>
+            <div className="text-[10px] text-[#ffb786] font-medium">
+              Recorde: {bestStreak}d
+            </div>
           </div>
 
           <div className="p-4 rounded-2xl bg-[#0b1a2a] border border-[#424754]/30 space-y-1">
-            <div className="text-[10px] font-mono text-[#8c91a0] uppercase">Total de XP</div>
-            <div className="text-2xl font-extrabold text-[#60a5fa]">{stats.xp}</div>
-            <div className="text-[10px] text-[#60a5fa] font-medium">+1,200 XP esta semana</div>
+            <div className="text-[10px] font-mono text-[#8c91a0] uppercase">XP Esta Semana</div>
+            <div className="text-2xl font-extrabold text-[#60a5fa]">
+              +{xpThisWeek.toLocaleString('pt-BR')}
+            </div>
+            <div className="text-[10px] text-[#60a5fa] font-medium">
+              Total: {stats.xp.toLocaleString('pt-BR')} XP
+            </div>
           </div>
 
           <div className="p-4 rounded-2xl bg-[#0b1a2a] border border-[#424754]/30 space-y-1">
             <div className="text-[10px] font-mono text-[#8c91a0] uppercase">Decks Ativos</div>
             <div className="text-2xl font-extrabold text-[#adc6ff]">{decks.length}</div>
-            <div className="text-[10px] text-[#adc6ff] font-medium">5 categorias</div>
+            <div className="text-[10px] text-[#adc6ff] font-medium">
+              {uniqueCategories} {uniqueCategories === 1 ? 'categoria' : 'categorias'}
+            </div>
           </div>
         </div>
 
@@ -81,28 +138,40 @@ export const StatsView: React.FC<StatsViewProps> = ({ stats, decks }) => {
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <Calendar className="w-4 h-4 text-[#60a5fa]" /> Matriz de Consistência de Estudos (Últimos 28 Dias)
             </h3>
-            <span className="text-xs text-[#8c91a0]">Meta cumprida diariamente</span>
+            <span className="text-xs text-[#8c91a0]">
+              {sumActivity(activityLog, 28)} cartões revisados
+            </span>
           </div>
 
           <div className="p-4 rounded-2xl bg-[#0b1a2a] border border-[#424754]/30 overflow-x-auto">
             <div className="grid grid-cols-7 sm:grid-cols-14 gap-2 min-w-[280px]">
-              {heatmapDays.map((d, i) => (
-                <div
-                  key={i}
-                  title={`Dia ${d.day}: ${d.count} cartões revisados`}
-                  className={`h-8 rounded-lg transition-all hover:scale-110 flex items-center justify-center text-[10px] font-mono font-bold cursor-pointer ${
-                    d.count > 12
-                      ? 'bg-[#3b82f6] text-white shadow-md shadow-blue-500/20'
-                      : d.count > 6
-                      ? 'bg-[#3b82f6]/60 text-slate-100'
-                      : d.count > 0
-                      ? 'bg-[#3b82f6]/30 text-slate-300'
-                      : 'bg-slate-800/40 text-slate-600'
-                  }`}
-                >
-                  {d.count > 0 ? d.count : ''}
-                </div>
-              ))}
+              {heatmapDays.map((d, i) => {
+                const ratio = d.count / maxHeatmapCount;
+                const label = d.count > 0 ? d.count : '';
+                const colorClass =
+                  d.count === 0
+                    ? 'bg-slate-800/40 text-slate-600'
+                    : ratio > 0.66
+                    ? 'bg-[#3b82f6] text-white shadow-md shadow-blue-500/20'
+                    : ratio > 0.33
+                    ? 'bg-[#3b82f6]/60 text-slate-100'
+                    : 'bg-[#3b82f6]/30 text-slate-300';
+
+                // Formata tooltip com data legível
+                const dateObj = new Date();
+                dateObj.setDate(dateObj.getDate() - d.daysAgo);
+                const tooltip = `${dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}: ${d.count} cartões`;
+
+                return (
+                  <div
+                    key={i}
+                    title={tooltip}
+                    className={`h-8 rounded-lg transition-all hover:scale-110 flex items-center justify-center text-[10px] font-mono font-bold cursor-pointer ${colorClass}`}
+                  >
+                    {label}
+                  </div>
+                );
+              })}
             </div>
             <div className="flex justify-between items-center text-[10px] text-[#8c91a0] mt-3 pt-2 border-t border-[#424754]/20 font-mono">
               <span>Menos ativo</span>
@@ -117,7 +186,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ stats, decks }) => {
           </div>
         </div>
 
-        {/* Schedule Forecast Section */}
+        {/* Schedule Forecast Section — dados reais do SM-2 */}
         <div className="space-y-3 pt-2">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <BarChart2 className="w-4 h-4 text-[#adc6ff]" /> Previsão do Algoritmo SM-2 para Próximas Revisões
@@ -125,21 +194,74 @@ export const StatsView: React.FC<StatsViewProps> = ({ stats, decks }) => {
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: 'Hoje', count: '14 cards', color: 'border-amber-500/40 text-amber-300' },
-              { label: 'Amanhã', count: '8 cards', color: 'border-blue-500/40 text-[#60a5fa]' },
-              { label: 'Em 3 dias', count: '22 cards', color: 'border-indigo-500/40 text-indigo-300' },
-              { label: 'Em 7 dias', count: '45 cards', color: 'border-emerald-500/40 text-emerald-300' },
+              { label: 'Hoje', count: dueToday, color: 'border-amber-500/40 text-amber-300' },
+              { label: 'Amanhã', count: dueTomorrow, color: 'border-blue-500/40 text-[#60a5fa]' },
+              { label: 'Em 3 dias', count: dueIn3Days, color: 'border-indigo-500/40 text-indigo-300' },
+              { label: 'Em 7 dias', count: dueIn7Days, color: 'border-emerald-500/40 text-emerald-300' },
             ].map((f, i) => (
               <div
                 key={i}
                 className={`p-3.5 rounded-xl bg-[#0b1a2a] border ${f.color} flex flex-col justify-between space-y-1`}
               >
                 <span className="text-[10px] font-mono text-[#8c91a0] uppercase">{f.label}</span>
-                <span className="text-base font-extrabold">{f.count}</span>
+                <span className={`text-base font-extrabold ${f.color.split(' ')[1]}`}>
+                  {f.count} {f.count === 1 ? 'card' : 'cards'}
+                </span>
               </div>
             ))}
           </div>
+
+          {dueToday === 0 && (
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+              Nenhum cartão vencido hoje — você está em dia com suas revisões! 🎉
+            </div>
+          )}
         </div>
+
+        {/* Resumo de atividade recente */}
+        {activityLog.length > 0 && (
+          <div className="space-y-3 pt-2 border-t border-[#424754]/20">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Clock className="w-4 h-4 text-[#adc6ff]" /> Atividade Recente
+            </h3>
+            <div className="space-y-2">
+              {[...activityLog]
+                .sort((a, b) => b.dateKey.localeCompare(a.dateKey))
+                .slice(0, 5)
+                .map((entry) => {
+                  const dateObj = new Date(entry.dateKey + 'T12:00:00');
+                  const label = dateObj.toLocaleDateString('pt-BR', {
+                    weekday: 'short',
+                    day: '2-digit',
+                    month: 'short',
+                  });
+                  return (
+                    <div
+                      key={entry.dateKey}
+                      className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-[#0b1a2a] border border-[#424754]/30 text-xs"
+                    >
+                      <span className="text-[#8c91a0] capitalize">{label}</span>
+                      <div className="flex items-center gap-4">
+                        <span className="text-white font-bold">
+                          {entry.cardsReviewed} cartões
+                        </span>
+                        <span className="text-[#60a5fa] font-mono">+{entry.xpEarned} XP</span>
+                        <span className="text-[#8c91a0]">{entry.minutesStudied} min</span>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
+        {activityLog.length === 0 && (
+          <div className="text-center py-8 text-[#8c91a0] text-xs space-y-2">
+            <Brain className="w-8 h-8 mx-auto text-[#424754]" />
+            <p>Conclua sua primeira sessão de estudos para ver as estatísticas aqui.</p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -17,7 +17,6 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
 }) => {
   const [cards, setCards] = useState<Flashcard[]>([...deck.cards]);
   const [title, setTitle] = useState(deck.title);
-  const [category, setCategory] = useState(deck.category);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [editFront, setEditFront] = useState('');
   const [editBack, setEditBack] = useState('');
@@ -33,7 +32,7 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
       id: `card-${Date.now()}`,
       front: newFront,
       back: newBack,
-      topic: category,
+      topic: deck.title,
       difficulty: 'medium',
       reps: 0,
       interval: 0,
@@ -69,7 +68,7 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
     const updated: Deck = {
       ...deck,
       title,
-      category,
+      category: deck.category,
       cards,
     };
     onSaveDeck(updated);
@@ -93,25 +92,14 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
         </div>
 
         {/* Deck metadata */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs font-bold text-[#8c91a0] uppercase">Título do Deck</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full mt-1 bg-[#122131] border border-[#424754]/40 rounded-xl p-2.5 text-xs text-white focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-[#8c91a0] uppercase">Categoria</label>
-            <input
-              type="text"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full mt-1 bg-[#122131] border border-[#424754]/40 rounded-xl p-2.5 text-xs text-white focus:outline-none"
-            />
-          </div>
+        <div>
+          <label className="text-xs font-bold text-[#8c91a0] uppercase">Título do Deck</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full mt-1 bg-[#122131] border border-[#424754]/40 rounded-xl p-2.5 text-xs text-white focus:outline-none"
+          />
         </div>
 
         {/* Card List */}

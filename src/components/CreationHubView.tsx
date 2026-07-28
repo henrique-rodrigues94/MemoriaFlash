@@ -58,8 +58,7 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
   // Common inputs
   const [deckTitle, setDeckTitle] = useState('');
   const [promptText, setPromptText] = useState('');
-  const [category, setCategory] = useState('Estudos Gerais');
-  const [cardCount, setCardCount] = useState(6);
+  const [cardCount, setCardCount] = useState(25);
   const [difficulty, setDifficulty] = useState<StudyDifficulty>('medium');
 
   // Topics Suggestion state
@@ -285,7 +284,7 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
       id: `card-gen-${Date.now()}-${i}`,
       front: c.front || '',
       back: c.back || '',
-      topic: c.topic || category || deckTitle,
+      topic: c.topic || deckTitle,
       difficulty: (c.difficulty as StudyDifficulty) || difficulty,
       reps: 0,
       interval: 0,
@@ -301,8 +300,8 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
     const newDeck: Deck = {
       id: `deck-${Date.now()}`,
       title: deckTitle || 'Novo Deck AI',
-      category: category || 'Geral',
-      description: `Deck nível ${difficulty.toUpperCase()} gerado com ${finalCards.length} cartões via Gemini 3.6 Flash.`,
+      category: 'Geral',
+      description: '',
       color: '#60a5fa',
       accentBorder: 'border-l-primary',
       cards: finalCards,
@@ -535,19 +534,8 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
             />
           </div>
 
-          {/* Quantity & Category options */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-[11px] font-bold text-[#8c91a0] uppercase">Categoria do Deck</label>
-              <input
-                type="text"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="Ex: Concursos, Faculdade, Idiomas"
-                className="w-full mt-1 bg-[#0b1a2a] border border-[#424754]/40 rounded-xl p-2.5 text-xs text-white focus:outline-none"
-              />
-            </div>
-
+          {/* Quantity options */}
+          <div>
             <div>
               <label className="text-[11px] font-bold text-[#8c91a0] uppercase">Quantidade de Cards</label>
               <select
@@ -555,10 +543,9 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
                 onChange={(e) => setCardCount(parseInt(e.target.value))}
                 className="w-full mt-1 bg-[#0b1a2a] border border-[#424754]/40 rounded-xl p-2.5 text-xs text-white focus:outline-none cursor-pointer"
               >
-                <option value={4}>4 Flashcards</option>
-                <option value={6}>6 Flashcards (Recomendado)</option>
-                <option value={10}>10 Flashcards</option>
-                <option value={16}>16 Flashcards</option>
+                <option value={25}>25 Flashcards (Recomendado)</option>
+                <option value={50}>50 Flashcards</option>
+                <option value={100}>100 Flashcards</option>
               </select>
             </div>
           </div>
@@ -764,16 +751,6 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
                 value={deckTitle}
                 onChange={(e) => setDeckTitle(e.target.value)}
                 placeholder="Ex: Anatomia Humana II"
-                className="w-full mt-1 bg-[#0b1a2a] border border-[#424754]/40 rounded-xl p-3 text-xs text-white focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-white uppercase">Categoria</label>
-              <input
-                type="text"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="Ex: Medicina"
                 className="w-full mt-1 bg-[#0b1a2a] border border-[#424754]/40 rounded-xl p-3 text-xs text-white focus:outline-none"
               />
             </div>

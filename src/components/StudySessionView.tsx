@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   RotateCw,
@@ -13,10 +13,11 @@ import {
   Lightbulb,
   BookOpen,
   X,
+  AlertTriangle,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Deck, Flashcard, RatingGrade } from '../types';
-import { calculateSM2 } from '../services/srsEngine';
+import { calculateSM2, getDueCardCount } from '../services/srsEngine';
 import { apiVoiceTutor } from '../services/api';
 import { SupportedLanguage, translations } from '../lib/i18n';
 
@@ -35,7 +36,15 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
 }) => {
   const t = translations[currentLanguage] || translations.pt;
 
-  const [cards, setCards] = useState<Flashcard[]>([...deck.cards]);
+  // Filtra apenas os cartões vencidos (dueDate <= agora). Se não houver nenhum,
+  // estuda todos (caso do deck recém-criado onde todos têm dueDate = now).
+  const dueCards = deck.cards.filter((c) => {
+    if (!c.dueDate) return true;
+    return new Date(c.dueDate) <= new Date();
+  });
+  const initialCards = dueCards.length > 0 ? dueCards : [...deck.cards];
+
+  const [cards, setCards] = useState<Flashcard[]>(initialCards);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [aiHint, setAiHint] = useState<string | null>(null);
@@ -45,22 +54,19 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   const [showExplanationModal, setShowExplanationModal] = useState(false);
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   const currentCard = cards[currentIndex];
 
   const handleFlip = () => {
-    setIsFlipped(!isFlipped);
+    setIsFlipped((prev) => !prev);
   };
 
   const handleRate = (rating: RatingGrade) => {
     if (!currentCard) return;
 
-    // Apply SM-2 algorithm update
     const sm2Result = calculateSM2(currentCard, rating);
-    const updatedCard: Flashcard = {
-      ...currentCard,
-      ...sm2Result,
-    };
+    const updatedCard: Flashcard = { ...currentCard, ...sm2Result };
 
     const updatedList = [...cards];
     updatedList[currentIndex] = updatedCard;
@@ -73,13 +79,8 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
     if (currentIndex + 1 < cards.length) {
       setCurrentIndex(currentIndex + 1);
     } else {
-      // Session Finished!
       setSessionCompleted(true);
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-      });
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     }
   };
 
@@ -128,12 +129,23 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   };
 
   const handleCompleteAndReturn = () => {
-    const updatedDeck: Deck = {
-      ...deck,
-      cards,
-    };
+    // Mescla os cards atualizados de volta no deck completo
+    const updatedCardMap = new Map(cards.map((c) => [c.id, c]));
+    const mergedCards = deck.cards.map((c) => updatedCardMap.get(c.id) || c);
+    const updatedDeck: Deck = { ...deck, cards: mergedCards };
     onFinishSession(updatedDeck, reviewedCount);
   };
+
+  const handleBackRequest = () => {
+    if (reviewedCount > 0) {
+      setShowExitConfirm(true);
+    } else {
+      onBack();
+    }
+  };
+
+  // Calcula XP real ganho nesta sessão
+  const xpEarned = reviewedCount * 25;
 
   if (sessionCompleted || !currentCard) {
     return (
@@ -145,9 +157,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
         </div>
 
         <div className="space-y-2">
-          <h2 className="text-2xl font-extrabold text-white">
-            Sessão Concluída! 🎉
-          </h2>
+          <h2 className="text-2xl font-extrabold text-white">Sessão Concluída! 🎉</h2>
           <p className="text-sm text-[#8c91a0]">
             Você revisou <strong className="text-[#adc6ff]">{reviewedCount} cartões</strong>{' '}
             e atualizou os intervalos de retenção SM-2 no seu cérebro.
@@ -158,13 +168,13 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
           <div>
             <div className="text-[10px] text-[#8c91a0] uppercase font-mono">Ganho de XP</div>
             <div className="text-xl font-extrabold text-[#60a5fa] flex items-center justify-center gap-1">
-              <Zap className="w-4 h-4" /> +{reviewedCount * 25} XP
+              <Zap className="w-4 h-4" /> +{xpEarned} XP
             </div>
           </div>
           <div className="w-px h-8 bg-[#424754]/40" />
           <div>
-            <div className="text-[10px] text-[#8c91a0] uppercase font-mono">Retenção Estimada</div>
-            <div className="text-xl font-extrabold text-emerald-400">94%</div>
+            <div className="text-[10px] text-[#8c91a0] uppercase font-mono">Cards Hoje</div>
+            <div className="text-xl font-extrabold text-emerald-400">{reviewedCount}</div>
           </div>
         </div>
 
@@ -183,11 +193,45 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-24 animate-fade-in">
+      {/* Modal de confirmação de saída */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-sm bg-[#0b1a2a] border border-amber-500/40 rounded-3xl p-6 space-y-4 shadow-2xl text-center">
+            <div className="flex justify-center">
+              <div className="p-3 rounded-2xl bg-amber-500/20 border border-amber-500/30">
+                <AlertTriangle className="w-6 h-6 text-amber-400" />
+              </div>
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-white">Sair da Sessão?</h3>
+              <p className="text-xs text-[#8c91a0] mt-1">
+                Você revisou <strong className="text-[#adc6ff]">{reviewedCount} cartão{reviewedCount !== 1 ? 's' : ''}</strong>.
+                O progresso desta sessão será perdido se sair agora.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowExitConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl bg-[#122131] text-[#c2c6d6] text-xs font-bold border border-[#424754]/40 hover:bg-[#1c2b3c] transition-all cursor-pointer"
+              >
+                Continuar Estudando
+              </button>
+              <button
+                onClick={() => { setShowExitConfirm(false); onBack(); }}
+                className="flex-1 py-2.5 rounded-xl bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30 hover:bg-amber-500/30 transition-all cursor-pointer"
+              >
+                Sair sem Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header bar */}
       <div className="flex items-center justify-between">
         <button
           id="btn-back-to-dashboard"
-          onClick={onBack}
+          onClick={handleBackRequest}
           className="p-2 rounded-xl bg-[#122131] text-[#c2c6d6] hover:text-white transition-colors flex items-center gap-2 text-xs font-medium"
         >
           <ArrowLeft className="w-4 h-4" /> Sair da Sessão
@@ -226,11 +270,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
           }`}
         >
           {/* FRONT */}
-          <div
-            className={`absolute inset-0 p-6 sm:p-8 backface-hidden flex flex-col justify-between h-full space-y-6 transition-opacity duration-300 ${
-              isFlipped ? 'opacity-0 pointer-events-none z-0' : 'opacity-100 z-10 pointer-events-auto'
-            }`}
-          >
+          <div className="absolute inset-0 p-6 sm:p-8 backface-hidden flex flex-col justify-between h-full space-y-6">
             <div className="flex items-center justify-between">
               <span className="px-3 py-1 rounded-full bg-[#122131] text-[#adc6ff] text-xs font-mono border border-[#adc6ff]/20">
                 {currentCard.topic || deck.category}
@@ -249,25 +289,19 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
             </div>
 
             <div className="my-auto text-center space-y-3">
-              <p className="text-xs font-mono text-[#8c91a0] uppercase tracking-wider">
-                Pergunta
-              </p>
+              <p className="text-xs font-mono text-[#8c91a0] uppercase tracking-wider">Pergunta</p>
               <h3 className="text-xl sm:text-2xl font-bold text-white leading-relaxed">
                 {currentCard.front}
               </h3>
             </div>
 
             <div className="text-center pt-4 border-t border-[#424754]/20 flex items-center justify-center gap-2 text-xs text-[#8c91a0]">
-              <RotateCw className="w-4 h-4 text-[#60a5fa]" /> Clique para virar o cartão
+              <RotateCw className="w-4 h-4 text-[#60a5fa]" /> Clique para ver a resposta
             </div>
           </div>
 
           {/* BACK */}
-          <div
-            className={`absolute inset-0 p-6 sm:p-8 rotate-y-180 backface-hidden flex flex-col justify-between h-full space-y-6 bg-[#0c1e30] rounded-3xl transition-opacity duration-300 ${
-              isFlipped ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 pointer-events-none z-0'
-            }`}
-          >
+          <div className="absolute inset-0 p-6 sm:p-8 rotate-y-180 backface-hidden flex flex-col justify-between h-full space-y-6 bg-[#0c1e30] rounded-3xl">
             <div className="flex items-center justify-between">
               <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-mono border border-emerald-500/20 font-bold">
                 Resposta & Explicação
@@ -340,7 +374,6 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
       {showExplanationModal && aiExplanation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
           <div className="relative w-full max-w-lg bg-[#0b1a2a] border border-amber-500/40 rounded-3xl p-6 text-white shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
-            {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-[#424754]/30 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30">
@@ -359,12 +392,10 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
               </button>
             </div>
 
-            {/* Content Box */}
             <div className="p-4 rounded-2xl bg-[#122131] border border-[#adc6ff]/20 text-xs text-slate-200 whitespace-pre-line leading-relaxed space-y-3 font-sans max-h-[380px] overflow-y-auto">
               {aiExplanation}
             </div>
 
-            {/* Audio & Actions */}
             <div className="flex items-center justify-between pt-2">
               <button
                 onClick={() => handleSpeakText(aiExplanation)}
@@ -384,44 +415,50 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
         </div>
       )}
 
-      {/* SM-2 Rating Controls */}
-      <div className="grid grid-cols-3 gap-3 pt-2">
-        <button
-          id="rate-btn-hard"
-          onClick={() => handleRate('hard')}
-          className="p-3.5 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all cursor-pointer group hover:scale-[1.02]"
-        >
-          <XCircle className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
-          <span>DIFÍCIL</span>
-          <span className="text-[10px] font-normal text-amber-400/70 font-mono">
-            Repetir em 1d
-          </span>
-        </button>
+      {/* SM-2 Rating Controls — só aparecem após virar o card */}
+      {isFlipped && (
+        <div className="grid grid-cols-3 gap-3 pt-2 animate-fade-in">
+          <button
+            id="rate-btn-hard"
+            onClick={() => handleRate('hard')}
+            className="p-3.5 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all cursor-pointer group hover:scale-[1.02]"
+          >
+            <XCircle className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
+            <span>DIFÍCIL</span>
+            <span className="text-[10px] font-normal text-amber-400/70 font-mono">Repetir em 1d</span>
+          </button>
 
-        <button
-          id="rate-btn-good"
-          onClick={() => handleRate('good')}
-          className="p-3.5 rounded-2xl bg-[#3b82f6]/10 hover:bg-[#3b82f6]/20 border border-[#3b82f6]/30 text-[#60a5fa] font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all cursor-pointer group hover:scale-[1.02]"
-        >
-          <RotateCw className="w-5 h-5 text-[#60a5fa] group-hover:scale-110 transition-transform" />
-          <span>BOM</span>
-          <span className="text-[10px] font-normal text-[#60a5fa]/70 font-mono">
-            Manter Ritmo
-          </span>
-        </button>
+          <button
+            id="rate-btn-good"
+            onClick={() => handleRate('good')}
+            className="p-3.5 rounded-2xl bg-[#3b82f6]/10 hover:bg-[#3b82f6]/20 border border-[#3b82f6]/30 text-[#60a5fa] font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all cursor-pointer group hover:scale-[1.02]"
+          >
+            <RotateCw className="w-5 h-5 text-[#60a5fa] group-hover:scale-110 transition-transform" />
+            <span>BOM</span>
+            <span className="text-[10px] font-normal text-[#60a5fa]/70 font-mono">Manter Ritmo</span>
+          </button>
 
-        <button
-          id="rate-btn-easy"
-          onClick={() => handleRate('easy')}
-          className="p-3.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all cursor-pointer group hover:scale-[1.02]"
-        >
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
-          <span>FÁCIL</span>
-          <span className="text-[10px] font-normal text-emerald-400/70 font-mono">
-            Expandir 6d+
+          <button
+            id="rate-btn-easy"
+            onClick={() => handleRate('easy')}
+            className="p-3.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all cursor-pointer group hover:scale-[1.02]"
+          >
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
+            <span>FÁCIL</span>
+            <span className="text-[10px] font-normal text-emerald-400/70 font-mono">Expandir 6d+</span>
+          </button>
+        </div>
+      )}
+
+      {/* Instrução quando o card ainda não foi virado */}
+      {!isFlipped && (
+        <div className="text-center py-3 text-xs text-[#8c91a0] animate-fade-in">
+          <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#122131] border border-[#424754]/30">
+            <RotateCw className="w-3.5 h-3.5 text-[#60a5fa]" />
+            Vire o cartão para ver a resposta e avaliar
           </span>
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 };

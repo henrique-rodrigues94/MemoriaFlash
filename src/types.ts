@@ -25,10 +25,24 @@ export interface Deck {
   isPublic?: boolean;
 }
 
+/** Registro de atividade de um único dia — usado no heatmap e estatísticas semanais. */
+export interface DailyActivity {
+  /** Chave do dia no formato YYYY-MM-DD (fuso local). */
+  dateKey: string;
+  /** Quantidade de cartões revisados naquele dia. */
+  cardsReviewed: number;
+  /** XP ganho naquele dia. */
+  xpEarned: number;
+  /** Minutos de estudo naquele dia (arredondado). */
+  minutesStudied: number;
+}
+
 export interface UserStats {
   name: string;
   avatar: string;
   streakDays: number;
+  /** Maior streak já alcançado — persiste mesmo após quebrar a ofensiva. */
+  bestStreakDays?: number;
   dailyGoalTotal: number;
   dailyGoalCompleted: number;
   totalCardsMastered: number;
@@ -43,26 +57,20 @@ export interface UserStats {
   /** Data (YYYY-MM-DD, fuso local) da última sessão de estudo concluída — usada para calcular streakDays corretamente. */
   lastStudyDateKey?: string;
 
+  /** Histórico de atividade diária (máx. 90 dias) — base para heatmap e XP semanal. */
+  activityLog?: DailyActivity[];
+
   // --- Economia de créditos por anúncio (AdMob rewarded) ---
-  /** Últimos timestamps (epoch ms) em que um vídeo recompensado foi assistido (usado para o limite diário). */
   adWatchTimestamps?: number[];
-  /** Dias consecutivos assistindo pelo menos 1 anúncio (streak de recompensa crescente). */
   adWatchStreakDays?: number;
-  /** Data (YYYY-MM-DD, fuso local) do último anúncio assistido — usado para calcular o streak. */
   lastAdWatchDay?: string;
-  /** Timestamps dos intersticiais mostrados hoje (frequency capping anti-banimento). */
   interstitialTimestamps?: number[];
-  /** Data (YYYY-MM-DD) do último crédito diário gratuito concedido. */
   lastDailyGrantDay?: string;
 
   // --- Programa de indicação (referral) ---
-  /** Código de indicação único deste usuário (gerado a partir do uid). */
   referralCode?: string;
-  /** Código de quem indicou este usuário (se aplicável). */
   referredByCode?: string;
-  /** Quantidade de amigos indicados que já foram recompensados. */
   referralCount?: number;
-  /** Total de créditos ganhos via indicação. */
   referralCreditsEarned?: number;
 }
 
@@ -70,9 +78,9 @@ export interface VoiceSettings {
   wakeWordEnabled: boolean;
   voicePersona: 'female' | 'male' | 'neutral' | 'custom';
   selectedVoiceURI?: string;
-  speechSpeed: number; // e.g., 0.5 to 2.0
-  speechPitch?: number; // e.g., 0.5 to 1.5
-  language: string;    // 'pt' | 'en' | 'es' | 'fr' | 'de'
+  speechSpeed: number;
+  speechPitch?: number;
+  language: string;
   sensitivityEnabled: boolean;
   onDevicePrivacy: boolean;
 }
@@ -120,8 +128,8 @@ export interface DuelState {
 export interface WeaknessCategory {
   title: string;
   subCategory: string;
-  errorFrequency: number; // e.g. 42%
-  avgResponseTimeSec: number; // e.g. 8.4s
+  errorFrequency: number;
+  avgResponseTimeSec: number;
   severity: 'CRITICAL' | 'MODERATE' | 'LOW';
 }
 
