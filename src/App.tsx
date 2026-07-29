@@ -29,6 +29,9 @@ const TeacherOverviewView = lazy(() =>
 const DeckManagerModal = lazy(() =>
   import('./components/DeckManagerModal').then((m) => ({ default: m.DeckManagerModal }))
 );
+const DecksLibraryView = lazy(() =>
+  import('./components/DecksLibraryView').then((m) => ({ default: m.DecksLibraryView }))
+);
 const AdMobRewardedModal = lazy(() =>
   import('./components/AdMobRewardedModal').then((m) => ({ default: m.AdMobRewardedModal }))
 );
@@ -365,6 +368,17 @@ export function App() {
                 onOpenAdMob={() => setShowAdMobModal(true)}
                 onOpenSubscription={() => setShowSubscriptionModal(true)}
                 onOpenReferral={() => setShowReferralModal(true)}
+              />
+            )}
+
+            {activeTab === 'explore' && (
+              <DecksLibraryView
+                decks={decks}
+                currentLanguage={currentLanguage}
+                setActiveTab={setActiveTab}
+                onStartStudySession={handleStartStudySession}
+                onManageDeck={(deck) => setManagedDeck(deck)}
+                onOpenQuickCreate={() => setActiveTab('create')}
               />
             )}
 
