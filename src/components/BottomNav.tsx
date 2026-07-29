@@ -1,6 +1,6 @@
 // src/components/BottomNav.tsx
 import React from 'react';
-import { Home, PlusCircle, Mic, Swords, BarChart3, GraduationCap } from 'lucide-react';
+import { Home, PlusCircle, Mic, BarChart3, GraduationCap } from 'lucide-react';
 import { ActiveTab } from '../types';
 
 interface BottomNavProps {
@@ -14,7 +14,7 @@ export function BottomNav({ activeTab, setActiveTab, currentLanguage }: BottomNa
     { id: 'home', label: 'Início', icon: <Home size={24} /> },
     { id: 'create', label: 'Criar', icon: <PlusCircle size={24} /> },
     { id: 'voice', label: 'Voz', icon: <Mic size={24} /> },
-    { id: 'duel', label: 'Duelo', icon: <Swords size={24} /> },
+    // Duelo removido
     { id: 'stats', label: 'Stats', icon: <BarChart3 size={24} /> },
     { id: 'teacher', label: 'Professor', icon: <GraduationCap size={24} /> },
   ];

@@ -16,15 +16,7 @@ const VoiceTutorView = lazy(() =>
 const VoiceSettingsModal = lazy(() =>
   import('./components/VoiceSettingsModal').then((m) => ({ default: m.VoiceSettingsModal }))
 );
-const DuelLobbyView = lazy(() =>
-  import('./components/DuelLobbyView').then((m) => ({ default: m.DuelLobbyView }))
-);
-const DuelArenaView = lazy(() =>
-  import('./components/DuelArenaView').then((m) => ({ default: m.DuelArenaView }))
-);
-const DuelResultsView = lazy(() =>
-  import('./components/DuelResultsView').then((m) => ({ default: m.DuelResultsView }))
-);
+// Duel removido: DuelLobbyView, DuelArenaView, DuelResultsView
 const CreationHubView = lazy(() =>
   import('./components/CreationHubView').then((m) => ({ default: m.CreationHubView }))
 );
@@ -37,7 +29,6 @@ const TeacherOverviewView = lazy(() =>
 const DeckManagerModal = lazy(() =>
   import('./components/DeckManagerModal').then((m) => ({ default: m.DeckManagerModal }))
 );
-// REMOVIDO: DecksLibraryView não é mais importado
 const AdMobRewardedModal = lazy(() =>
   import('./components/AdMobRewardedModal').then((m) => ({ default: m.AdMobRewardedModal }))
 );
@@ -68,7 +59,7 @@ import {
   VoiceHistoryItem,
   TeacherClass,
   ActiveTab,
-  QuizQuestion,
+  // QuizQuestion removido (não usado sem Duelo)
 } from './types';
 
 import {
@@ -105,7 +96,8 @@ import {
 } from './services/economy/creditsEngine';
 
 import { applyStudySessionCompleted } from './services/studyStreak';
-import { apiGenerateQuiz } from './services/api';
+// apiGenerateQuiz não é mais necessário sem Duelo
+// import { apiGenerateQuiz } from './services/api';
 import { detectBrowserLanguage, SupportedLanguage } from './lib/i18n';
 import { auth, onAuthStateChanged, ensureAuthenticated } from './lib/firebase';
 import { deriveReferralCode } from './shared/referralCode';
@@ -150,20 +142,9 @@ export function App() {
   const [activeStudyDeck, setActiveStudyDeck] = useState<Deck | null>(null);
   const [managedDeck, setManagedDeck] = useState<Deck | null>(null);
 
-  const [duelStage, setDuelStage] = useState<'lobby' | 'arena' | 'results'>('lobby');
-  const [duelOpponent, setDuelOpponent] = useState({
-    name: 'Bot Alex (IA)',
-    avatar:
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
-  });
-  const [duelQuestions, setDuelQuestions] = useState<QuizQuestion[]>([]);
-  const [duelResults, setDuelResults] = useState<{
-    userPoints: number;
-    opponentPoints: number;
-    wrongQuestions: QuizQuestion[];
-  }>({ userPoints: 0, opponentPoints: 0, wrongQuestions: [] });
+  // Estados de Duelo removidos
 
-  // Efeitos (mantidos os mesmos)
+  // Efeitos (mantidos)
   useEffect(() => {
     saveStoredDecks(decks);
   }, [decks]);
@@ -239,7 +220,7 @@ export function App() {
     };
   }, []);
 
-  // Handlers (mantidos)
+  // Handlers
   const handleDeductCredit = (amount: number = 1) => {
     const updatedStats = applySpendCredits(stats, amount);
     setStats(updatedStats);
@@ -341,68 +322,7 @@ export function App() {
     handleSaveDeck(updatedDeck);
   };
 
-  const handleStartDuel = async (opponentType: 'ai' | 'player', topic: string) => {
-    if (opponentType === 'ai') {
-      setDuelOpponent({
-        name: 'Bot Gemini IA',
-        avatar:
-          'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
-      });
-    } else {
-      setDuelOpponent({
-        name: 'Gabriel Santos (Online)',
-        avatar:
-          'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&q=80',
-      });
-    }
-
-    try {
-      const qList = await apiGenerateQuiz(topic, 5, currentLanguage);
-      setDuelQuestions(qList);
-    } catch {
-      setDuelQuestions([
-        {
-          question: 'O que caracteriza o mecanismo de repetição espaçada no algoritmo SM-2?',
-          options: [
-            'Revisar todos os cards diariamente sem distinção',
-            'Ajustar os intervalos baseando-se na facilidade de lembrança do usuário',
-            'Aleatorizar o tempo entre revisões para surpreender o cérebro',
-            'Eliminar cartões que foram errados mais de 3 vezes',
-          ],
-          correctIndex: 1,
-          explanation:
-            'O SM-2 calcula um Fator de Facilidade (EF) dinâmico que expande os dias entre as revisões conforme a retenção aumenta.',
-        },
-        {
-          question: 'Qual remetente tem garantia constitucional via Mandado de Segurança?',
-          options: [
-            'Qualquer cidadão sem necessidade de advogado',
-            'Direito líquido e certo não amparado por Habeas Corpus ou Habeas Data',
-            'Apenas crimes ambientais em zonas rurais',
-            'Processos trabalhistas de menor complexidade',
-          ],
-          correctIndex: 1,
-          explanation:
-            'O Mandado de Segurança protege direito líquido e certo contra ilegalidade de autoridade pública.',
-        },
-      ]);
-    }
-    setDuelStage('arena');
-  };
-
-  const handleFinishDuel = (
-    userPoints: number,
-    opponentPoints: number,
-    wrongQuestions: QuizQuestion[]
-  ) => {
-    setDuelResults({ userPoints, opponentPoints, wrongQuestions });
-    setDuelStage('results');
-
-    const gained = userPoints >= opponentPoints ? 250 : 100;
-    const newStats = { ...stats, xp: stats.xp + gained };
-    setStats(newStats);
-    maybeShowInterstitial(newStats);
-  };
+  // Handlers de Duelo removidos: handleStartDuel, handleFinishDuel
 
   // Renderização
   return (
@@ -479,31 +399,7 @@ export function App() {
               />
             )}
 
-            {activeTab === 'duel' && (
-              <>
-                {duelStage === 'lobby' && (
-                  <DuelLobbyView stats={stats} onStartDuel={handleStartDuel} />
-                )}
-                {duelStage === 'arena' && (
-                  <DuelArenaView
-                    stats={stats}
-                    opponentName={duelOpponent.name}
-                    opponentAvatar={duelOpponent.avatar}
-                    questions={duelQuestions}
-                    onFinishDuel={handleFinishDuel}
-                  />
-                )}
-                {duelStage === 'results' && (
-                  <DuelResultsView
-                    userPoints={duelResults.userPoints}
-                    opponentPoints={duelResults.opponentPoints}
-                    opponentName={duelOpponent.name}
-                    wrongQuestions={duelResults.wrongQuestions}
-                    onReturnToLobby={() => setDuelStage('lobby')}
-                  />
-                )}
-              </>
-            )}
+            {/* Bloco do Duelo removido */}
 
             {activeTab === 'stats' && <StatsView stats={stats} decks={decks} />}
 
