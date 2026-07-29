@@ -68,8 +68,6 @@ export const createReferralSchema = z.object({
   }),
 });
 
-// --- Health (opcional, sem validação) ---
-
 // ============================================================================
 // TIPOS INFERIDOS (para usar nos controllers)
 // ============================================================================

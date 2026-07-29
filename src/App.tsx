@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 
-// Componentes carregados de forma síncrona (críticos para a primeira renderização)
+// Componentes síncronos
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { OnboardingModal } from './components/OnboardingModal';
@@ -9,7 +9,7 @@ import { StudySessionView } from './components/StudySessionView';
 import { TabLoadingFallback } from './components/TabLoadingFallback';
 import { ConsentBanner } from './components/ConsentBanner';
 
-// Componentes carregados sob demanda (lazy) – cada um vira um chunk separado
+// Componentes lazy (code-splitting)
 const VoiceTutorView = lazy(() =>
   import('./components/VoiceTutorView').then((m) => ({ default: m.VoiceTutorView }))
 );
@@ -37,9 +37,7 @@ const TeacherOverviewView = lazy(() =>
 const DeckManagerModal = lazy(() =>
   import('./components/DeckManagerModal').then((m) => ({ default: m.DeckManagerModal }))
 );
-const DecksLibraryView = lazy(() =>
-  import('./components/DecksLibraryView').then((m) => ({ default: m.DecksLibraryView }))
-);
+// REMOVIDO: DecksLibraryView não é mais importado
 const AdMobRewardedModal = lazy(() =>
   import('./components/AdMobRewardedModal').then((m) => ({ default: m.AdMobRewardedModal }))
 );
@@ -121,7 +119,6 @@ import {
 // APP PRINCIPAL
 // ============================================================================
 export function App() {
-  // -------------------- Estados de navegação e UI --------------------
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');
   const [showOnboarding, setShowOnboarding] = useState(!isOnboardingDone());
   const [showVoiceSettings, setShowVoiceSettings] = useState(false);
@@ -133,7 +130,6 @@ export function App() {
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
 
-  // -------------------- Idioma --------------------
   const [currentLanguage, setCurrentLanguage] = useState<SupportedLanguage>(
     detectBrowserLanguage()
   );
@@ -145,18 +141,15 @@ export function App() {
     saveVoiceSettings(updatedVoice);
   };
 
-  // -------------------- Estados de dados --------------------
   const [decks, setDecks] = useState<Deck[]>(getStoredDecks());
   const [stats, setStats] = useState<UserStats>(getStoredStats());
   const [voiceSettings, setVoiceSettingsState] = useState<VoiceSettings>(getVoiceSettings());
   const [voiceHistory, setVoiceHistoryState] = useState<VoiceHistoryItem[]>(getVoiceHistory());
   const [teacherClasses, setTeacherClassesState] = useState<TeacherClass[]>(getStoredClasses());
 
-  // -------------------- Sessão ativa / modais --------------------
   const [activeStudyDeck, setActiveStudyDeck] = useState<Deck | null>(null);
   const [managedDeck, setManagedDeck] = useState<Deck | null>(null);
 
-  // -------------------- Estado do Duelo --------------------
   const [duelStage, setDuelStage] = useState<'lobby' | 'arena' | 'results'>('lobby');
   const [duelOpponent, setDuelOpponent] = useState({
     name: 'Bot Alex (IA)',
@@ -170,11 +163,7 @@ export function App() {
     wrongQuestions: QuizQuestion[];
   }>({ userPoints: 0, opponentPoints: 0, wrongQuestions: [] });
 
-  // ==========================================================================
-  // EFEITOS COLATERAIS
-  // ==========================================================================
-
-  // Persistência local: salvar decks e estatísticas sempre que mudarem
+  // Efeitos (mantidos os mesmos)
   useEffect(() => {
     saveStoredDecks(decks);
   }, [decks]);
@@ -183,17 +172,14 @@ export function App() {
     saveStoredStats(stats);
   }, [stats]);
 
-  // Captura o parâmetro ?ref=CODE da URL (indicação de amigo)
   useEffect(() => {
     capturePendingReferralFromURL();
   }, []);
 
-  // Concede o crédito diário gratuito (1x por dia)
   useEffect(() => {
     setStats((prev) => applyDailyFreeGrantIfNeeded(prev));
   }, []);
 
-  // Garante código de indicação local e, se autenticado, registra no servidor
   useEffect(() => {
     ensureAuthenticated().then((user) => {
       const code = deriveReferralCode(user?.uid || '');
@@ -217,7 +203,6 @@ export function App() {
     return () => unsubscribe();
   }, []);
 
-  // Sincronização em tempo real com o Firestore
   useEffect(() => {
     let unsubDecks: (() => void) | undefined;
     let unsubStats: (() => void) | undefined;
@@ -254,10 +239,7 @@ export function App() {
     };
   }, []);
 
-  // ==========================================================================
-  // HANDLERS
-  // ==========================================================================
-
+  // Handlers (mantidos)
   const handleDeductCredit = (amount: number = 1) => {
     const updatedStats = applySpendCredits(stats, amount);
     setStats(updatedStats);
@@ -378,7 +360,6 @@ export function App() {
       const qList = await apiGenerateQuiz(topic, 5, currentLanguage);
       setDuelQuestions(qList);
     } catch {
-      // Fallback questions if offline
       setDuelQuestions([
         {
           question: 'O que caracteriza o mecanismo de repetição espaçada no algoritmo SM-2?',
@@ -423,13 +404,9 @@ export function App() {
     maybeShowInterstitial(newStats);
   };
 
-  // ==========================================================================
-  // RENDERIZAÇÃO
-  // ==========================================================================
-
+  // Renderização
   return (
     <div className="min-h-screen bg-[#051424] text-[#d4e4fa] font-sans antialiased selection:bg-[#adc6ff]/30 selection:text-white">
-      {/* Cabeçalho fixo */}
       <Header
         stats={stats}
         activeTab={activeTab}
@@ -445,7 +422,6 @@ export function App() {
         onOpenNotifications={() => setShowNotificationsModal(true)}
       />
 
-      {/* Conteúdo principal */}
       <main className="pt-20 px-4 sm:px-6 max-w-6xl mx-auto">
         {activeStudyDeck ? (
           <StudySessionView
@@ -455,7 +431,6 @@ export function App() {
             onBack={() => setActiveStudyDeck(null)}
           />
         ) : (
-          /* Suspense único para todas as seções carregadas sob demanda */
           <Suspense fallback={<TabLoadingFallback />}>
             {activeTab === 'home' && (
               <DashboardView
@@ -470,17 +445,6 @@ export function App() {
                 onOpenAdMob={() => setShowAdMobModal(true)}
                 onOpenSubscription={() => setShowSubscriptionModal(true)}
                 onOpenReferral={() => setShowReferralModal(true)}
-              />
-            )}
-
-            {activeTab === 'explore' && (
-              <DecksLibraryView
-                decks={decks}
-                currentLanguage={currentLanguage}
-                setActiveTab={setActiveTab}
-                onStartStudySession={handleStartStudySession}
-                onManageDeck={(deck) => setManagedDeck(deck)}
-                onOpenQuickCreate={() => setActiveTab('create')}
               />
             )}
 
@@ -558,12 +522,10 @@ export function App() {
         )}
       </main>
 
-      {/* Rodapé de navegação (mobile) */}
       {!activeStudyDeck && (
         <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} currentLanguage={currentLanguage} />
       )}
 
-      {/* -------------------- MODAIS (todos lazy) -------------------- */}
       <Suspense fallback={null}>
         {showOnboarding && (
           <OnboardingModal
@@ -647,7 +609,6 @@ export function App() {
         )}
       </Suspense>
 
-      {/* Banner de consentimento LGPD/GDPR */}
       <ConsentBanner />
     </div>
   );
