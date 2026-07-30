@@ -108,28 +108,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         currentLanguage={currentLanguage}
       />
 
-      {/* Memory Trend & SRS Tips Footer Card */}
-      <section className="glass-card rounded-2xl p-5 border border-[#adc6ff]/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400">
-            <TrendingUp className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-xs text-[#8c91a0]">Tendência de Memorização</div>
-            <div className="text-sm font-bold text-white flex items-center gap-2">
-              +15% Maior Retenção de Longo Prazo
-              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                SRS SM-2 Ativo
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="text-xs text-[#8c91a0] flex items-center gap-2 bg-[#0b1a2a] px-3 py-2 rounded-xl border border-[#424754]/30">
-          <Clock className="w-4 h-4 text-[#60a5fa]" />
-          <span>Próxima revisão ideal em ~24 horas</span>
-        </div>
-      </section>
+      {/* Memory Trend removed as requested */}
     </div>
   );
 };

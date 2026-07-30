@@ -20,10 +20,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab, c
   const t = translations[currentLanguage] || translations.pt;
 
   const navItems: NavItem[] = [
-    { id: 'home', label: 'Estudar', icon: Home },
-    { id: 'quiz', label: 'QUIZ', icon: HelpCircle },
-    { id: 'create', label: t.aiStudio, icon: PlusCircle, isHighlight: true },
-    { id: 'stats', label: t.stats, icon: BarChart3 },
+      { id: 'home', label: 'Estudar', icon: Home },
+      { id: 'quiz', label: 'QUIZ', icon: HelpCircle },
+      { id: 'create', label: 'Cards', icon: PlusCircle },
+      { id: 'stats', label: t.stats, icon: BarChart3 },
   ];
 
   return (
@@ -31,24 +31,6 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab, c
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.id;
-
-        if (item.isHighlight) {
-          return (
-            <button
-              key={item.id}
-              id={`nav-btn-${item.id}`}
-              onClick={() => setActiveTab(item.id as ActiveTab)}
-              className="flex flex-col items-center -mt-5 cursor-pointer group"
-            >
-              <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#3b82f6] to-[#60a5fa] text-white flex items-center justify-center shadow-lg shadow-[#3b82f6]/40 group-hover:scale-105 transition-transform">
-                <Icon className="w-6 h-6" />
-              </div>
-              <span className="text-[10px] font-semibold mt-1 text-[#adc6ff]">
-                {item.label}
-              </span>
-            </button>
-          );
-        }
 
         return (
           <button
