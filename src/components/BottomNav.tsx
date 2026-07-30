@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Compass, PlusCircle, BarChart3, HelpCircle } from 'lucide-react';
+import { Home, HelpCircle, Camera, Layers, BarChart2 } from 'lucide-react';
 import { ActiveTab } from '../types';
 import { SupportedLanguage, translations } from '../lib/i18n';
 
@@ -22,8 +22,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab, c
   const navItems: NavItem[] = [
       { id: 'home', label: 'Estudar', icon: Home },
       { id: 'quiz', label: 'QUIZ', icon: HelpCircle },
-      { id: 'create', label: 'Cards', icon: PlusCircle },
-      { id: 'stats', label: t.stats, icon: BarChart3 },
+      { id: 'scanner', label: 'Scanner', icon: Camera },
+      { id: 'cards', label: 'Cards', icon: Layers },
+      { id: 'stats', label: t.stats, icon: BarChart2 },
   ];
 
   return (

@@ -17,9 +17,8 @@ const DuelArenaView = lazy(() => import('./components/DuelArenaView').then((m) =
 const DuelResultsView = lazy(() =>
   import('./components/DuelResultsView').then((m) => ({ default: m.DuelResultsView }))
 );
-const CreationHubView = lazy(() =>
-  import('./components/CreationHubView').then((m) => ({ default: m.CreationHubView }))
-);
+const ScannerView = lazy(() => import('./components/ScannerView').then((m) => ({ default: m.ScannerView })));
+const StudioView = lazy(() => import('./components/StudioView').then((m) => ({ default: m.StudioView })));
 const QuizView = lazy(() => import('./components/QuizView').then((m) => ({ default: m.QuizView })));
 const StatsView = lazy(() => import('./components/StatsView').then((m) => ({ default: m.StatsView })));
 const DeckManagerModal = lazy(() =>
@@ -426,8 +425,12 @@ export function App() {
               <QuizView />
             )}
 
-            {activeTab === 'create' && (
-              <CreationHubView
+            {activeTab === 'scanner' && (
+              <ScannerView />
+            )}
+
+            {activeTab === 'cards' && (
+              <StudioView
                 decks={decks}
                 stats={stats}
                 currentLanguage={currentLanguage}

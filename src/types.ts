@@ -165,4 +165,4 @@ export interface TeacherClass {
   students: StudentProgress[];
 }
 
-export type ActiveTab = 'home' | 'explore' | 'quiz' | 'create' | 'stats' | 'profile' | 'duel';
+export type ActiveTab = 'home' | 'explore' | 'quiz' | 'scanner' | 'cards' | 'stats' | 'profile' | 'duel';
