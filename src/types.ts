@@ -1,4 +1,3 @@
-// src/types.ts
 export type RatingGrade = 'hard' | 'good' | 'easy';
 
 export interface Flashcard {
@@ -7,11 +6,13 @@ export interface Flashcard {
   back: string;
   topic?: string;
   difficulty?: 'easy' | 'medium' | 'hard' | 'expert';
-  reps: number;
-  interval: number;
-  efactor: number;
-  dueDate: string;
-  lastReviewed?: string;
+  explanation?: string;   // Detailed explanation with practical example
+  curiosity?: string;     // Interesting curiosity/fun fact about the topic
+  reps: number;           // Repetition count in SM-2
+  interval: number;       // Days until next review
+  efactor: number;        // Easiness factor (default 2.5)
+  dueDate: string;        // ISO Date string
+  lastReviewed?: string;  // ISO Date string
 }
 
 export interface Deck {
@@ -20,16 +21,21 @@ export interface Deck {
   category: string;
   description: string;
   cards: Flashcard[];
-  color: string;
+  color: string; // TailWind color key or hex accent
   accentBorder: string;
   iconName?: string;
   isPublic?: boolean;
 }
 
+/** Registro de atividade de um único dia — usado no heatmap e estatísticas semanais. */
 export interface DailyActivity {
+  /** Chave do dia no formato YYYY-MM-DD (fuso local). */
   dateKey: string;
+  /** Quantidade de cartões revisados naquele dia. */
   cardsReviewed: number;
+  /** XP ganho naquele dia. */
   xpEarned: number;
+  /** Minutos de estudo naquele dia (arredondado). */
   minutesStudied: number;
 }
 
@@ -37,6 +43,7 @@ export interface UserStats {
   name: string;
   avatar: string;
   streakDays: number;
+  /** Maior streak já alcançado — persiste mesmo após quebrar a ofensiva. */
   bestStreakDays?: number;
   dailyGoalTotal: number;
   dailyGoalCompleted: number;
@@ -48,13 +55,21 @@ export interface UserStats {
   aiCredits: number;
   isPro?: boolean;
   proPlanType?: 'monthly' | 'annual';
+
+  /** Data (YYYY-MM-DD, fuso local) da última sessão de estudo concluída — usada para calcular streakDays corretamente. */
   lastStudyDateKey?: string;
+
+  /** Histórico de atividade diária (máx. 90 dias) — base para heatmap e XP semanal. */
   activityLog?: DailyActivity[];
+
+  // --- Economia de créditos por anúncio (AdMob rewarded) ---
   adWatchTimestamps?: number[];
   adWatchStreakDays?: number;
   lastAdWatchDay?: string;
   interstitialTimestamps?: number[];
   lastDailyGrantDay?: string;
+
+  // --- Programa de indicação (referral) ---
   referralCode?: string;
   referredByCode?: string;
   referralCount?: number;
@@ -150,7 +165,4 @@ export interface TeacherClass {
   students: StudentProgress[];
 }
 
-// Remove 'duel' and 'profile' (profile não é usado) – ajuste conforme necessário
-export type ActiveTab = 'home' | 'explore' | 'create' | 'stats' | 'voice' | 'teacher';
-// Nota: 'explore' já foi removido do BottomNav, mas mantido no tipo para compatibilidade; você pode removê-lo se quiser.
-// Se não houver mais referência a 'explore' em lugar nenhum, pode removê-lo também.
+export type ActiveTab = 'home' | 'explore' | 'create' | 'stats' | 'profile' | 'duel';

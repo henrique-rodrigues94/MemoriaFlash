@@ -1,58 +1,35 @@
-// vite.config.ts
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
 import path from 'path';
+import {defineConfig} from 'vite';
 
-export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
-  ],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
+export default defineConfig(() => {
+  return {
+    plugins: [react(), tailwindcss()],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, '.'),
+      },
     },
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          // Firebase SDK separado (pesado)
-          firebase: [
-            'firebase/app',
-            'firebase/auth',
-            'firebase/firestore',
-            'firebase/storage',
-            'firebase/analytics',
-          ],
-          // Bibliotecas de UI grandes
-          ui: [
-            'framer-motion',
-            'lucide-react',
-            'canvas-confetti',
-          ],
-          // React e core
-          react: [
-            'react',
-            'react-dom',
-            'react/jsx-runtime',
-          ],
-          // Outras dependências (opcional)
-          vendor: [
-            'zod',
-            'dotenv',
-          ],
+    build: {
+      rollupOptions: {
+        output: {
+          // Separa dependências pesadas e estáveis (mudam raramente) num
+          // chunk "vendor" próprio — melhora o cache do navegador entre
+          // deploys, já que o código do app muda bem mais que essas libs.
+          manualChunks: {
+            'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/messaging'],
+            'vendor-motion': ['motion', 'canvas-confetti'],
+          },
         },
       },
     },
-    // Aumenta o limite para chunks grandes (evita warnings)
-    chunkSizeWarningLimit: 1000,
-  },
-  server: {
-    port: 3000,
-    proxy: {
-      '/api': 'http://localhost:3000', // se o backend estiver na mesma porta
+    server: {
+      // HMR is disabled in AI Studio via DISABLE_HMR env var.
+      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      hmr: process.env.DISABLE_HMR !== 'true',
+      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
+      watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
-  },
+  };
 });

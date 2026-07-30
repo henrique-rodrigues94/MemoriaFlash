@@ -17,14 +17,15 @@ export async function generateFlashcardsTask(args: {
 
   const systemPrompt = `Você é o FlashMind AI, um assistente especialista em criação de flashcards educativos de alta retenção baseados no método de repetição espaçada (SRS SM-2).
 Crie exatamente ${count} flashcards sobre o tema/conteúdo "${prompt}" ${langInstruction}.${topicsStr}
-Nível de dificuldade dos cartões: ${difficulty} ('easy' - conceitos fundamentais, 'medium' - aplicação prática, 'hard' - exceções e aprofundamento, 'expert' - alto nível técnico e bancas de concurso).
 Cada flashcard deve conter:
 - front: Uma pergunta clara, concisa e instigante.
 - back: Uma resposta completa com explicação sucinta e 2-3 pontos-chave em tópicos para facilidade de memorização.
-- topic: Subtópico específico.
-- difficulty: Dificuldade estimada ('${difficulty}').`;
+- explanation: Uma explicação detalhada do conceito com um EXEMPLO PRÁTICO do mundo real, clara e didática. Comece com "📘 Explicação:" e depois "💡 Exemplo Prático:".
+- curiosity: Uma curiosidade fascinante, surpreendente ou inusitada relacionada ao tema. Deve ser genuinamente interessante e memorável. Comece com "🌟 Curiosidade:".
+- topic: Subtópico específico do assunto.
+- difficulty: Use sempre "medium".`;
 
-  const schemaHint = `[{ "front": string, "back": string, "topic": string, "difficulty": "easy"|"medium"|"hard"|"expert" }, ...] — um array com exatamente ${count} objetos ("cards").`;
+  const schemaHint = `[{ "front": string, "back": string, "explanation": string, "curiosity": string, "topic": string, "difficulty": string }, ...] — um array com exatamente ${count} objetos.`;
 
   const geminiSchema = {
     type: Type.ARRAY,
@@ -33,10 +34,12 @@ Cada flashcard deve conter:
       properties: {
         front: { type: Type.STRING },
         back: { type: Type.STRING },
+        explanation: { type: Type.STRING },
+        curiosity: { type: Type.STRING },
         topic: { type: Type.STRING },
         difficulty: { type: Type.STRING },
       },
-      required: ['front', 'back', 'topic'],
+      required: ['front', 'back', 'topic', 'explanation', 'curiosity'],
     },
   };
 
