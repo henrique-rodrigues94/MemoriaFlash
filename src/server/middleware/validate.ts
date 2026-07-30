@@ -1,9 +1,9 @@
 // src/server/middleware/validate.ts
 import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject, ZodError } from 'zod';
+import { ZodTypeAny, ZodError } from 'zod';
 import { sanitizeObject } from '../schemas';
 
-export const validate = (schema: AnyZodObject) => {
+export const validate = (schema: ZodTypeAny) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Aplica sanitização nos dados da requisição (body, query, params)

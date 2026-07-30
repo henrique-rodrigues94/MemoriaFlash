@@ -20,6 +20,7 @@ const DuelResultsView = lazy(() =>
 const CreationHubView = lazy(() =>
   import('./components/CreationHubView').then((m) => ({ default: m.CreationHubView }))
 );
+const QuizView = lazy(() => import('./components/QuizView').then((m) => ({ default: m.QuizView })));
 const StatsView = lazy(() => import('./components/StatsView').then((m) => ({ default: m.StatsView })));
 const DeckManagerModal = lazy(() =>
   import('./components/DeckManagerModal').then((m) => ({ default: m.DeckManagerModal }))
@@ -419,6 +420,10 @@ export function App() {
                 onManageDeck={(deck) => setManagedDeck(deck)}
                 onOpenQuickCreate={() => setActiveTab('create')}
               />
+            )}
+
+            {activeTab === 'quiz' && (
+              <QuizView />
             )}
 
             {activeTab === 'create' && (

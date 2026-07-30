@@ -1,10 +1,12 @@
 // src/server/routes/aiRoutes.ts
 import { Router, Request, Response, NextFunction } from 'express';
 import { rateLimit } from 'express-rate-limit';
-import { aiOrchestrator } from '../../lib/ai/orchestrator';
 import { validate } from '../middleware/validate';
+import { aiOrchestrator } from '../ai';
 import { AppError } from '../middleware/errorHandler';
 import { generateFlashcardsSchema, suggestTopicsSchema } from '../schemas';
+import { generateFlashcardsTask } from '../ai/tasks/generateFlashcards';
+import { suggestTopicsTask } from '../ai/tasks/suggestTopics';
 // import { authenticate } from '../middleware/auth'; // DESABILITADO
 
 const router = Router();
@@ -27,20 +29,8 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { prompt, topic, numberOfCards } = req.body;
-      const userId = 'test-user'; // mock temporário
-
-      const result = await aiOrchestrator.generateFlashcards({
-        prompt,
-        topic,
-        numberOfCards,
-        userId,
-      });
-
-      if (!result.success) {
-        throw new AppError(result.error || 'Falha ao gerar flashcards', 503, 'AI_SERVICE_ERROR');
-      }
-
-      res.json({ success: true, data: result.data });
+      const result = await generateFlashcardsTask({ prompt, count: numberOfCards, selectedTopics: topic });
+      res.json({ success: true, data: result.cards });
     } catch (error) {
       next(error);
     }
@@ -56,15 +46,8 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { subject } = req.body;
-      const userId = 'test-user';
-
-      const result = await aiOrchestrator.suggestTopics({ subject, userId });
-
-      if (!result.success) {
-        throw new AppError(result.error || 'Falha ao sugerir tópicos', 503, 'AI_SERVICE_ERROR');
-      }
-
-      res.json({ success: true, data: result.data });
+      const result = await suggestTopicsTask({ title: subject });
+      res.json({ success: true, data: result.topics });
     } catch (error) {
       next(error);
     }

@@ -84,13 +84,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Seus Decks de Estudo
             </h2>
           </div>
-          <button
-            id="view-all-decks-btn"
-            onClick={() => setActiveTab('explore')}
-            className="text-xs text-[#60a5fa] hover:underline flex items-center gap-1 font-medium"
-          >
-            Ver todos <ChevronRight className="w-3.5 h-3.5" />
-          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
