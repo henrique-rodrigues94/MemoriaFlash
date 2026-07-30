@@ -1,18 +1,156 @@
+#######################################
+# DEPENDÊNCIAS
+#######################################
+
 node_modules/
+.pnpm-store/
+.yarn/
+.yarn-cache/
+
+
+#######################################
+# BUILDS / PRODUÇÃO
+#######################################
+
 build/
 dist/
+out/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+
+
+#######################################
+# TESTES
+#######################################
+
 coverage/
-.DS_Store
+.nyc_output/
+
+
+#######################################
+# LOGS
+#######################################
+
 *.log
-.env*
-!.env
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Firebase / Service Accounts — nunca commitar credenciais
-*serviceAccount*.json
-firebase-debug.log
+
+#######################################
+# VARIÁVEIS DE AMBIENTE
+# Nunca enviar chaves da API/Firebase
+#######################################
+
+.env
+.env.*
+!.env.example
+
+
+#######################################
+# FIREBASE
+#######################################
+
 .firebase/
+firebase-debug.log
+firebase-debug.*.log
+firebase-error.log
 
-# Editor
+# Credenciais Firebase Admin
+*serviceAccount*.json
+service-account*.json
+*-adminsdk*.json
+
+
+#######################################
+# CHAVES E CERTIFICADOS
+#######################################
+
+*.pem
+*.key
+*.crt
+
+
+#######################################
+# BANCO LOCAL
+#######################################
+
+*.sqlite
+*.sqlite3
+*.db
+
+
+#######################################
+# SISTEMA OPERACIONAL
+#######################################
+
+.DS_Store
+Thumbs.db
+
+
+#######################################
+# VS CODE
+#######################################
+
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
+
+
+#######################################
+# IDEs
+#######################################
+
 .idea/
+*.iml
+
+
+#######################################
+# ARQUIVOS TEMPORÁRIOS
+#######################################
+
+*.tmp
+*.temp
+*.swp
+*.swo
+
+
+#######################################
+# CACHE DE FERRAMENTAS
+#######################################
+
+.eslintcache
+.stylelintcache
+.turbo
+
+
+#######################################
+# FRONTEND
+#######################################
+
+.vercel/
+.netlify/
+
+
+#######################################
+# MOBILE (se usar futuramente)
+#######################################
+
+android/.gradle/
+android/local.properties
+ios/Pods/
+ios/build/
+
+
+#######################################
+# IA / MODELOS LOCAIS
+#######################################
+
+models/
+*.bin
+*.onnx
+*.pt
+*.pth
