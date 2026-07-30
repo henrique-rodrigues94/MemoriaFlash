@@ -5,13 +5,14 @@ export async function apiGenerateFlashcards(
   count: number = 6,
   language: string = 'pt',
   difficulty: string = 'medium',
-  selectedTopics: string[] = []
+  selectedTopics: string[] = [],
+  customSystemPrompt?: string
 ): Promise<Partial<Flashcard>[]> {
   try {
     const res = await fetch('/api/gemini/generate-flashcards', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, count, language, difficulty, selectedTopics }),
+      body: JSON.stringify({ prompt, count, language, difficulty, selectedTopics, customSystemPrompt }),
     });
 
     if (!res.ok) {

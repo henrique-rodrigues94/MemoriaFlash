@@ -8,14 +8,26 @@ export async function generateFlashcardsTask(args: {
   language?: string;
   difficulty?: string;
   selectedTopics?: string[];
+  customSystemPrompt?: string;
 }) {
-  const { prompt, count = 6, language = 'pt', difficulty = 'medium', selectedTopics = [] } = args;
+  const { prompt, count = 6, language = 'pt', difficulty = 'medium', selectedTopics = [], customSystemPrompt } = args;
 
   const langInstruction = language === 'pt' ? 'em Português' : `in ${language}`;
   const topicsStr =
     selectedTopics.length > 0 ? ` Priorize os subtópicos: ${selectedTopics.join(', ')}.` : '';
 
-  const systemPrompt = `Você é o FlashMind AI, um assistente especialista em criação de flashcards educativos de alta retenção baseados no método de repetição espaçada (SRS SM-2).
+  // Build system prompt: use custom if provided (substituting variables), else use default.
+  let systemPrompt: string;
+  if (customSystemPrompt && customSystemPrompt.trim()) {
+    systemPrompt = customSystemPrompt
+      .replace(/\{count\}/g, String(count))
+      .replace(/\{prompt\}/g, prompt)
+      .replace(/\{topics\}/g, topicsStr)
+      .replace(/\{language\}/g, langInstruction);
+    // Always enforce exact count
+    systemPrompt += `\n\nIMPORTANTE: Retorne EXATAMENTE ${count} flashcards no array JSON. Não retorne menos que ${count} itens.`;
+  } else {
+    systemPrompt = `Você é o FlashMind AI, um assistente especialista em criação de flashcards educativos de alta retenção baseados no método de repetição espaçada (SRS SM-2).
 Crie exatamente ${count} flashcards sobre o tema/conteúdo "${prompt}" ${langInstruction}.${topicsStr}
 Cada flashcard deve conter:
 - front: Uma pergunta clara, concisa e instigante.
@@ -23,7 +35,10 @@ Cada flashcard deve conter:
 - explanation: Uma explicação detalhada do conceito com um EXEMPLO PRÁTICO do mundo real, clara e didática. Comece com "📘 Explicação:" e depois "💡 Exemplo Prático:".
 - curiosity: Uma curiosidade fascinante, surpreendente ou inusitada relacionada ao tema. Deve ser genuinamente interessante e memorável. Comece com "🌟 Curiosidade:".
 - topic: Subtópico específico do assunto.
-- difficulty: Use sempre "medium".`;
+- difficulty: Classifique como "easy", "medium", "hard" ou "expert" de acordo com a complexidade real do conteúdo.
+
+IMPORTANTE: Retorne EXATAMENTE ${count} flashcards no array JSON. Não retorne menos que ${count} itens.`;
+  }
 
   const schemaHint = `[{ "front": string, "back": string, "explanation": string, "curiosity": string, "topic": string, "difficulty": string }, ...] — um array com exatamente ${count} objetos.`;
 
@@ -42,6 +57,18 @@ Cada flashcard deve conter:
       required: ['front', 'back', 'topic', 'explanation', 'curiosity'],
     },
   };
+
+  // Skip cache when using a custom prompt so edits are always reflected
+  if (customSystemPrompt && customSystemPrompt.trim()) {
+    const { data, providerUsed } = await aiOrchestrator.generateJSON({
+      systemPrompt,
+      userPrompt: prompt,
+      schemaHint,
+      geminiSchema,
+    });
+    const cards = Array.isArray(data) ? data : (data as any)?.cards ?? [];
+    return { cards, providerUsed };
+  }
 
   const result = await withCache(
     'generateFlashcards',

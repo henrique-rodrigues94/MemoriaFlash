@@ -20,6 +20,9 @@ import {
   Scan,
   X,
   FileUp,
+  Settings2,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Deck, Flashcard, QuizQuestion, UserStats } from '../types';
 import {
@@ -73,6 +76,20 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
   // AI Direct Generation state
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedCards, setGeneratedCards] = useState<Partial<Flashcard>[]>([]);
+  const [generationProgress, setGenerationProgress] = useState<{ done: number; total: number } | null>(null);
+
+  // Prompt editor state
+  const [showPromptEditor, setShowPromptEditor] = useState(false);
+  const DEFAULT_SYSTEM_PROMPT = `Você é o FlashMind AI, um assistente especialista em criação de flashcards educativos de alta retenção baseados no método de repetição espaçada (SRS SM-2).
+Crie exatamente {count} flashcards sobre o tema/conteúdo "{prompt}" em Português.{topics}
+Cada flashcard deve conter:
+- front: Uma pergunta clara, concisa e instigante.
+- back: Uma resposta completa com explicação sucinta e 2-3 pontos-chave em tópicos para facilidade de memorização.
+- explanation: Uma explicação detalhada do conceito com um EXEMPLO PRÁTICO do mundo real. Comece com "📘 Explicação:" e depois "💡 Exemplo Prático:".
+- curiosity: Uma curiosidade fascinante relacionada ao tema. Comece com "🌟 Curiosidade:".
+- topic: Subtópico específico do assunto.
+- difficulty: Classifique como "easy", "medium", "hard" ou "expert" de acordo com a complexidade real do conteúdo.`;
+  const [customSystemPrompt, setCustomSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
 
   // Upload state
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -177,7 +194,8 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
     }
   };
 
-  // Direct AI Generation
+  // Direct AI Generation (with batch chunking for large counts)
+  const BATCH_SIZE = 25;
   const handleGenerateAi = async () => {
     const finalPrompt =
       activeMode === 'upload'
@@ -196,15 +214,47 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
 
     setIsGenerating(true);
     setGeneratedCards([]);
+    setGenerationProgress(null);
+
     try {
-      const cards = await apiGenerateFlashcards(
-        finalPrompt,
-        cardCount,
-        currentLanguage,
-        difficulty,
-        selectedTopics
-      );
-      setGeneratedCards(cards);
+      if (cardCount <= BATCH_SIZE) {
+        // Single request — small deck
+        const cards = await apiGenerateFlashcards(
+          finalPrompt,
+          cardCount,
+          currentLanguage,
+          difficulty,
+          selectedTopics,
+          customSystemPrompt
+        );
+        setGeneratedCards(cards);
+      } else {
+        // Batch mode — split into chunks of BATCH_SIZE
+        const batches = Math.ceil(cardCount / BATCH_SIZE);
+        const allCards: Partial<Flashcard>[] = [];
+        setGenerationProgress({ done: 0, total: cardCount });
+
+        for (let b = 0; b < batches; b++) {
+          const remaining = cardCount - b * BATCH_SIZE;
+          const batchCount = Math.min(BATCH_SIZE, remaining);
+          const batchIndex = b + 1;
+
+          // Vary the prompt per batch to avoid duplicate cards
+          const batchPrompt = `${finalPrompt} [Lote ${batchIndex} de ${batches}: gere cards DIFERENTES dos lotes anteriores, abordando novos aspectos e subtópicos ainda não cobertos]`;
+
+          const cards = await apiGenerateFlashcards(
+            batchPrompt,
+            batchCount,
+            currentLanguage,
+            difficulty,
+            selectedTopics,
+            customSystemPrompt
+          );
+          allCards.push(...cards);
+          setGenerationProgress({ done: allCards.length, total: cardCount });
+          setGeneratedCards([...allCards]); // live preview
+        }
+      }
 
       if (!deckTitle) {
         setDeckTitle(`Deck: ${finalPrompt.slice(0, 24)}`);
@@ -216,6 +266,7 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
       alert(err.message || 'Falha ao gerar flashcards');
     } finally {
       setIsGenerating(false);
+      setGenerationProgress(null);
     }
   };
 
@@ -625,6 +676,64 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
             </select>
           </div>
 
+          {/* Prompt Editor (collapsible) */}
+          {aiSubMode === 'direct' && (
+            <div className="rounded-2xl bg-[#0b1a2a] border border-[#424754]/40 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowPromptEditor(!showPromptEditor)}
+                className="w-full flex items-center justify-between px-4 py-3 text-xs font-bold text-slate-300 hover:text-white cursor-pointer transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Settings2 className="w-4 h-4 text-amber-400" />
+                  Controle do Prompt da IA
+                  <span className="text-[10px] font-normal text-slate-500">(avançado)</span>
+                </span>
+                {showPromptEditor ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+              </button>
+              {showPromptEditor && (
+                <div className="px-4 pb-4 space-y-3 border-t border-[#424754]/30">
+                  <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
+                    Edite o system prompt enviado à IA. Use <code className="text-amber-300 bg-amber-500/10 px-1 rounded">{'{count}'}</code>, <code className="text-amber-300 bg-amber-500/10 px-1 rounded">{'{prompt}'}</code> e <code className="text-amber-300 bg-amber-500/10 px-1 rounded">{'{topics}'}</code> como variáveis.
+                  </p>
+                  <textarea
+                    rows={10}
+                    value={customSystemPrompt}
+                    onChange={(e) => setCustomSystemPrompt(e.target.value)}
+                    className="w-full bg-[#060f18] border border-[#424754]/50 rounded-xl p-3 text-[11px] text-slate-200 font-mono leading-relaxed focus:outline-none focus:border-amber-400/50 resize-y"
+                    placeholder="System prompt da IA..."
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCustomSystemPrompt(DEFAULT_SYSTEM_PROMPT)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold border border-slate-700 cursor-pointer"
+                    >
+                      ↩ Restaurar padrão
+                    </button>
+                    <span className="text-[10px] text-slate-600 self-center">{customSystemPrompt.length} chars</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Generation progress bar */}
+          {isGenerating && generationProgress && (
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-[10px] text-slate-400">
+                <span>Gerando em lotes...</span>
+                <span className="font-mono font-bold text-blue-300">{generationProgress.done} / {generationProgress.total} cards</span>
+              </div>
+              <div className="h-2 rounded-full bg-[#0b1a2a] border border-[#424754]/40 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500 rounded-full"
+                  style={{ width: `${Math.round((generationProgress.done / generationProgress.total) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Generate / Quiz buttons */}
           {aiSubMode === 'direct' ? (
             <button
@@ -634,7 +743,11 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-xl shadow-blue-500/25 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 hover:scale-[1.01]"
             >
               <Sparkles className="w-4 h-4 text-blue-300 animate-spin" />
-              {isGenerating ? 'Gemini IA Criando Flashcards...' : 'Gerar Deck com IA'}
+              {isGenerating
+                ? generationProgress
+                  ? `Lote ${Math.ceil(generationProgress.done / 25)} de ${Math.ceil(generationProgress.total / 25)} — ${generationProgress.done} cards prontos...`
+                  : 'IA Criando Flashcards...'
+                : 'Gerar Deck com IA'}
             </button>
           ) : (
             <div className="space-y-4 pt-2 border-t border-[#424754]/30">
@@ -756,13 +869,32 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
             <div className="space-y-4 pt-4 border-t border-[#424754]/30 animate-fade-in">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Prévia dos Cartões Gerados ({generatedCards.length})
+                {isGenerating && generationProgress && (
+                  <span className="text-[10px] text-blue-300 font-mono animate-pulse">gerando mais...</span>
+                )}
               </h3>
               <div className="space-y-3">
-                {generatedCards.map((card, idx) => (
+                {generatedCards.map((card, idx) => {
+                  const diff = (card as any).difficulty as string || 'medium';
+                  const diffStyles: Record<string, { badge: string; dot: string; label: string }> = {
+                    easy:   { badge: 'bg-blue-500/20 text-blue-300 border-blue-500/40',   dot: 'bg-blue-400',   label: 'Fácil' },
+                    medium: { badge: 'bg-green-500/20 text-green-300 border-green-500/40', dot: 'bg-green-400',  label: 'Médio' },
+                    hard:   { badge: 'bg-violet-500/20 text-violet-300 border-violet-500/40', dot: 'bg-violet-400', label: 'Difícil' },
+                    expert: { badge: 'bg-orange-500/20 text-orange-300 border-orange-500/40', dot: 'bg-orange-400', label: 'Especialista' },
+                  };
+                  const ds = diffStyles[diff] ?? diffStyles.medium;
+                  return (
                   <div key={idx} className="p-4 rounded-2xl bg-[#0b1a2a] border border-[#adc6ff]/20 space-y-2 text-xs">
-                    <span className="font-mono text-[10px] font-bold text-[#60a5fa]">
-                      CARD #{idx + 1} • {(card as any).topic || deckTitle}
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-[10px] font-bold text-[#60a5fa]">CARD #{idx + 1}</span>
+                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ${ds.badge}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${ds.dot}`} />
+                        {(card as any).topic || deckTitle}
+                      </span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${ds.badge}`}>
+                        {ds.label}
+                      </span>
+                    </div>
                     <div><strong className="text-[#8c91a0]">P:</strong> <span className="text-white font-bold">{card.front}</span></div>
                     <div><strong className="text-[#8c91a0]">R:</strong> <span className="text-slate-300">{card.back}</span></div>
                     {(card as any).explanation && (
@@ -772,7 +904,8 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
                       <div className="p-2 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-200">{(card as any).curiosity}</div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
               <button
                 id="btn-save-generated-deck"
@@ -856,9 +989,25 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
             <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Flashcards Gerados do Documento ({generatedCards.length})
           </h3>
           <div className="space-y-3">
-            {generatedCards.map((card, idx) => (
+            {generatedCards.map((card, idx) => {
+              const diff = (card as any).difficulty as string || 'medium';
+              const diffStyles: Record<string, { badge: string; dot: string; label: string }> = {
+                easy:   { badge: 'bg-blue-500/20 text-blue-300 border-blue-500/40',   dot: 'bg-blue-400',   label: 'Fácil' },
+                medium: { badge: 'bg-green-500/20 text-green-300 border-green-500/40', dot: 'bg-green-400',  label: 'Médio' },
+                hard:   { badge: 'bg-violet-500/20 text-violet-300 border-violet-500/40', dot: 'bg-violet-400', label: 'Difícil' },
+                expert: { badge: 'bg-orange-500/20 text-orange-300 border-orange-500/40', dot: 'bg-orange-400', label: 'Especialista' },
+              };
+              const ds = diffStyles[diff] ?? diffStyles.medium;
+              return (
               <div key={idx} className="p-4 rounded-2xl bg-[#0b1a2a] border border-[#adc6ff]/20 space-y-2 text-xs">
-                <span className="font-mono text-[10px] font-bold text-violet-400">CARD #{idx + 1}</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-[10px] font-bold text-violet-400">CARD #{idx + 1}</span>
+                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ${ds.badge}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${ds.dot}`} />
+                    {(card as any).topic || deckTitle}
+                  </span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${ds.badge}`}>{ds.label}</span>
+                </div>
                 <div><strong className="text-[#8c91a0]">P:</strong> <span className="text-white font-bold">{card.front}</span></div>
                 <div><strong className="text-[#8c91a0]">R:</strong> <span className="text-slate-300">{card.back}</span></div>
                 {(card as any).explanation && (
@@ -868,7 +1017,8 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
                   <div className="p-2 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-200">{(card as any).curiosity}</div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
           <button
             onClick={handleSaveDeck}
