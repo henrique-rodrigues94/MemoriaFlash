@@ -433,7 +433,7 @@ export function App() {
                 setActiveTab={setActiveTab}
                 onStartStudySession={handleStartStudySession}
                 onManageDeck={(deck) => setManagedDeck(deck)}
-                onOpenQuickCreate={() => setActiveTab('create')}
+                onOpenQuickCreate={() => setActiveTab('cards')}
                 onOpenAdMob={() => setShowAdMobModal(true)}
                 onOpenSubscription={() => setShowSubscriptionModal(true)}
                 onOpenReferral={() => setShowReferralModal(true)}
@@ -447,7 +447,7 @@ export function App() {
                 setActiveTab={setActiveTab}
                 onStartStudySession={handleStartStudySession}
                 onManageDeck={(deck) => setManagedDeck(deck)}
-                onOpenQuickCreate={() => setActiveTab('create')}
+                onOpenQuickCreate={() => setActiveTab('cards')}
               />
             )}
 
