@@ -137,12 +137,30 @@ function buildTopicsFallback(prompt: string): string[] {
   ];
 }
 
-function buildQuizFallback(topic: string) {
-  return Array.from({ length: 5 }).map((_, i) => ({
-    question: `[Offline] Pergunta ${i + 1} sobre ${topic}?`,
-    options: ['Opção A', 'Opção B', 'Opção C', 'Opção D'],
+// Extrai o tema real do prompt do quiz ("...sobre X." / "...sobre X")
+function extractQuizTopic(prompt: string): string {
+  const m = prompt.match(/sobre\s+"?([^".\n]+)"?/i);
+  return m ? m[1].trim() : prompt.replace(/^Tema:\s*/i, '').split('\n')[0].trim() || 'o tema';
+}
+
+function buildQuizFallback(prompt: string) {
+  const topic = extractQuizTopic(prompt);
+  const questionTemplates = [
+    (t: string) => `O que é ${t}?`,
+    (t: string) => `Quais são as principais características de ${t}?`,
+    (t: string) => `Como funciona ${t} na prática?`,
+    (t: string) => `Qual a importância de ${t}?`,
+  ];
+  return Array.from({ length: 4 }).map((_, i) => ({
+    question: questionTemplates[i % questionTemplates.length](topic),
+    options: [
+      `${topic} é um conceito essencial da área de estudo`,
+      `${topic} é um tópico avançado sem aplicação prática`,
+      `${topic} não se relaciona com os demais conteúdos`,
+      `${topic} só é relevante em provas específicas`,
+    ],
     correctIndex: 0,
-    explanation: 'Geração offline: reconecte-se para perguntas geradas por IA.',
+    explanation: `O conceito central de "${topic}" deve ser estudado a partir de suas definições, características e exemplos práticos.`,
   }));
 }
 
