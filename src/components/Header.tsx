@@ -75,9 +75,10 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onOpenSubscription}
             className={`px-2.5 py-1 rounded-full border text-[11px] font-mono font-extrabold flex items-center gap-1.5 cursor-pointer hover:scale-105 transition-transform ${isLightTheme ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border-amber-500/40'}`}
-            title="Sua conta é PRO Ilimitada"
+            title={stats.proPlanType === 'monthly' ? 'Sua conta é PRO — Plano Mensal' : stats.proPlanType === 'annual' ? 'Sua conta é PRO — Plano Anual' : 'Sua conta é PRO Ilimitada'}
           >
-            <Crown className="w-3.5 h-3.5 text-amber-400" /> PRO
+            <Crown className="w-3.5 h-3.5 text-amber-400" />
+            {stats.proPlanType === 'monthly' ? 'Plano Mensal' : stats.proPlanType === 'annual' ? 'Plano Anual' : 'PRO'}
           </button>
         ) : (
           <button

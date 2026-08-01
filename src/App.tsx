@@ -554,6 +554,7 @@ export function App() {
         {showSubscriptionModal && (
           <SubscriptionModal
             stats={stats}
+            theme={theme}
             onUpgradePro={handleUpgradePro}
             onOpenAdMob={() => {
               setShowSubscriptionModal(false);

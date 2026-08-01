@@ -148,7 +148,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <Cloud className="w-4 h-4" /> Nuvem Ativa
               </div>
               <div className="font-mono font-bold text-[#adc6ff]">
-                {stats.isPro ? 'Plano PRO' : `${stats.aiCredits || 0} Créditos`}
+                {stats.isPro
+                  ? stats.proPlanType === 'monthly'
+                    ? 'Plano Mensal'
+                    : stats.proPlanType === 'annual'
+                      ? 'Plano Anual'
+                      : 'Plano PRO'
+                  : `${stats.aiCredits || 0} Créditos`}
               </div>
             </div>
 
