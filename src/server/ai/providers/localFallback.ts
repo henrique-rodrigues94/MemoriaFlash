@@ -53,37 +53,62 @@ export const localFallbackProvider: AIProvider = {
 
 function buildFlashcardsFallback(topic: string, subtopics: string[] = []) {
   const extractedTopic = topic.replace(/^Tema:\s*/i, '').split('\n')[0].trim();
+  const fallbackTopics = subtopics.length > 0 ? subtopics : [extractedTopic];
 
-  const questionTemplates = [
-    (t: string) => `Qual é a definição de ${t}?`,
-    (t: string) => `Quais são as principais características de ${t}?`,
-    (t: string) => `Como funciona ${t}?`,
-    (t: string) => `Quais são os tipos de ${t}?`,
-    (t: string) => `Qual a importância de ${t}?`,
-    (t: string) => `Quais são as aplicações práticas de ${t}?`,
-  ];
-
-  const answerTemplates = [
-    (t: string) =>
-      `${t} pode ser definido como um conjunto de conceitos e práticas fundamentais na área estudada.\n\n• Ponto chave 1: Revise o material original para uma definição precisa.\n• Ponto chave 2: Pratique com exemplos reais para melhor fixação.`,
-    (t: string) =>
-      `As principais características de ${t} incluem aspectos técnicos e práticos da área.\n\n• Ponto chave 1: Identifique os elementos centrais do conceito.\n• Ponto chave 2: Compare com conceitos relacionados para entender diferenças.`,
-    (t: string) =>
-      `O funcionamento de ${t} envolve processos e mecanismos específicos da área de estudo.\n\n• Ponto chave 1: Compreenda o fluxo ou sequência de etapas envolvidas.\n• Ponto chave 2: Relacione com exemplos do cotidiano para fixação.`,
-    (t: string) =>
-      `Os tipos de ${t} são classificados conforme suas características e aplicações.\n\n• Ponto chave 1: Memorize as categorias principais e seus critérios.\n• Ponto chave 2: Saiba distinguir as diferenças entre cada tipo.`,
-    (t: string) =>
-      `A importância de ${t} está relacionada ao seu impacto e utilidade na área estudada.\n\n• Ponto chave 1: Entenda o contexto histórico e prático do tema.\n• Ponto chave 2: Associe à relevância atual no campo de estudo.`,
-    (t: string) =>
-      `As aplicações práticas de ${t} abrangem situações reais e casos de uso concretos.\n\n• Ponto chave 1: Identifique exemplos reais de aplicação.\n• Ponto chave 2: Pratique resolvendo problemas relacionados.`,
+  // Templates combinados: pergunta ↔ resposta ↔ explicação(exemplo) coerentes,
+  // específicos do tópico — nunca respostas genéricas desconexas.
+  const cardTemplates = [
+    {
+      question: (t: string) => `O que é ${t}?`,
+      answer: (t: string) =>
+        `${t} é um conceito essencial da área, definido por características e regras próprias que precisam ser estudadas com atenção.`,
+      explanation: (t: string) =>
+        `📘 Explicação: ${t} é um conceito fundamental que se aplica em diversos contextos práticos.\n💡 Exemplo: Ao estudar ${t}, procure relacionar com situações reais do dia a dia para fixar melhor o conteúdo.`,
+    },
+    {
+      question: (t: string) => `Quais são as principais características de ${t}?`,
+      answer: (t: string) =>
+        `As principais características de ${t} incluem: definição clara, exemplos de aplicação, regras principais e casos especiais que diferenciam o conceito.`,
+      explanation: (t: string) =>
+        `📘 Explicação: Para entender ${t}, analise primeiro sua definição, depois as características que o distinguem de conceitos semelhantes.\n💡 Exemplo: Compare ${t} com um caso prático do seu cotidiano para enxergar suas características na prática.`,
+    },
+    {
+      question: (t: string) => `Como funciona ${t} na prática?`,
+      answer: (t: string) =>
+        `Na prática, ${t} funciona através de etapas e mecanismos próprios: identificação do contexto, aplicação das regras do conceito e verificação do resultado obtido.`,
+      explanation: (t: string) =>
+        `📘 Explicação: O funcionamento de ${t} envolve um processo com passos bem definidos.\n💡 Exemplo: Pense em ${t} como uma receita: siga cada passo em ordem e o resultado será previsível e correto.`,
+    },
+    {
+      question: (t: string) => `Quais são os tipos de ${t}?`,
+      answer: (t: string) =>
+        `Os tipos de ${t} variam conforme o contexto, mas podem ser organizados em categorias principais, cada uma com características e finalidades específicas.`,
+      explanation: (t: string) =>
+        `📘 Explicação: Classificar ${t} em tipos ajuda a memorizar as variações e saber quando aplicar cada um.\n💡 Exemplo: Assim como os animais são classificados em grupos, ${t} pode ser dividido em categorias para facilitar o estudo.`,
+    },
+    {
+      question: (t: string) => `Qual a importância de ${t}?`,
+      answer: (t: string) =>
+        `A importância de ${t} está no seu papel central dentro da área: é a base para entender tópicos mais avançados e para resolver problemas práticos.`,
+      explanation: (t: string) =>
+        `📘 Explicação: ${t} é importante porque conecta a teoria à prática e fundamenta o restante da matéria.\n💡 Exemplo: Dominar ${t} é como dominar o alfabeto antes de formar palavras e frases completas.`,
+    },
+    {
+      question: (t: string) => `Quais são as aplicações práticas de ${t}?`,
+      answer: (t: string) =>
+        `As aplicações práticas de ${t} incluem seu uso em situações reais: resolução de problemas, tomada de decisão e embasamento de tópicos mais avançados.`,
+      explanation: (t: string) =>
+        `📘 Explicação: ${t} se aplica diretamente em cenários reais da profissão ou dos estudos.\n💡 Exemplo: Profissionais usam ${t} diariamente para resolver problemas e tomar decisões mais assertivas.`,
+    },
   ];
 
   return Array.from({ length: 6 }).map((_, i) => {
-    const cardTopic = subtopics[i % Math.max(subtopics.length, 1)] || extractedTopic;
-    const tmplIdx = i % questionTemplates.length;
+    const cardTopic = fallbackTopics[i % Math.max(fallbackTopics.length, 1)];
+    const tmpl = cardTemplates[i % cardTemplates.length];
     return {
-      front: questionTemplates[tmplIdx](cardTopic),
-      back: answerTemplates[tmplIdx](cardTopic),
+      front: tmpl.question(cardTopic),
+      back: tmpl.answer(cardTopic),
+      explanation: tmpl.explanation(cardTopic),
       topic: cardTopic,
       difficulty: 'medium',
     };
