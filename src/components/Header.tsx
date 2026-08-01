@@ -68,9 +68,6 @@ export const Header: React.FC<HeaderProps> = ({
           <span className={`font-bold text-lg sm:text-xl tracking-tight transition-colors ${isLightTheme ? 'text-[#1d4ed8] group-hover:text-[#2563eb]' : 'text-[#adc6ff] group-hover:text-white'}`}>
             FlashMind
           </span>
-          <span className={`hidden sm:inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full border ${isLightTheme ? 'bg-[#eff6ff] text-[#2563eb] border-[#bfdbfe]' : 'bg-[#adc6ff]/10 text-[#adc6ff] border-[#adc6ff]/20'}`}>
-            <Sparkles className={`w-3 h-3 ${isLightTheme ? 'text-[#2563eb]' : 'text-[#60a5fa]'}`} /> v2.4 SRS
-          </span>
         </div>
 
         {/* AI Credits / PRO Badge */}
