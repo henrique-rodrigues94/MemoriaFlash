@@ -415,15 +415,6 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
         </div>
       )}
 
-      {/* Instruction when card not flipped */}
-      {!isFlipped && (
-        <div className="text-center py-2 pb-3 text-xs text-[#8c91a0] animate-fade-in shrink-0">
-          <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#122131] border border-[#424754]/30">
-            <RotateCw className="w-3.5 h-3.5 text-[#60a5fa]" />
-            Vire o cartão para ver a resposta e avaliar
-          </span>
-        </div>
-      )}
     </div>
   );
 };
