@@ -6,7 +6,6 @@ import {
   XCircle,
   ArrowLeft,
   Award,
-  Zap,
   Lightbulb,
   X,
   AlertTriangle,
@@ -186,8 +185,6 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
     }
   };
 
-  const xpEarned = reviewedCount * 25;
-
   // ── Session Complete Screen ──
   if (sessionCompleted || !currentCard) {
     return (
@@ -203,18 +200,10 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
             Você revisou <strong className="text-[#adc6ff]">{reviewedCount} cartões</strong> e atualizou os intervalos de retenção SM-2 no seu cérebro.
           </p>
         </div>
-        <div className="p-4 rounded-2xl bg-[#122131] border border-[#adc6ff]/20 flex items-center justify-around text-center">
-          <div>
-            <div className="text-[10px] text-[#8c91a0] uppercase font-mono">Ganho de XP</div>
-            <div className="text-xl font-extrabold text-[#60a5fa] flex items-center justify-center gap-1">
-              <Zap className="w-4 h-4" /> +{xpEarned} XP
-            </div>
-          </div>
-          <div className="w-px h-8 bg-[#424754]/40" />
-          <div>
-            <div className="text-[10px] text-[#8c91a0] uppercase font-mono">Cards Hoje</div>
-            <div className="text-xl font-extrabold text-emerald-400">{reviewedCount}</div>
-          </div>
+
+        <div className="p-4 rounded-2xl bg-[#122131] border border-[#adc6ff]/20">
+          <div className="text-[10px] text-[#8c91a0] uppercase font-mono">Cards Hoje</div>
+          <div className="text-xl font-extrabold text-emerald-400">{reviewedCount}</div>
         </div>
 
         <button
@@ -222,7 +211,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
           onClick={handleCompleteAndReturn}
           className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm shadow-xl shadow-blue-600/30 hover:scale-[1.02] transition-all cursor-pointer"
         >
-          Salvar Progresso e Voltar
+          Voltar para Estudo
         </button>
       </div>
     );
