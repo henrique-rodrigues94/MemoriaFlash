@@ -286,6 +286,17 @@ export function App() {
     saveDeckToFirestore(updatedDeck);
   };
 
+  // Salva o progresso do estudo automaticamente a cada card (mantém a sessão aberta)
+  const handleSaveStudyProgress = (updatedDeck: Deck) => {
+    const exists = decks.some((d) => d.id === updatedDeck.id);
+    if (exists) {
+      setDecks(decks.map((d) => (d.id === updatedDeck.id ? updatedDeck : d)));
+    } else {
+      setDecks([updatedDeck, ...decks]);
+    }
+    saveDeckToFirestore(updatedDeck);
+  };
+
   const handleDeleteDeck = (deckId: string) => {
     setDecks(decks.filter((d) => d.id !== deckId));
     deleteDeckFromFirestore(deckId);
@@ -407,6 +418,7 @@ export function App() {
             deck={activeStudyDeck}
             currentLanguage={currentLanguage}
             onFinishSession={handleFinishStudySession}
+            onSaveProgress={handleSaveStudyProgress}
             onBack={() => setActiveStudyDeck(null)}
           />
         ) : (

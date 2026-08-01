@@ -69,6 +69,8 @@ interface StudySessionViewProps {
   deck: Deck;
   currentLanguage?: SupportedLanguage;
   onFinishSession: (updatedDeck: Deck, cardsReviewedCount: number) => void;
+  // Salva o progresso automaticamente a cada card avaliado (sem fechar a sessão)
+  onSaveProgress?: (updatedDeck: Deck) => void;
   onBack: () => void;
 }
 
@@ -76,6 +78,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   deck,
   currentLanguage = 'pt',
   onFinishSession,
+  onSaveProgress,
   onBack,
 }) => {
   const t = translations[currentLanguage] || translations.pt;
@@ -95,20 +98,8 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
-  // Inverte pergunta/resposta ao revisar (útil para consolidar a resposta como estímulo)
-  const [invertCards, setInvertCards] = useState(false);
 
-  // Cards com pergunta/resposta invertidas (resposta vira pergunta e vice-versa)
-  const effectiveCards = invertCards
-    ? cards.map((c) => ({
-        ...c,
-        front: c.back,
-        back: c.front,
-        explanation: c.explanation,
-        curiosity: c.curiosity,
-      }))
-    : cards;
-  const currentCard = effectiveCards[currentIndex];
+  const currentCard = cards[currentIndex];
 
   const handleFlip = () => {
     setIsFlipped((prev) => !prev);
@@ -123,10 +114,16 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
     const updatedList = [...cards];
     updatedList[currentIndex] = updatedCard;
     setCards(updatedList);
-    setReviewedCount((prev) => prev + 1);
+    const newReviewedCount = reviewedCount + 1;
+    setReviewedCount(newReviewedCount);
 
     setIsFlipped(false);
     setAiExplanation(null);
+
+    // Salva automaticamente o progresso (deck + intervalo SM-2) a cada card avaliado
+    const updatedCardMap = new Map(updatedList.map((c) => [c.id, c]));
+    const mergedCards = deck.cards.map((c) => updatedCardMap.get(c.id) || c);
+    if (onSaveProgress) onSaveProgress({ ...deck, cards: mergedCards });
 
     if (currentIndex + 1 < cards.length) {
       setCurrentIndex(currentIndex + 1);
@@ -162,20 +159,10 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
     }
   };
 
-  const handleCompleteAndReturn = (shouldInvert: boolean = invertCards) => {
+  const handleCompleteAndReturn = () => {
     const updatedCardMap = new Map(cards.map((c) => [c.id, c]));
     const mergedCards = deck.cards.map((c) => updatedCardMap.get(c.id) || c);
-
-    // Se o usuário quiser inverter, troca front/back de todos os cards antes de salvar
-    const finalCards = shouldInvert
-      ? mergedCards.map((c) => ({
-          ...c,
-          front: c.back,
-          back: c.front,
-        }))
-      : mergedCards;
-
-    const updatedDeck: Deck = { ...deck, cards: finalCards };
+    const updatedDeck: Deck = { ...deck, cards: mergedCards };
     onFinishSession(updatedDeck, reviewedCount);
   };
 
@@ -218,28 +205,9 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
           </div>
         </div>
 
-        {/* Opção de inverter resposta com pergunta antes de sair */}
-        <button
-          type="button"
-          onClick={() => setInvertCards((prev) => !prev)}
-          className={`w-full py-3 rounded-2xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-            invertCards
-              ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
-              : 'bg-[#122131] border-[#424754]/40 text-[#8c91a0] hover:border-violet-500/40 hover:text-violet-300'
-          }`}
-        >
-          <RotateCw className={`w-4 h-4 ${invertCards ? 'text-violet-400' : ''}`} />
-          {invertCards ? '✓ Inverter Resposta com Pergunta (ativo)' : 'Inverter Resposta com Pergunta'}
-        </button>
-        {invertCards && (
-          <p className="text-[11px] text-[#8c91a0] -mt-2">
-            A resposta virará a pergunta e a pergunta virará a resposta ao salvar.
-          </p>
-        )}
-
         <button
           id="btn-finish-study-session"
-          onClick={() => handleCompleteAndReturn(invertCards)}
+          onClick={handleCompleteAndReturn}
           className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm shadow-xl shadow-blue-600/30 hover:scale-[1.02] transition-all cursor-pointer"
         >
           Salvar Progresso e Voltar
@@ -334,28 +302,14 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
 
       {/* Cabeçalho + progresso + botão explicar (área fixa no topo) */}
       <div className="flex flex-col gap-3 shrink-0 pt-3">
-        {/* Header: Sair da Sessão (esquerda) + Inverter Resposta/Pergunta (direita) */}
-        <div className="flex items-center justify-between gap-2">
+        {/* Header: Sair da Sessão */}
+        <div className="flex items-center justify-between">
           <button
             id="btn-back-to-dashboard"
             onClick={handleBackRequest}
             className="p-2 rounded-xl bg-[#122131] text-[#c2c6d6] hover:text-white transition-colors flex items-center gap-2 text-xs font-medium"
           >
             <ArrowLeft className="w-4 h-4" /> Sair da Sessão
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setInvertCards((prev) => !prev)}
-            title={invertCards ? 'Desativar inversão de pergunta/resposta' : 'Inverter resposta com pergunta'}
-            className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              invertCards
-                ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
-                : 'bg-[#122131] border-[#424754]/40 text-[#8c91a0] hover:border-violet-500/40 hover:text-violet-300'
-            }`}
-          >
-            <RotateCw className={`w-4 h-4 ${invertCards ? 'text-violet-400' : ''}`} />
-            <span className="hidden sm:inline">{invertCards ? 'Inversão ativa' : 'Inverter Resposta/Pergunta'}</span>
           </button>
         </div>
 
