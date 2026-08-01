@@ -22,6 +22,11 @@ export class AIOrchestrator {
 
   constructor(private providers: AIProvider[]) {}
 
+  /** Expõe a lista de provedores (para gerenciamento/status). */
+  getProviders(): AIProvider[] {
+    return this.providers;
+  }
+
   private isAvailable(p: AIProvider): boolean {
     if (!p.isConfigured()) return false;
     const cd = this.cooldowns.get(p.id);

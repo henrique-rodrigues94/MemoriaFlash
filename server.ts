@@ -72,6 +72,13 @@ app.post('/api/gemini/suggest-topics', async (req, res) => {
   }
 });
 
+// Gerenciamento de provedores de IA: limpa cooldowns (após aguardar o reset
+// do rate limit, ex.: reset diário do OpenRouter free ou janela do Groq).
+app.post('/api/ai/reset-cooldowns', (_req, res) => {
+  aiOrchestrator.getProviders().forEach((p) => aiOrchestrator.resetCooldown(p.id));
+  res.json({ ok: true, status: aiOrchestrator.getStatus() });
+});
+
 // Endpoint: AI Diagnostic Quiz Analysis & Targeted Flashcard Generator
 app.post('/api/gemini/quiz-diagnostic', async (req, res) => {
   try {
