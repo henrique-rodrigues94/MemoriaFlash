@@ -28,8 +28,8 @@ export const localFallbackProvider: AIProvider = {
       return buildFlashcardsFallback(topic, subtopics, requestedCount);
     }
     if (hint.includes('topics')) {
-      // Retorna array vazio — o cliente detecta e exibe aviso de configuração
-      return { topics: [] };
+      // Gera sugestões úteis a partir do tema (mesmo offline)
+      return { topics: buildTopicsFallback(params.userPrompt) };
     }
     if (hint.includes('diagnosticsummary')) {
       return {
@@ -119,6 +119,22 @@ function buildFlashcardsFallback(topic: string, subtopics: string[] = [], count:
       difficulty: 'medium',
     };
   });
+}
+
+// Gera sugestões de subtópicos úteis a partir do tema informado (offline).
+function buildTopicsFallback(prompt: string): string[] {
+  const titleMatch = prompt.match(/assunto\s+"([^"]+)"/i);
+  const title = titleMatch ? titleMatch[1].trim() : prompt.slice(0, 60).replace(/^Tema:\s*/i, '').trim();
+  const t = title || 'o tema';
+
+  return [
+    `Conceitos fundamentais de ${t}`,
+    `Principais definições e termos de ${t}`,
+    `Aplicações práticas de ${t}`,
+    `Exemplos reais envolvendo ${t}`,
+    `Regras e exceções de ${t}`,
+    `Questões frequentes sobre ${t}`,
+  ];
 }
 
 function buildQuizFallback(topic: string) {
