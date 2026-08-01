@@ -204,7 +204,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   const progressPercent = Math.round(((currentIndex + 1) / cards.length) * 100);
 
   return (
-    <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto h-[100dvh] flex flex-col gap-4 sm:gap-5 overflow-hidden animate-fade-in">
+    <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto h-[100dvh] flex flex-col gap-4 sm:gap-5 overflow-hidden animate-fade-in px-3 sm:px-6 py-3">
 
       {/* Exit confirm modal */}
       {showExitConfirm && (
