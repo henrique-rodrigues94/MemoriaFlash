@@ -18,6 +18,43 @@ import { calculateSM2 } from '../services/srsEngine';
 import { apiVoiceTutor } from '../services/api';
 import { SupportedLanguage, translations } from '../lib/i18n';
 
+// Define um tamanho de fonte que se ajusta ao comprimento do texto E à altura
+// do card (cqh = 1% da altura do container do card), garantindo que o texto
+// permaneça sempre visível dentro do card, mesmo com textos muito grandes.
+function responsiveFontSize(text: string, kind: 'question' | 'answer' = 'question'): string {
+  const len = (text || '').length;
+  const isQuestion = kind === 'question';
+
+  // Percentual da altura do card usado como fonte-base
+  let sizeCqh: number;
+  let maxPx: number;
+  let minPx: number;
+
+  if (len <= 60) {
+    sizeCqh = isQuestion ? 6.5 : 4.5;
+    maxPx = isQuestion ? 46 : 34;
+    minPx = 16;
+  } else if (len <= 110) {
+    sizeCqh = isQuestion ? 5.5 : 4;
+    maxPx = isQuestion ? 38 : 30;
+    minPx = 15;
+  } else if (len <= 180) {
+    sizeCqh = isQuestion ? 4.6 : 3.4;
+    maxPx = isQuestion ? 32 : 26;
+    minPx = 14;
+  } else if (len <= 280) {
+    sizeCqh = isQuestion ? 3.7 : 2.9;
+    maxPx = isQuestion ? 27 : 22;
+    minPx = 13;
+  } else {
+    sizeCqh = isQuestion ? 3 : 2.4;
+    maxPx = isQuestion ? 22 : 19;
+    minPx = 12;
+  }
+
+  return `clamp(${minPx}px, ${sizeCqh}cqh, ${maxPx}px)`;
+}
+
 interface StudySessionViewProps {
   deck: Deck;
   currentLanguage?: SupportedLanguage;
@@ -342,7 +379,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
       <div
         id="flashcard-flip-container"
         onClick={handleFlip}
-        className="flex-1 min-h-0 cursor-pointer select-none"
+        className="flex-1 min-h-0 cursor-pointer select-none [container-type:size]"
       >
         {!isFlipped ? (
           /* FRONT */
@@ -355,7 +392,10 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
 
             <div className="my-auto text-center space-y-3 overflow-hidden">
               <p className="text-xs font-mono text-[#8c91a0] uppercase tracking-wider">Pergunta</p>
-              <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-relaxed break-words">
+              <h3
+                className="font-bold text-white leading-snug break-words"
+                style={{ fontSize: responsiveFontSize(currentCard.front, 'question') }}
+              >
                 {currentCard.front}
               </h3>
             </div>
@@ -374,7 +414,10 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
             </div>
 
             <div className="my-auto space-y-3 overflow-y-auto pr-1 min-h-0">
-              <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-medium text-slate-100 whitespace-pre-line leading-relaxed">
+              <div
+                className="font-medium text-slate-100 whitespace-pre-line leading-relaxed"
+                style={{ fontSize: responsiveFontSize(currentCard.back, 'answer') }}
+              >
                 {currentCard.back}
               </div>
 
