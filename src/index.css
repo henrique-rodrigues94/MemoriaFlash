@@ -19,7 +19,7 @@ body {
 }
 
 :root[data-theme='light'] body {
-  background: #f4f7fb;
+  background: #f5f9fc;
   color: #14213d;
 }
 
@@ -29,6 +29,12 @@ body {
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(173, 198, 255, 0.12);
+  }
+
+  :root[data-theme='light'] .glass-card {
+    background: rgba(245, 249, 252, 0.75);
+    border: 1px solid rgba(37, 99, 235, 0.1);
+    box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
   }
 
   .ai-glow-border {
@@ -79,6 +85,159 @@ body {
 .waveform-bar {
   animation: wave 1.4s ease-in-out infinite;
 }
+
+/* ============================================================
+   TEMA CLARO — sobrescreve os tokens de cor "escuros" usados
+   nos componentes (classes arbitrárias e slate-*) para produzir
+   um visual branco, com cores suaves quando data-theme='light'.
+   Gerado a partir dos tokens de cor realmente usados no app.
+   ============================================================ */
+/* Generated light-theme overrides: 98 rules, 0 skipped */
+:root[data-theme='light'] .bg-\[\#051424\] { background-color: #f5f9fc; }
+:root[data-theme='light'] .bg-\[\#051424\]\/80 { background-color: rgba(245, 249, 252, 0.8); }
+:root[data-theme='light'] .bg-\[\#051424\]\/90 { background-color: rgba(245, 249, 252, 0.9); }
+:root[data-theme='light'] .bg-\[\#0b1a2a\] { background-color: #f5f9fc; }
+:root[data-theme='light'] .bg-\[\#0b1a2a\]\/40 { background-color: rgba(245, 249, 252, 0.4); }
+:root[data-theme='light'] .bg-\[\#0b1a2a\]\/60 { background-color: rgba(245, 249, 252, 0.6); }
+:root[data-theme='light'] .bg-\[\#0b1a2a\]\/70 { background-color: rgba(245, 249, 252, 0.7); }
+:root[data-theme='light'] .bg-\[\#0b1a2a\]\/80 { background-color: rgba(245, 249, 252, 0.8); }
+:root[data-theme='light'] .bg-\[\#0b1a2a\]\/90 { background-color: rgba(245, 249, 252, 0.9); }
+:root[data-theme='light'] .bg-\[\#0b1a2a\]\/95 { background-color: rgba(245, 249, 252, 0.95); }
+:root[data-theme='light'] .bg-\[\#0c1e30\] { background-color: #f7fafd; }
+:root[data-theme='light'] .bg-\[\#0e2742\] { background-color: #eef4fb; }
+:root[data-theme='light'] .bg-\[\#122131\] { background-color: #f1f5f9; }
+:root[data-theme='light'] .bg-\[\#122131\]\/50 { background-color: rgba(241, 245, 249, 0.5); }
+:root[data-theme='light'] .bg-\[\#122131\]\/60 { background-color: rgba(241, 245, 249, 0.6); }
+:root[data-theme='light'] .bg-\[\#122131\]\/80 { background-color: rgba(241, 245, 249, 0.8); }
+:root[data-theme='light'] .bg-\[\#122238\] { background-color: #eef2f9; }
+:root[data-theme='light'] .bg-\[\#163a61\] { background-color: #dbe9fb; }
+:root[data-theme='light'] .bg-\[\#1a2d42\] { background-color: #e7edf5; }
+:root[data-theme='light'] .bg-\[\#1c2b3c\] { background-color: #e7edf5; }
+:root[data-theme='light'] .bg-\[\#2563eb\] { background-color: #2563eb; }
+:root[data-theme='light'] .bg-\[\#3b82f6\] { background-color: #3b82f6; }
+:root[data-theme='light'] .bg-\[\#3b82f6\]\/10 { background-color: rgba(59, 130, 246, 0.1); }
+:root[data-theme='light'] .bg-\[\#3b82f6\]\/20 { background-color: rgba(59, 130, 246, 0.2); }
+:root[data-theme='light'] .bg-\[\#3b82f6\]\/30 { background-color: rgba(59, 130, 246, 0.3); }
+:root[data-theme='light'] .bg-\[\#3b82f6\]\/60 { background-color: rgba(59, 130, 246, 0.6); }
+:root[data-theme='light'] .bg-\[\#424754\]\/40 { background-color: rgba(226, 232, 240, 0.4); }
+:root[data-theme='light'] .bg-\[\#4d8eff\] { background-color: #4d8eff; }
+:root[data-theme='light'] .bg-\[\#4d8eff\]\/10 { background-color: rgba(77, 142, 255, 0.1); }
+:root[data-theme='light'] .bg-\[\#60a5fa\] { background-color: #60a5fa; }
+:root[data-theme='light'] .bg-\[\#60a5fa\]\/20 { background-color: rgba(96, 165, 250, 0.2); }
+:root[data-theme='light'] .bg-\[\#60a5fa\]\/30 { background-color: rgba(96, 165, 250, 0.3); }
+:root[data-theme='light'] .bg-\[\#D8EFEF\]\/10 { background-color: rgba(236, 253, 249, 0.1); }
+:root[data-theme='light'] .bg-\[\#adc6ff\]\/10 { background-color: rgba(147, 197, 253, 0.1); }
+:root[data-theme='light'] .bg-\[\#adc6ff\]\/15 { background-color: rgba(147, 197, 253, 0.15); }
+:root[data-theme='light'] .bg-\[\#adc6ff\]\/30 { background-color: rgba(147, 197, 253, 0.3); }
+:root[data-theme='light'] .bg-\[\#f4f7fb\] { background-color: #f4f7fb; }
+:root[data-theme='light'] .bg-\[\#ffb786\]\/10 { background-color: rgba(255, 237, 213, 0.1); }
+:root[data-theme='light'] .bg-\[\#ffb786\]\/20 { background-color: rgba(255, 237, 213, 0.2); }
+:root[data-theme='light'] .border-\[\#051424\] { border-color: #e2e8f0; }
+:root[data-theme='light'] .border-\[\#3b82f6\]\/20 { border-color: rgba(147, 197, 253, 0.2); }
+:root[data-theme='light'] .border-\[\#3b82f6\]\/30 { border-color: rgba(147, 197, 253, 0.3); }
+:root[data-theme='light'] .border-\[\#3b82f6\]\/40 { border-color: rgba(147, 197, 253, 0.4); }
+:root[data-theme='light'] .border-\[\#3b82f6\]\/50 { border-color: rgba(147, 197, 253, 0.5); }
+:root[data-theme='light'] .border-\[\#424754\]\/20 { border-color: rgba(226, 232, 240, 0.2); }
+:root[data-theme='light'] .border-\[\#424754\]\/30 { border-color: rgba(226, 232, 240, 0.3); }
+:root[data-theme='light'] .border-\[\#424754\]\/40 { border-color: rgba(226, 232, 240, 0.4); }
+:root[data-theme='light'] .border-\[\#424754\]\/50 { border-color: rgba(226, 232, 240, 0.5); }
+:root[data-theme='light'] .border-\[\#4d8eff\]\/60 { border-color: rgba(147, 197, 253, 0.6); }
+:root[data-theme='light'] .border-\[\#60a5fa\] { border-color: #93c5fd; }
+:root[data-theme='light'] .border-\[\#60a5fa\]\/30 { border-color: rgba(147, 197, 253, 0.3); }
+:root[data-theme='light'] .border-\[\#60a5fa\]\/40 { border-color: rgba(147, 197, 253, 0.4); }
+:root[data-theme='light'] .border-\[\#60a5fa\]\/50 { border-color: rgba(147, 197, 253, 0.5); }
+:root[data-theme='light'] .border-\[\#D8EFEF\]\/20 { border-color: rgba(153, 246, 228, 0.2); }
+:root[data-theme='light'] .border-\[\#adc6ff\] { border-color: #93c5fd; }
+:root[data-theme='light'] .border-\[\#adc6ff\]\/20 { border-color: rgba(147, 197, 253, 0.2); }
+:root[data-theme='light'] .border-\[\#adc6ff\]\/30 { border-color: rgba(147, 197, 253, 0.3); }
+:root[data-theme='light'] .border-\[\#adc6ff\]\/40 { border-color: rgba(147, 197, 253, 0.4); }
+:root[data-theme='light'] .border-\[\#adc6ff\]\/50 { border-color: rgba(147, 197, 253, 0.5); }
+:root[data-theme='light'] .border-\[\#ffb786\] { border-color: #fdba74; }
+:root[data-theme='light'] .border-\[\#ffb786\]\/20 { border-color: rgba(253, 186, 116, 0.2); }
+:root[data-theme='light'] .border-\[\#ffb786\]\/30 { border-color: rgba(253, 186, 116, 0.3); }
+:root[data-theme='light'] .border-\[\#ffb786\]\/40 { border-color: rgba(253, 186, 116, 0.4); }
+:root[data-theme='light'] .from-\[\#0b1a2a\] { --tw-gradient-from: #f5f9fc; }
+:root[data-theme='light'] .from-\[\#122131\] { --tw-gradient-from: #f1f5f9; }
+:root[data-theme='light'] .from-\[\#122238\] { --tw-gradient-from: #eef2f9; }
+:root[data-theme='light'] .from-\[\#162a45\] { --tw-gradient-from: #e7edf5; }
+:root[data-theme='light'] .from-\[\#3b82f6\] { --tw-gradient-from: #3b82f6; }
+:root[data-theme='light'] .from-\[\#4d8eff\] { --tw-gradient-from: #4d8eff; }
+:root[data-theme='light'] .from-\[\#df7412\]\/20 { --tw-gradient-from: rgba(223, 116, 18, 0.2); }
+:root[data-theme='light'] .from-\[\#ffb786\] { --tw-gradient-from: #ffedd5; }
+:root[data-theme='light'] .placeholder-\[\#8c91a0\]::placeholder { color: #64748b; }
+:root[data-theme='light'] .ring-\[\#60a5fa\]\/50 { --tw-ring-color: rgba(147, 197, 253, 0.5); }
+:root[data-theme='light'] .shadow-\[\#4d8eff\]\/20 { --tw-shadow-color: rgba(147, 197, 253, 0.2); }
+:root[data-theme='light'] .text-\[\#0f172a\] { color: #0f172a; }
+:root[data-theme='light'] .text-\[\#14213d\] { color: #14213d; }
+:root[data-theme='light'] .text-\[\#1d4ed8\] { color: #1d4ed8; }
+:root[data-theme='light'] .text-\[\#2563eb\] { color: #2563eb; }
+:root[data-theme='light'] .text-\[\#424754\] { color: #64748b; }
+:root[data-theme='light'] .text-\[\#60a5fa\] { color: #2563eb; }
+:root[data-theme='light'] .text-\[\#60a5fa\]\/70 { color: rgba(37, 99, 235, 0.7); }
+:root[data-theme='light'] .text-\[\#8c91a0\] { color: #64748b; }
+:root[data-theme='light'] .text-\[\#D8EFEF\] { color: #0d9488; }
+:root[data-theme='light'] .text-\[\#adc6ff\] { color: #2563eb; }
+:root[data-theme='light'] .text-\[\#c2c6d6\] { color: #475569; }
+:root[data-theme='light'] .text-\[\#d4e4fa\] { color: #1e293b; }
+:root[data-theme='light'] .text-\[\#ffb786\] { color: #ea580c; }
+:root[data-theme='light'] .to-\[\#0b1a2a\] { --tw-gradient-to: #f5f9fc; }
+:root[data-theme='light'] .to-\[\#122131\] { --tw-gradient-to: #f1f5f9; }
+:root[data-theme='light'] .to-\[\#122238\] { --tw-gradient-to: #eef2f9; }
+:root[data-theme='light'] .to-\[\#2563eb\] { --tw-gradient-to: #2563eb; }
+:root[data-theme='light'] .to-\[\#273647\] { --tw-gradient-to: #dde6f0; }
+:root[data-theme='light'] .to-\[\#3b82f6\] { --tw-gradient-to: #3b82f6; }
+:root[data-theme='light'] .to-\[\#60a5fa\] { --tw-gradient-to: #60a5fa; }
+:root[data-theme='light'] .to-\[\#df7412\] { --tw-gradient-to: #df7412; }
+:root[data-theme='light'] .via-\[\#1a2e48\] { --tw-gradient-via: #e7edf5; }
+:root[data-theme='light'] .via-\[\#60a5fa\]\/10 { --tw-gradient-via: rgba(96, 165, 250, 0.1); }
+:root[data-theme='light'] .via-\[\#ffb786\]\/10 { --tw-gradient-via: rgba(255, 237, 213, 0.1); }
+/* ============================================================
+   TEMA CLARO — texto branco vira escuro (legível) por padrão,
+   exceto em elementos com fundo colorido (botões/badges).
+   ============================================================ */
+:root[data-theme='light'] .text-white { color: #1e293b; }
+
+/* Mantém texto branco apenas em fundos coloridos de destaque */
+:root[data-theme='light'] .text-white.bg-blue-600,
+:root[data-theme='light'] .text-white.bg-blue-500,
+:root[data-theme='light'] .text-white.bg-indigo-600,
+:root[data-theme='light'] .text-white.bg-\[\#2563eb\],
+:root[data-theme='light'] .text-white.bg-\[\#3b82f6\],
+:root[data-theme='light'] .text-white.bg-\[\#4d8eff\],
+:root[data-theme='light'] .text-white.bg-emerald-500,
+:root[data-theme='light'] .text-white.bg-emerald-600,
+:root[data-theme='light'] .text-white.bg-teal-600,
+:root[data-theme='light'] .text-white.bg-amber-500,
+:root[data-theme='light'] .text-white.bg-amber-600,
+:root[data-theme='light'] .text-white.bg-orange-500,
+:root[data-theme='light'] .text-white.bg-orange-600,
+:root[data-theme='light'] .text-white.bg-rose-500,
+:root[data-theme='light'] .text-white.bg-red-500,
+:root[data-theme='light'] .text-white.bg-gradient-to-r,
+:root[data-theme='light'] .text-white.bg-gradient-to-br,
+:root[data-theme='light'] .text-white.bg-gradient-to-tr,
+:root[data-theme='light'] .text-white.bg-slate-900 { color: #ffffff; }
+
+/* Generated light-theme overrides for standard slate utilities: 19 rules */
+:root[data-theme='light'] .bg-slate-700 { background-color: #e7edf5; }
+:root[data-theme='light'] .bg-slate-800 { background-color: #f1f5f9; }
+:root[data-theme='light'] .bg-slate-800\/40 { background-color: rgba(241, 245, 249, 0.4); }
+:root[data-theme='light'] .bg-slate-800\/50 { background-color: rgba(241, 245, 249, 0.5); }
+:root[data-theme='light'] .bg-slate-800\/70 { background-color: rgba(241, 245, 249, 0.7); }
+:root[data-theme='light'] .bg-slate-900\/60 { background-color: rgba(245, 249, 252, 0.6); }
+:root[data-theme='light'] .bg-slate-900\/80 { background-color: rgba(245, 249, 252, 0.8); }
+:root[data-theme='light'] .bg-slate-950 { background-color: #f5f9fc; }
+:root[data-theme='light'] .bg-slate-950\/40 { background-color: rgba(245, 249, 252, 0.4); }
+:root[data-theme='light'] .bg-slate-950\/60 { background-color: rgba(245, 249, 252, 0.6); }
+:root[data-theme='light'] .bg-slate-950\/70 { background-color: rgba(245, 249, 252, 0.7); }
+:root[data-theme='light'] .border-slate-700 { border-color: #e2e8f0; }
+:root[data-theme='light'] .border-slate-700\/50 { border-color: rgba(226, 232, 240, 0.5); }
+:root[data-theme='light'] .border-slate-800 { border-color: #e2e8f0; }
+:root[data-theme='light'] .border-slate-500 { border-color: #e2e8f0; }
+:root[data-theme='light'] .text-slate-100 { color: #1e293b; }
+:root[data-theme='light'] .text-slate-200 { color: #334155; }
+:root[data-theme='light'] .text-slate-300 { color: #475569; }
+:root[data-theme='light'] .text-slate-400 { color: #64748b; }
 
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
