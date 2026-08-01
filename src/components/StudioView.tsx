@@ -3,13 +3,16 @@ import { Sparkles, PlusCircle, CheckCircle2, Loader2, Plus, X, Trash2, BookOpen,
 import { Deck, UserStats, Flashcard } from '../types';
 import { SupportedLanguage } from '../lib/i18n';
 import { ManualCardForm } from './ManualCardForm';
-import { getAITopicSuggestions, generateAICards } from '../lib/aiGenerator';
+import { fetchAITopicSuggestions, generateAICards } from '../lib/aiGenerator';
 
 interface StudioViewProps {
   decks: Deck[];
   stats: UserStats;
   currentLanguage: SupportedLanguage;
   onSaveNewDeck: (deck: Deck) => void;
+  onDeductCredit?: (amount?: number) => void;
+  onOpenAdMob?: () => void;
+  onOpenSubscription?: () => void;
 }
 
 export const StudioView: React.FC<StudioViewProps> = ({
@@ -38,12 +41,16 @@ export const StudioView: React.FC<StudioViewProps> = ({
   const existingSubjects = Array.from(new Set(decks.map((d) => d.category || d.title)));
 
   useEffect(() => {
-    if (subject.trim().length >= 2) {
-      const suggestions = getAITopicSuggestions(subject);
-      setSuggestedTopics(suggestions.filter((t) => !topics.includes(t)));
-    } else {
+    if (subject.trim().length < 2) {
       setSuggestedTopics([]);
+      return;
     }
+    // Debounce 600ms — chama o backend para sugestões reais de IA
+    const timer = setTimeout(async () => {
+      const suggestions = await fetchAITopicSuggestions(subject);
+      setSuggestedTopics(suggestions.filter((t) => !topics.includes(t)));
+    }, 600);
+    return () => clearTimeout(timer);
   }, [subject, topics]);
 
   const handleAddTopic = (topicToAdd?: string) => {
@@ -78,6 +85,9 @@ export const StudioView: React.FC<StudioViewProps> = ({
         id: `deck-${Date.now()}`,
         title: targetDeckName.trim(),
         category: newCard.subject || 'Geral',
+        description: '',
+        color: '#60a5fa',
+        accentBorder: 'border-l-primary',
         cards: [newCard],
         createdAt: new Date().toISOString(),
       };
@@ -132,6 +142,9 @@ export const StudioView: React.FC<StudioViewProps> = ({
         id: `deck-${Date.now()}`,
         title: mainSubject,
         category: generatedAICards[0].topic || 'Geral',
+        description: '',
+        color: '#60a5fa',
+        accentBorder: 'border-l-primary',
         cards: generatedAICards,
         createdAt: new Date().toISOString(),
       };

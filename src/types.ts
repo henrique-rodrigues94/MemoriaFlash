@@ -5,6 +5,7 @@ export interface Flashcard {
   front: string;
   back: string;
   topic?: string;
+  subject?: string;       // Matéria/assunto principal do deck
   difficulty?: 'easy' | 'medium' | 'hard' | 'expert';
   explanation?: string;   // Detailed explanation with practical example
   curiosity?: string;     // Interesting curiosity/fun fact about the topic
@@ -25,6 +26,7 @@ export interface Deck {
   accentBorder: string;
   iconName?: string;
   isPublic?: boolean;
+  createdAt?: string;     // ISO Date string
 }
 
 /** Registro de atividade de um único dia — usado no heatmap e estatísticas semanais. */
@@ -165,4 +167,4 @@ export interface TeacherClass {
   students: StudentProgress[];
 }
 
-export type ActiveTab = 'home' | 'explore' | 'quiz' | 'scanner' | 'cards' | 'stats' | 'profile' | 'duel';
+export type ActiveTab = 'home' | 'explore' | 'quiz' | 'scanner' | 'cards' | 'stats' | 'profile' | 'duel' | 'create';

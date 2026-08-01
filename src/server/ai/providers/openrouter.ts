@@ -34,6 +34,7 @@ export const openRouterProvider: AIProvider = {
         body: JSON.stringify({
           model: MODEL,
           temperature: params.temperature ?? 0.7,
+          max_tokens: params.maxOutputTokens ?? 8192,
           messages: [
             { role: 'system', content: params.systemPrompt + buildJSONInstruction(params.schemaHint) },
             { role: 'user', content: params.userPrompt },

@@ -1,38 +1,35 @@
 import { AIProvider, AIProviderError, GenerateJSONParams } from '../types';
 import { buildJSONInstruction, extractJSON } from '../jsonUtils';
 
-// Groq: inferência extremamente rápida (LPU), camada gratuita generosa.
-// Crie uma chave grátis em https://console.groq.com/keys
-const MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
-const ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
+// FreeLLM: endpoint público sem autenticação para prototipagem.
+// Baseado em https://api.freellm.com — sem necessidade de chave de API.
+// Limite: baixo throughput, bom para desenvolvimento/fallback emergencial.
+// Ative com FREELLM_ENABLED=true no .env
+const MODEL = process.env.FREELLM_MODEL || 'llama3-8b';
+const ENDPOINT = 'https://api.freellm.com/v1/chat/completions';
 
-export const groqProvider: AIProvider = {
-  id: 'groq',
-  label: 'Groq (Llama 3.3, gratuito)',
+export const freeLLMProvider: AIProvider = {
+  id: 'freellm',
+  label: `FreeLLM (${MODEL}, sem chave)`,
   tier: 'free',
-  isConfigured: () => !!process.env.GROQ_API_KEY,
+  isConfigured: () => process.env.FREELLM_ENABLED === 'true',
 
   async generateJSON(params: GenerateJSONParams): Promise<unknown> {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) throw new AIProviderError('GROQ_API_KEY não configurada', 'groq');
-
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), params.timeoutMs ?? 20000);
 
     try {
       const res = await fetch(ENDPOINT, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: MODEL,
           temperature: params.temperature ?? 0.7,
-          max_tokens: params.maxOutputTokens ?? 8192,
-          response_format: { type: 'json_object' },
           messages: [
-            { role: 'system', content: params.systemPrompt + buildJSONInstruction(params.schemaHint) },
+            {
+              role: 'system',
+              content: params.systemPrompt + buildJSONInstruction(params.schemaHint),
+            },
             { role: 'user', content: params.userPrompt },
           ],
         }),
@@ -41,7 +38,12 @@ export const groqProvider: AIProvider = {
 
       if (!res.ok) {
         const body = await res.text().catch(() => '');
-        throw new AIProviderError(`Groq HTTP ${res.status}: ${body}`, 'groq', res.status === 429, res.status);
+        throw new AIProviderError(
+          `FreeLLM HTTP ${res.status}: ${body}`,
+          'freellm',
+          res.status === 429,
+          res.status
+        );
       }
 
       const data = await res.json();
@@ -50,7 +52,10 @@ export const groqProvider: AIProvider = {
     } catch (err: any) {
       if (err instanceof AIProviderError) throw err;
       const aborted = err?.name === 'AbortError';
-      throw new AIProviderError(aborted ? 'Groq: timeout' : err?.message || 'Falha ao chamar Groq', 'groq');
+      throw new AIProviderError(
+        aborted ? 'FreeLLM: timeout' : err?.message || 'Falha ao chamar FreeLLM',
+        'freellm'
+      );
     } finally {
       clearTimeout(timeout);
     }

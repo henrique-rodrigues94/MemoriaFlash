@@ -5,20 +5,46 @@ import { openRouterProvider } from './providers/openrouter';
 import { huggingFaceProvider } from './providers/huggingface';
 import { cohereProvider } from './providers/cohere';
 import { openaiProvider } from './providers/openai';
+import { deepseekProvider } from './providers/deepseek';
+import { anthropicProvider } from './providers/anthropic';
+import { freeLLMProvider } from './providers/freellm';
 import { localFallbackProvider } from './providers/localFallback';
 import { AIProvider } from './types';
 
 // ============================================================================
-// FILA DE PROVEDORES — esta é a ÚNICA lista que você precisa editar para
-// mudar a estratégia de fallback do app inteiro.
+// FILA DE PROVEDORES
+// ─────────────────────────────────────────────────────────────────────────────
+// Gratuitos (em ordem de qualidade/velocidade):
+//   1. Gemini 2.5 Flash  — melhor qualidade gratuita, suporta 32k tokens out
+//   2. Groq Llama 3.3    — ultra-rápido, bom para respostas curtas
+//   3. DeepSeek Chat     — qualidade excelente, preço muito baixo
+//   4. OpenRouter :free  — agrega modelos gratuitos de vários labs
+//   5. Hugging Face      — fallback open-source
+//   6. Cohere            — fallback trial
+//   7. FreeLLM           — sem chave, último recurso sem custo
 //
-// Ordem padrão: gratuitos primeiro (na ordem de qualidade/velocidade),
-// depois o pago opcional (se configurado), e por último o gerador local
-// (que nunca falha). Defina AI_PRIORITIZE_PAID=true no .env para usar o
-// provedor pago primeiro, mesmo com os gratuitos disponíveis.
+// Pagos (usados quando AI_PRIORITIZE_PAID=true ou todos gratuitos falharem):
+//   8. OpenAI GPT-4o-mini
+//   9. Anthropic Claude
+//
+// Local (nunca falha, gera conteúdo heurístico offline):
+//  10. LocalFallback
 // ============================================================================
-const freeProviders: AIProvider[] = [geminiProvider, groqProvider, openRouterProvider, huggingFaceProvider, cohereProvider];
-const paidProviders: AIProvider[] = [openaiProvider];
+
+const freeProviders: AIProvider[] = [
+  geminiProvider,
+  groqProvider,
+  deepseekProvider,   // barato o suficiente para tratar como "free" em uso normal
+  openRouterProvider,
+  huggingFaceProvider,
+  cohereProvider,
+  freeLLMProvider,
+];
+
+const paidProviders: AIProvider[] = [
+  openaiProvider,
+  anthropicProvider,
+];
 
 const prioritizePaid = process.env.AI_PRIORITIZE_PAID === 'true';
 

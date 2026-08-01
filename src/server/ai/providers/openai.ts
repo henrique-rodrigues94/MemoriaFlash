@@ -32,6 +32,7 @@ export const openaiProvider: AIProvider = {
         body: JSON.stringify({
           model: MODEL,
           temperature: params.temperature ?? 0.7,
+          max_tokens: params.maxOutputTokens ?? 8192,
           response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: params.systemPrompt + `\n\nResponda apenas com JSON válido no formato:\n${params.schemaHint}` },

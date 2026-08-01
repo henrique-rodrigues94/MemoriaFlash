@@ -211,14 +211,11 @@ export async function apiGenerateRecoveryPlan(
       aiInsightMessage: `Olá ${studentName}, elaboramos um roteiro personalizado focado no fortalecimento dos pontos onde você encontrou maior dificuldade!`,
       days: topics.map((topic, idx) => ({
         dayNumber: idx + 1,
+        dayLabel: `Dia ${idx + 1}`,
         title: `Dia ${idx + 1}: Foco em ${topic}`,
-        focusTopic: topic,
-        activities: [
-          `Revisão ativa dos conceitos fundamentais de ${topic}`,
-          `Resolução de 5 exercícios práticos focados nas dúvidas`,
-          `Criação e revisão de flashcards resumo`
-        ],
-        estimatedMinutes: 30,
+        focusBadge: topic,
+        description: `Revisão ativa dos conceitos fundamentais de ${topic}`,
+        cardCount: 10,
       })),
     };
   }
