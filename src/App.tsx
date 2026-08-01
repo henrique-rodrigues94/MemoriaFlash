@@ -398,7 +398,7 @@ export function App() {
       />
 
       {/* Main Content Viewport */}
-      <main className="pt-20 px-4 sm:px-6 max-w-6xl mx-auto">
+      <main className="pt-20 px-4 sm:px-6 max-w-6xl mx-auto pb-24 sm:pb-28">
         {/* If Active Study Session */}
         {activeStudyDeck ? (
           <StudySessionView

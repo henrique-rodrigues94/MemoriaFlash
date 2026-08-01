@@ -3,12 +3,17 @@ import { buildJSONInstruction, extractJSON } from '../jsonUtils';
 
 // Groq: inferência extremamente rápida (LPU), camada gratuita generosa.
 // Crie uma chave grátis em https://console.groq.com/keys
-const MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
 const ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
+
+// Lido na hora da chamada (lazy) — ver comentário em openrouter.ts.
+function getModel(): string {
+  return process.env.GROQ_MODEL || DEFAULT_MODEL;
+}
 
 export const groqProvider: AIProvider = {
   id: 'groq',
-  label: 'Groq (Llama 3.3, gratuito)',
+  label: 'Groq (gratuito)',
   tier: 'free',
   isConfigured: () => !!process.env.GROQ_API_KEY,
 
@@ -27,7 +32,7 @@ export const groqProvider: AIProvider = {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: MODEL,
+          model: getModel(),
           temperature: params.temperature ?? 0.7,
           max_tokens: params.maxOutputTokens ?? 8192,
           response_format: { type: 'json_object' },

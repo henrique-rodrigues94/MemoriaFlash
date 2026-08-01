@@ -6,12 +6,19 @@ import { buildJSONInstruction, extractJSON } from '../jsonUtils';
 // A lista de modelos gratuitos muda com frequência — ajuste OPENROUTER_MODEL
 // no .env caso o modelo padrão seja descontinuado. Veja modelos disponíveis
 // em https://openrouter.ai/models?max_price=0
-const MODEL = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.1-8b-instruct:free';
+const DEFAULT_MODEL = 'openai/gpt-oss-20b:free';
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+
+// Lido na hora da chamada (lazy): o .env é carregado antes dos imports via
+// `import 'dotenv/config'` no server.ts, mas mantemos a leitura por função
+// para que qualquer mudança no ambiente reflita sem reiniciar o processo.
+function getModel(): string {
+  return process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
+}
 
 export const openRouterProvider: AIProvider = {
   id: 'openrouter',
-  label: `OpenRouter (${MODEL}, gratuito)`,
+  label: 'OpenRouter (gratuito)',
   tier: 'free',
   isConfigured: () => !!process.env.OPENROUTER_API_KEY,
 
@@ -20,7 +27,9 @@ export const openRouterProvider: AIProvider = {
     if (!apiKey) throw new AIProviderError('OPENROUTER_API_KEY não configurada', 'openrouter');
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), params.timeoutMs ?? 25000);
+    // Modelos gratuitos do OpenRouter são mais lentos — 90s evita timeouts
+    // em gerações maiores (ex.: 25+ flashcards).
+    const timeout = setTimeout(() => controller.abort(), params.timeoutMs ?? 90000);
 
     try {
       const res = await fetch(ENDPOINT, {
@@ -32,9 +41,9 @@ export const openRouterProvider: AIProvider = {
           'X-Title': 'FlashMind AI',
         },
         body: JSON.stringify({
-          model: MODEL,
+          model: getModel(),
           temperature: params.temperature ?? 0.7,
-          max_tokens: params.maxOutputTokens ?? 8192,
+          max_tokens: params.maxOutputTokens ?? 4096,
           messages: [
             { role: 'system', content: params.systemPrompt + buildJSONInstruction(params.schemaHint) },
             { role: 'user', content: params.userPrompt },

@@ -4,7 +4,12 @@ import { AIProvider, AIProviderError, GenerateJSONParams } from '../types';
 // Modelo válido e atual com camada gratuita generosa via Google AI Studio.
 // (O scaffold original referenciava "gemini-3.6-flash", que não existe —
 // corrigido aqui. Se a Google lançar um modelo mais novo, troque só esta linha.)
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-2.5-flash';
+
+// Lido na hora da chamada (lazy) — ver comentário em openrouter.ts.
+function getModel(): string {
+  return process.env.GEMINI_MODEL || DEFAULT_MODEL;
+}
 
 let client: GoogleGenAI | null = null;
 function getClient(): GoogleGenAI | null {
@@ -40,7 +45,7 @@ export const geminiProvider: AIProvider = {
       }
 
       const response = await ai.models.generateContent({
-        model: MODEL,
+        model: getModel(),
         contents: params.userPrompt,
         config,
       });

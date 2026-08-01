@@ -1,6 +1,10 @@
+// Carrega o .env ANTES de qualquer outro import: os providers de IA leem
+// process.env.* no momento em que o módulo é avaliado (const MODEL, etc.).
+// Sem isto, dotenv.config() rodaria depois dos imports e o .env nunca
+// chegaria aos providers (bug: modelo do OpenRouter sempre era o padrão).
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
-import dotenv from 'dotenv';
 
 import { aiOrchestrator } from './src/server/ai';
 import { generateFlashcardsTask } from './src/server/ai/tasks/generateFlashcards';
@@ -15,8 +19,6 @@ import { notificationsRouter } from './src/server/routes/notifications';
 import { getCacheStats } from './src/server/ai/cache/aiCache';
 import { startCronJobs } from './src/server/cron';
 import { injectReferralMeta, readIndexHtmlTemplate } from './src/server/ogPreview';
-
-dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;

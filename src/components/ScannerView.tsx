@@ -163,51 +163,60 @@ export function ScannerView({ onSaveNewDeck }: ScannerViewProps) {
   const triggerCameraPicker = () => cameraInputRef.current?.click();
 
   return (
-    <div className="max-w-4xl mx-auto p-4 space-y-6 text-slate-100">
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-md space-y-6">
-        <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
-          <div className="p-2.5 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-xl">
-            <Camera className="w-6 h-6" />
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6 text-slate-100">
+      {/* Cabeçalho da tela */}
+      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-gradient-to-br from-purple-950/60 via-slate-900/70 to-slate-900/40 p-6 shadow-2xl backdrop-blur-md">
+        <div className="absolute -top-16 -right-16 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-purple-500/15 border border-purple-500/30 text-purple-300 rounded-2xl shadow-lg shadow-purple-500/10">
+            <Camera className="w-7 h-7" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-white">Scanner / Upload de Documento</h3>
-            <p className="text-xs text-slate-400">
+            <h3 className="text-xl font-bold text-white tracking-tight">Scanner / Upload de Documento</h3>
+            <p className="text-sm text-slate-400 mt-0.5">
               PDF, Word, TXT, imagem/foto de livro ou revista — a IA gera flashcards automaticamente
             </p>
           </div>
         </div>
+      </div>
 
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-md space-y-6">
+        {/* Zona de upload */}
         <div
           onClick={triggerPicker}
-          className="border-2 border-dashed border-slate-700 hover:border-purple-500 rounded-2xl p-8 text-center bg-slate-950/40 transition cursor-pointer group"
+          className="group relative overflow-hidden border-2 border-dashed border-slate-700 hover:border-purple-500 rounded-2xl p-8 text-center bg-slate-950/40 transition cursor-pointer"
         >
-          <div className="w-12 h-12 bg-purple-500/10 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition">
-            <Upload className="w-6 h-6" />
-          </div>
-          <h4 className="text-white font-medium text-base">Arraste ou clique para fazer upload / tirar foto</h4>
-          <p className="text-xs text-slate-400 mt-1">PDF, Word (.docx), TXT, Markdown, EPUB, JPG, PNG</p>
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition" />
+          <div className="relative">
+            <div className="w-14 h-14 bg-purple-500/10 text-purple-400 rounded-2xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 group-hover:text-purple-300 transition">
+              <Upload className="w-7 h-7" />
+            </div>
+            <h4 className="text-white font-semibold text-base">Arraste ou clique para fazer upload / tirar foto</h4>
+            <p className="text-xs text-slate-400 mt-1">PDF, Word (.docx), TXT, Markdown, EPUB, JPG, PNG</p>
 
-          <button
-            type="button"
-            className="mt-4 bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 border border-purple-500/30 px-5 py-2 rounded-xl text-xs font-semibold transition"
-          >
-            Selecionar Arquivo
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".txt,.md,.json,.pdf,.doc,.docx,.jpg,.jpeg,.png,.epub"
-            className="hidden"
-            onChange={handleFilePick}
-          />
+            <button
+              type="button"
+              className="mt-4 bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 border border-purple-500/30 px-5 py-2 rounded-xl text-xs font-semibold transition"
+            >
+              Selecionar Arquivo
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.md,.json,.pdf,.doc,.docx,.jpg,.jpeg,.png,.epub"
+              className="hidden"
+              onChange={handleFilePick}
+            />
+          </div>
         </div>
 
+        {/* Captura por câmera */}
         <div className="flex flex-col gap-2 sm:flex-row">
           <button
             type="button"
             onClick={triggerCameraPicker}
             disabled={isGenerating}
-            className="flex-1 bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30 border border-emerald-500/30 px-4 py-3 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2 disabled:opacity-60"
+            className="flex-1 bg-gradient-to-r from-emerald-600/25 to-teal-600/25 text-emerald-300 hover:from-emerald-600/40 hover:to-teal-600/40 border border-emerald-500/30 px-4 py-3 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2 disabled:opacity-60 shadow-lg shadow-emerald-900/20"
           >
             <Camera className="w-4 h-4" />
             Tirar Foto da Página
@@ -223,17 +232,24 @@ export function ScannerView({ onSaveNewDeck }: ScannerViewProps) {
           />
         </div>
 
+        {/* Páginas capturadas */}
         {capturedPages.length > 0 ? (
-          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm text-slate-300">
-            <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Páginas capturadas</div>
-            <ul className="mt-2 space-y-1 text-xs text-slate-400">
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-950/30 p-3 text-sm text-emerald-200">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-300">
+              <Camera className="w-3.5 h-3.5" /> Páginas capturadas ({capturedPages.length})
+            </div>
+            <ul className="mt-2 grid gap-1 text-xs text-emerald-200/80 sm:grid-cols-2">
               {capturedPages.map((page, index) => (
-                <li key={`${page.name}-${index}`}>• {page.name}</li>
+                <li key={`${page.name}-${index}`} className="flex items-center gap-1.5 truncate">
+                  <CheckCircle2 className="w-3 h-3 shrink-0 text-emerald-400" />
+                  <span className="truncate">{page.name}</span>
+                </li>
               ))}
             </ul>
           </div>
         ) : null}
 
+        {/* Assunto */}
         <div className="space-y-2">
           <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
             📖 MATÉRIA / ASSUNTO (OPCIONAL):
@@ -243,10 +259,11 @@ export function ScannerView({ onSaveNewDeck }: ScannerViewProps) {
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder="Ex: Direito Constitucional, Anatomia Humana, Python..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition text-sm"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition text-sm"
           />
         </div>
 
+        {/* Quantidade de cards */}
         <div className="space-y-2">
           <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
             QUANTIDADE DE CARDS
@@ -254,7 +271,7 @@ export function ScannerView({ onSaveNewDeck }: ScannerViewProps) {
           <select
             value={cardCount}
             onChange={(e) => setCardCount(Number(e.target.value))}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition text-sm"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition text-sm"
           >
             <option value={10}>10 Flashcards</option>
             <option value={25}>25 Flashcards (Recomendado)</option>
@@ -262,7 +279,16 @@ export function ScannerView({ onSaveNewDeck }: ScannerViewProps) {
           </select>
         </div>
 
-        <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-300">
+        {/* Status */}
+        <div
+          className={`rounded-xl border p-4 text-sm ${
+            status.type === 'success'
+              ? 'border-emerald-500/20 bg-emerald-950/30 text-emerald-200'
+              : status.type === 'error'
+                ? 'border-rose-500/20 bg-rose-950/30 text-rose-200'
+                : 'border-slate-800 bg-slate-950/60 text-slate-300'
+          }`}
+        >
           <div className="flex items-center gap-2">
             {isGenerating ? (
               <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
@@ -273,26 +299,36 @@ export function ScannerView({ onSaveNewDeck }: ScannerViewProps) {
             ) : (
               <Sparkles className="w-4 h-4 text-purple-400" />
             )}
-            <span>{status.message}</span>
+            <span className="font-medium">{status.message}</span>
           </div>
-          {selectedFileName ? <p className="mt-2 text-xs text-slate-500">Arquivo selecionado: {selectedFileName}</p> : null}
+          {selectedFileName ? <p className="mt-2 text-xs opacity-70">Arquivo selecionado: {selectedFileName}</p> : null}
         </div>
 
+        {/* Dica */}
         <div className="rounded-xl border border-purple-500/20 bg-purple-500/10 p-4 text-sm text-purple-200">
-          <p className="font-medium">Capture páginas com a câmera e, ao finalizar, os flashcards serão gerados automaticamente.</p>
+          <p className="font-medium flex items-center gap-2">
+            <Sparkles className="w-4 h-4 shrink-0" />
+            Capture páginas com a câmera e, ao finalizar, os flashcards serão gerados automaticamente.
+          </p>
           <p className="text-xs text-purple-200/80 mt-1">As fotos ficam agrupadas, salvas no deck e exibidas abaixo para revisão.</p>
         </div>
 
+        {/* Flashcards gerados */}
         {generatedCards.length > 0 ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold text-white">Flashcards gerados</h4>
-              <span className="text-xs text-slate-400">{generatedCards.length} cards</span>
+              <span className="px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300 text-xs font-semibold">
+                {generatedCards.length} cards
+              </span>
             </div>
             <div className="space-y-2">
               {generatedCards.map((card, index) => (
-                <div key={card.id || index} className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                  <div className="text-[11px] uppercase tracking-wider text-purple-400">{card.topic || 'Tema'}</div>
+                <div key={card.id || index} className="rounded-xl border border-slate-800 bg-slate-950/70 p-4 hover:border-purple-500/30 transition">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[11px] uppercase tracking-wider text-purple-400 truncate">{card.topic || 'Tema'}</div>
+                    <span className="text-[10px] text-slate-500 shrink-0">Card {index + 1}</span>
+                  </div>
                   <div className="mt-2 text-sm text-white">
                     <span className="font-semibold text-purple-300">Frente:</span> {card.front || card.question || '—'}
                   </div>

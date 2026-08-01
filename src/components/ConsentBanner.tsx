@@ -44,7 +44,7 @@ export const ConsentBanner: React.FC<{ onOpenPrivacyPolicy?: () => void }> = ({ 
   };
 
   return (
-    <div className="fixed bottom-0 left-0 w-full z-[60] p-3 sm:p-4 animate-fade-in">
+    <div className="fixed bottom-20 left-0 w-full z-30 p-3 sm:p-4 animate-fade-in">
       <div className="max-w-2xl mx-auto bg-[#0b1a2a] border border-[#adc6ff]/30 rounded-2xl shadow-2xl p-4 sm:p-5 text-white space-y-3">
         <div className="flex items-start gap-3">
           <div className="p-2 rounded-xl bg-[#adc6ff]/10 text-[#adc6ff] flex-shrink-0">
