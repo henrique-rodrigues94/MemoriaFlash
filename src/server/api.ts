@@ -100,9 +100,8 @@ export async function apiGenerateFlashcards(
     }
   }
 
-  // 3ª tentativa: fallback local com templates distintos
-  console.warn('Usando fallback local. Configure VITE_GEMINI_API_KEY no .env');
-  return buildLocalFallbackCards(prompt, count, difficulty, selectedTopics);
+  // Nenhum provedor de IA disponível
+  throw new Error('Não há servidor de IA disponível no momento. Tente novamente mais tarde.');
 }
 
 // ─── Suggest Topics ──────────────────────────────────────────────────────────
@@ -140,15 +139,8 @@ export async function apiSuggestTopics(title: string, language: string = 'pt'): 
     }
   }
 
-  // Fallback final: tópicos genéricos com o título
-  return [
-    `Conceitos Fundamentais de ${title}`,
-    `Classificação e Tipos de ${title}`,
-    `Aplicações Práticas de ${title}`,
-    `Casos Especiais e Exceções em ${title}`,
-    `Relação de ${title} com Outros Temas`,
-    `Questões Frequentes sobre ${title}`,
-  ];
+  // Nenhum provedor de IA disponível
+  throw new Error('Não há servidor de IA disponível no momento. Tente novamente mais tarde.');
 }
 
 // ─── Quiz Diagnostic ─────────────────────────────────────────────────────────
@@ -180,19 +172,7 @@ export async function apiQuizDiagnostic(
     return await res.json();
   } catch (err: any) {
     console.error('apiQuizDiagnostic error:', err);
-    const correctCount = userAnswers.filter((a) => a.isCorrect).length;
-    const weakList = userAnswers.filter((a) => !a.isCorrect).map((a) => a.topic || topic);
-    const strongList = userAnswers.filter((a) => a.isCorrect).map((a) => a.topic || topic);
-    const effectiveWeakTopics = weakList.length > 0 ? weakList : [topic];
-    const safeDiff = (['easy', 'medium', 'hard', 'expert'].includes(difficulty)
-      ? difficulty
-      : 'medium') as any;
-    return {
-      diagnosticSummary: `Você acertou ${correctCount} de ${userAnswers.length} questões. Lacunas em: ${effectiveWeakTopics.join(', ')}.`,
-      masteredTopics: Array.from(new Set(strongList)),
-      weakTopics: Array.from(new Set(effectiveWeakTopics)),
-      cards: buildLocalFallbackCards(topic, count, safeDiff, effectiveWeakTopics),
-    };
+    throw new Error('Não há servidor de IA disponível no momento. Tente novamente mais tarde.');
   }
 }
 

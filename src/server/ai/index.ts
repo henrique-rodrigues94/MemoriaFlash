@@ -8,7 +8,6 @@ import { openaiProvider } from './providers/openai';
 import { deepseekProvider } from './providers/deepseek';
 import { anthropicProvider } from './providers/anthropic';
 import { freeLLMProvider } from './providers/freellm';
-import { localFallbackProvider } from './providers/localFallback';
 import { AIProvider } from './types';
 
 // ============================================================================
@@ -27,8 +26,6 @@ import { AIProvider } from './types';
 //   8. OpenAI GPT-4o-mini
 //   9. Anthropic Claude
 //
-// Local (nunca falha, gera conteúdo heurístico offline):
-//  10. LocalFallback
 // ============================================================================
 
 const freeProviders: AIProvider[] = [
@@ -49,8 +46,8 @@ const paidProviders: AIProvider[] = [
 const prioritizePaid = process.env.AI_PRIORITIZE_PAID === 'true';
 
 const orderedProviders: AIProvider[] = prioritizePaid
-  ? [...paidProviders, ...freeProviders, localFallbackProvider]
-  : [...freeProviders, ...paidProviders, localFallbackProvider];
+  ? [...paidProviders, ...freeProviders]
+  : [...freeProviders, ...paidProviders];
 
 export const aiOrchestrator = new AIOrchestrator(orderedProviders);
 

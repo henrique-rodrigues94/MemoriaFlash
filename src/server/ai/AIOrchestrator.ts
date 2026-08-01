@@ -74,9 +74,9 @@ export class AIOrchestrator {
       }
     }
 
+    // Mensagem amigável para o usuário: nenhum servidor de IA disponível no momento
     throw new Error(
-      `Todos os provedores de IA disponíveis falharam. Tentados: [${attempted.join(', ') || 'nenhum configurado'}]. ` +
-        `Detalhes: ${errors.join(' | ')}`
+      'Não há servidor de IA disponível no momento. Tente novamente mais tarde.'
     );
   }
 
