@@ -1,39 +1,21 @@
 import { Flashcard } from '../types';
 
 /**
- * Gera sugestões de tópicos para uma matéria.
- * Chama o backend — as chaves de API ficam APENAS no servidor.
- */
-export const getAITopicSuggestions = (subject: string): string[] => {
-  if (!subject.trim()) return [];
-  // Retorno local imediato enquanto o backend responde de forma assíncrona
-  return [
-    `Conceitos Principais de ${subject}`,
-    `Fundamentos de ${subject}`,
-    `Aplicações Práticas`,
-    `Regras e Exceções`,
-    `Exercícios e Questões Frequentes`,
-  ];
-};
-
-/**
  * Busca sugestões de tópicos reais via IA no backend.
+ * Lança erro amigável se nenhum provedor de IA estiver disponível.
  */
 export const fetchAITopicSuggestions = async (subject: string): Promise<string[]> => {
   if (!subject.trim()) return [];
-  try {
-    const res = await fetch('/api/gemini/suggest-topics', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: subject, language: 'pt' }),
-    });
-    if (!res.ok) return getAITopicSuggestions(subject);
-    const data = await res.json();
-    // O backend retorna { topics: string[] } ou { cacheHit, topics, ... }
-    return Array.isArray(data.topics) ? data.topics : getAITopicSuggestions(subject);
-  } catch {
-    return getAITopicSuggestions(subject);
+  const res = await fetch('/api/gemini/suggest-topics', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: subject, language: 'pt' }),
+  });
+  if (!res.ok) {
+    throw new Error('Não há servidor de IA disponível no momento. Tente novamente mais tarde.');
   }
+  const data = await res.json();
+  return Array.isArray(data.topics) ? data.topics : [];
 };
 
 /**

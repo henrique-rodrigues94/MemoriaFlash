@@ -6,59 +6,6 @@ import {
   isGeminiClientConfigured,
 } from './geminiClient';
 
-// Templates distintos de perguntas e respostas para o fallback FINAL (sem IA alguma)
-const QUESTION_TEMPLATES = [
-  (t: string) => `Qual é a definição de ${t}?`,
-  (t: string) => `Quais são as principais características de ${t}?`,
-  (t: string) => `Como funciona ${t} na prática?`,
-  (t: string) => `Quais são os tipos de ${t} e suas diferenças?`,
-  (t: string) => `Qual a importância de ${t} na área de estudo?`,
-  (t: string) => `Quais são as aplicações práticas de ${t}?`,
-  (t: string) => `Quais são os erros mais comuns relacionados a ${t}?`,
-  (t: string) => `Como ${t} se relaciona com outros conceitos da área?`,
-];
-
-const ANSWER_TEMPLATES = [
-  (t: string) =>
-    `${t} é definido como um conjunto de conceitos e práticas fundamentais.\n\n• Ponto chave 1: Compreenda o significado central do conceito.\n• Ponto chave 2: Relacione com exemplos concretos para fixar melhor.`,
-  (t: string) =>
-    `As principais características de ${t} incluem aspectos técnicos e estruturais.\n\n• Ponto chave 1: Identifique os elementos que definem e distinguem o conceito.\n• Ponto chave 2: Compare com temas relacionados para entender diferenças.`,
-  (t: string) =>
-    `Na prática, ${t} funciona por meio de processos e mecanismos específicos.\n\n• Ponto chave 1: Compreenda o fluxo ou sequência de etapas envolvidas.\n• Ponto chave 2: Relacione com situações do cotidiano para melhor compreensão.`,
-  (t: string) =>
-    `Os tipos de ${t} são classificados conforme suas propriedades e finalidades.\n\n• Ponto chave 1: Memorize as categorias principais e seus critérios.\n• Ponto chave 2: Saiba identificar as diferenças entre cada tipo.`,
-  (t: string) =>
-    `A importância de ${t} está no seu impacto e aplicabilidade dentro da área.\n\n• Ponto chave 1: Entenda o papel histórico e atual do conceito.\n• Ponto chave 2: Relacione com problemas reais que esse conhecimento resolve.`,
-  (t: string) =>
-    `As aplicações práticas de ${t} abrangem contextos reais e casos de uso concretos.\n\n• Ponto chave 1: Identifique onde esse conceito é usado no mundo real.\n• Ponto chave 2: Pratique resolvendo exercícios e problemas relacionados.`,
-  (t: string) =>
-    `Os erros mais comuns em ${t} envolvem confusões conceituais e má aplicação.\n\n• Ponto chave 1: Identifique os pontos de maior confusão no tema.\n• Ponto chave 2: Revise as exceções e casos especiais do conceito.`,
-  (t: string) =>
-    `${t} se relaciona com outros conceitos por meio de princípios e fundamentos compartilhados.\n\n• Ponto chave 1: Mapeie os conceitos conectados e suas interdependências.\n• Ponto chave 2: Construa um mapa mental para visualizar as relações.`,
-];
-
-function buildLocalFallbackCards(
-  prompt: string,
-  count: number,
-  difficulty: string,
-  selectedTopics: string[]
-): Partial<Flashcard>[] {
-  const safeDiff = (['easy', 'medium', 'hard', 'expert'].includes(difficulty)
-    ? difficulty
-    : 'medium') as 'easy' | 'medium' | 'hard' | 'expert';
-  const effectiveTopics = selectedTopics.length > 0 ? selectedTopics : [prompt];
-  return Array.from({ length: count }).map((_, i) => {
-    const cardTopic = effectiveTopics[i % effectiveTopics.length];
-    const tmplIdx = i % QUESTION_TEMPLATES.length;
-    return {
-      front: QUESTION_TEMPLATES[tmplIdx](cardTopic),
-      back: ANSWER_TEMPLATES[tmplIdx](cardTopic),
-      topic: cardTopic,
-      difficulty: safeDiff,
-    };
-  });
-}
-
 // ─── Generate Flashcards ─────────────────────────────────────────────────────
 
 export async function apiGenerateFlashcards(
