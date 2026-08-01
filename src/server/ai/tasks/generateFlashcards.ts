@@ -62,6 +62,9 @@ REGRA CRÍTICA: O campo "front" deve ser uma PERGUNTA e o campo "back" deve ser 
         userPrompt: userPromptFull,
         schemaHint,
         geminiSchema,
+        // Gerações maiores (25/50/100 cards) precisam de mais tokens de saída
+        // para não truncar o JSON — senão o parser retorna 0 cards.
+        maxOutputTokens: Math.max(8192, count * 350),
       });
       const cards = extractArrayField(data, ['cards', 'flashcards']);
       return { cards, providerUsed };

@@ -305,10 +305,9 @@ export const StudioView: React.FC<StudioViewProps> = ({
                 onChange={(e) => setCardCount(Number(e.target.value))}
                 className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#60a5fa] text-sm cursor-pointer"
               >
-                <option value={5}>5 Flashcards</option>
-                <option value={10}>10 Flashcards</option>
-                <option value={15}>15 Flashcards</option>
-                <option value={25}>25 Flashcards (Recomendado)</option>
+                <option value={25}>25 Flashcards</option>
+                <option value={50}>50 Flashcards</option>
+                <option value={100}>100 Flashcards</option>
               </select>
             </div>
 

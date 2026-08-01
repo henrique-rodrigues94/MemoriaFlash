@@ -19,8 +19,13 @@ export const localFallbackProvider: AIProvider = {
       ? topicsMatch[1].split(',').map((t) => t.trim()).filter(Boolean)
       : [];
 
+    // Extrai a quantidade pedida (ex.: "Gere 50 flashcards") para o fallback
+    // gerar exatamente esse número de cards — nunca menos.
+    const countMatch = params.userPrompt.match(/Gere\s+(\d+)\s+flashcards/i);
+    const requestedCount = countMatch ? parseInt(countMatch[1], 10) : 6;
+
     if (hint.includes('"cards"') || (hint.includes('front') && hint.includes('back'))) {
-      return buildFlashcardsFallback(topic, subtopics);
+      return buildFlashcardsFallback(topic, subtopics, requestedCount);
     }
     if (hint.includes('topics')) {
       // Retorna array vazio — o cliente detecta e exibe aviso de configuração
@@ -31,7 +36,7 @@ export const localFallbackProvider: AIProvider = {
         diagnosticSummary: `Não foi possível conectar aos provedores de IA no momento. Continue estudando — seu progresso local foi salvo.`,
         masteredTopics: [],
         weakTopics: [topic],
-        cards: buildFlashcardsFallback(topic, subtopics),
+        cards: buildFlashcardsFallback(topic, subtopics, requestedCount),
       };
     }
     if (hint.includes('answer') && hint.includes('aiinsight')) {
@@ -51,7 +56,7 @@ export const localFallbackProvider: AIProvider = {
   },
 };
 
-function buildFlashcardsFallback(topic: string, subtopics: string[] = []) {
+function buildFlashcardsFallback(topic: string, subtopics: string[] = [], count: number = 6) {
   const extractedTopic = topic.replace(/^Tema:\s*/i, '').split('\n')[0].trim();
   const fallbackTopics = subtopics.length > 0 ? subtopics : [extractedTopic];
 
@@ -102,7 +107,8 @@ function buildFlashcardsFallback(topic: string, subtopics: string[] = []) {
     },
   ];
 
-  return Array.from({ length: 6 }).map((_, i) => {
+  const safeCount = Math.max(1, Math.min(count, 100));
+  return Array.from({ length: safeCount }).map((_, i) => {
     const cardTopic = fallbackTopics[i % Math.max(fallbackTopics.length, 1)];
     const tmpl = cardTemplates[i % cardTemplates.length];
     return {
