@@ -287,14 +287,28 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
 
       {/* Cabeçalho + progresso + botão explicar (área fixa no topo) */}
       <div className="flex flex-col gap-3 shrink-0 pt-3">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        {/* Header: Sair da Sessão (esquerda) + Inverter Resposta/Pergunta (direita) */}
+        <div className="flex items-center justify-between gap-2">
           <button
             id="btn-back-to-dashboard"
             onClick={handleBackRequest}
             className="p-2 rounded-xl bg-[#122131] text-[#c2c6d6] hover:text-white transition-colors flex items-center gap-2 text-xs font-medium"
           >
             <ArrowLeft className="w-4 h-4" /> Sair da Sessão
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setInvertCards((prev) => !prev)}
+            title={invertCards ? 'Desativar inversão de pergunta/resposta' : 'Inverter resposta com pergunta'}
+            className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              invertCards
+                ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
+                : 'bg-[#122131] border-[#424754]/40 text-[#8c91a0] hover:border-violet-500/40 hover:text-violet-300'
+            }`}
+          >
+            <RotateCw className={`w-4 h-4 ${invertCards ? 'text-violet-400' : ''}`} />
+            <span className="hidden sm:inline">{invertCards ? 'Inversão ativa' : 'Inverter Resposta/Pergunta'}</span>
           </button>
         </div>
 
