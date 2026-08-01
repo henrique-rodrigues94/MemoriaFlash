@@ -452,7 +452,7 @@ export function App() {
             )}
 
             {activeTab === 'quiz' && (
-              <QuizView />
+              <QuizView currentLanguage={currentLanguage} />
             )}
 
             {activeTab === 'scanner' && (
