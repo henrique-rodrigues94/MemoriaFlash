@@ -204,7 +204,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   const progressPercent = Math.round(((currentIndex + 1) / cards.length) * 100);
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5 pb-24 animate-fade-in">
+    <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto space-y-5 pb-24 animate-fade-in">
 
       {/* Exit confirm modal */}
       {showExitConfirm && (
@@ -321,15 +321,15 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
         {isLoadingExplanation ? 'Gerando explicação...' : t.explainQuestionAndExample || 'Explicar Pergunta & Ver Exemplo'}
       </button>
 
-      {/* ── CARD ── */}
+      {/* ── CARD (responsivo: cresce com a altura da tela) ── */}
       <div
         id="flashcard-flip-container"
         onClick={handleFlip}
-        className="min-h-[420px] sm:min-h-[500px] cursor-pointer select-none"
+        className="min-h-[45vh] md:min-h-[55vh] lg:min-h-[62vh] cursor-pointer select-none"
       >
         {!isFlipped ? (
           /* FRONT */
-          <div className="w-full min-h-[420px] sm:min-h-[500px] p-7 sm:p-10 flex flex-col justify-between glass-card rounded-3xl border-2 border-[#adc6ff]/20 hover:border-[#adc6ff]/40 transition-colors">
+          <div className="w-full min-h-[45vh] md:min-h-[55vh] lg:min-h-[62vh] p-6 sm:p-8 md:p-10 lg:p-12 flex flex-col justify-between glass-card rounded-3xl border-2 border-[#adc6ff]/20 hover:border-[#adc6ff]/40 transition-colors">
             <div className="flex items-center justify-between">
               <span className="px-3 py-1 rounded-full bg-[#122131] text-[#adc6ff] text-xs font-mono border border-[#adc6ff]/20">
                 {currentCard.topic || deck.category}
@@ -338,7 +338,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
 
             <div className="my-auto text-center space-y-4">
               <p className="text-xs font-mono text-[#8c91a0] uppercase tracking-wider">Pergunta</p>
-              <h3 className="text-2xl sm:text-3xl font-bold text-white leading-relaxed">
+              <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-relaxed">
                 {currentCard.front}
               </h3>
             </div>
@@ -349,15 +349,15 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
           </div>
         ) : (
           /* BACK */
-          <div className="w-full min-h-[420px] sm:min-h-[500px] p-7 sm:p-10 flex flex-col justify-between rounded-3xl border-2 border-[#60a5fa]/50 bg-[#0c1e30] transition-colors">
+          <div className="w-full min-h-[45vh] md:min-h-[55vh] lg:min-h-[62vh] p-6 sm:p-8 md:p-10 lg:p-12 flex flex-col justify-between rounded-3xl border-2 border-[#60a5fa]/50 bg-[#0c1e30] transition-colors">
             <div className="flex items-center justify-between">
               <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-mono border border-emerald-500/20 font-bold">
                 Resposta
               </span>
             </div>
 
-            <div className="my-auto space-y-4 overflow-y-auto max-h-[260px] pr-1">
-              <div className="text-lg sm:text-xl font-medium text-slate-100 whitespace-pre-line leading-relaxed">
+            <div className="my-auto space-y-4 overflow-y-auto max-h-[50%] pr-1">
+              <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-medium text-slate-100 whitespace-pre-line leading-relaxed">
                 {currentCard.back}
               </div>
 
