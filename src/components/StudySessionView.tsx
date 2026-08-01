@@ -98,8 +98,20 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  // Inverte pergunta/resposta ao revisar (útil para consolidar a resposta como estímulo)
+  const [invertCards, setInvertCards] = useState(false);
 
-  const currentCard = cards[currentIndex];
+  // Cards com pergunta/resposta invertidas (resposta vira pergunta e vice-versa)
+  const effectiveCards = invertCards
+    ? cards.map((c) => ({
+        ...c,
+        front: c.back,
+        back: c.front,
+        explanation: c.explanation,
+        curiosity: c.curiosity,
+      }))
+    : cards;
+  const currentCard = effectiveCards[currentIndex];
 
   const handleFlip = () => {
     setIsFlipped((prev) => !prev);
@@ -310,6 +322,20 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
             className="p-2 rounded-xl bg-[#122131] text-[#c2c6d6] hover:text-white transition-colors flex items-center gap-2 text-xs font-medium"
           >
             <ArrowLeft className="w-4 h-4" /> Sair da Sessão
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setInvertCards((prev) => !prev)}
+            title={invertCards ? 'Desativar inversão de pergunta/resposta' : 'Inverter resposta com pergunta'}
+            className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              invertCards
+                ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
+                : 'bg-[#122131] border-[#424754]/40 text-[#8c91a0] hover:border-violet-500/40 hover:text-violet-300'
+            }`}
+          >
+            <RotateCw className={`w-4 h-4 ${invertCards ? 'text-violet-400' : ''}`} />
+            <span className="hidden sm:inline">{invertCards ? 'Inversão ativa' : 'Inverter Resposta/Pergunta'}</span>
           </button>
         </div>
 
