@@ -64,8 +64,13 @@ export const generateAICards = async (
 
   const data = await res.json();
 
-  // O backend pode retornar { cards: [...] } ou diretamente um array
-  const raw: any[] = Array.isArray(data) ? data : (data.cards ?? []);
+  const raw: any[] = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.cards)
+      ? data.cards
+      : Array.isArray(data?.flashcards)
+        ? data.flashcards
+        : [];
 
   if (!Array.isArray(raw) || raw.length === 0) {
     throw new Error('Nenhum flashcard foi gerado. Tente novamente.');
@@ -75,8 +80,8 @@ export const generateAICards = async (
     id: `ai-card-${Date.now()}-${idx}`,
     subject: item.subject || subject,
     topic: item.topic || topics[0] || subject,
-    front: item.front || '',
-    back: item.back || '',
+    front: item.front || item.question || '',
+    back: item.back || item.answer || '',
     explanation: item.explanation || '',
     curiosity: item.curiosity || '',
     difficulty: (item.difficulty as Flashcard['difficulty']) || 'medium',

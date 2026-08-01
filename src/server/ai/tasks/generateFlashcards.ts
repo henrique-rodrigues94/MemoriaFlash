@@ -1,6 +1,7 @@
 import { Type } from '@google/genai';
 import { aiOrchestrator } from '../index';
 import { withCache, CACHE_TTL } from '../cache/aiCache';
+import { extractArrayField } from '../jsonUtils';
 
 export async function generateFlashcardsTask(args: {
   prompt: string;
@@ -60,7 +61,7 @@ REGRA CRÍTICA: O campo "front" deve ser uma PERGUNTA e o campo "back" deve ser 
         schemaHint,
         geminiSchema,
       });
-      const cards = Array.isArray(data) ? data : (data as any)?.cards ?? [];
+      const cards = extractArrayField(data, ['cards', 'flashcards']);
       return { cards, providerUsed };
     }
   );

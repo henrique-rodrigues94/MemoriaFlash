@@ -1,6 +1,7 @@
 import { Type } from '@google/genai';
 import { aiOrchestrator } from '../index';
 import { withCache, CACHE_TTL } from '../cache/aiCache';
+import { extractArrayField } from '../jsonUtils';
 
 export async function suggestTopicsTask(args: { title: string; language?: string }) {
   const { title, language = 'pt' } = args;
@@ -39,7 +40,9 @@ Retorne subtópicos ESPECÍFICOS para "${title}".`;
       schemaHint,
       geminiSchema,
     });
-    const topics = (data as any)?.topics ?? (Array.isArray(data) ? data : []);
+    const topics = Array.isArray((data as any)?.topics)
+      ? (data as any).topics
+      : extractArrayField(data, ['topics', 'suggestions']);
     return { topics, providerUsed };
   });
 

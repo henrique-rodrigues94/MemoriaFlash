@@ -102,6 +102,11 @@ export function App() {
 
   // Auto-detected or saved language
   const [currentLanguage, setCurrentLanguage] = useState<SupportedLanguage>(detectBrowserLanguage());
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window === 'undefined') return 'dark';
+    const savedTheme = window.localStorage.getItem('flashmind-theme');
+    return savedTheme === 'light' ? 'light' : 'dark';
+  });
 
   const handleSelectLanguage = (lang: SupportedLanguage) => {
     setCurrentLanguage(lang);
@@ -125,6 +130,13 @@ export function App() {
     opponentPoints: number;
     wrongQuestions: QuizQuestion[];
   }>({ userPoints: 0, opponentPoints: 0, wrongQuestions: [] });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('theme-light', theme === 'light');
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem('flashmind-theme', theme);
+  }, [theme]);
 
   // Persistence & Firestore Effects
   useEffect(() => {
@@ -364,14 +376,18 @@ export function App() {
     maybeShowInterstitial(newStats);
   };
 
+  const isLightTheme = theme === 'light';
+
   return (
-    <div className="min-h-screen bg-[#051424] text-[#d4e4fa] font-sans antialiased selection:bg-[#adc6ff]/30 selection:text-white">
+    <div className={`min-h-screen font-sans antialiased transition-colors duration-300 ${isLightTheme ? 'bg-[#f4f7fb] text-[#14213d]' : 'bg-[#051424] text-[#d4e4fa]'} ${isLightTheme ? 'selection:bg-[#60a5fa]/30 selection:text-[#0f172a]' : 'selection:bg-[#adc6ff]/30 selection:text-white'}`}>
       {/* App Header */}
       <Header
         stats={stats}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         currentLanguage={currentLanguage}
+        theme={theme}
+        onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
         onOpenLanguageSelector={() => setShowLanguageModal(true)}
         onShowOnboarding={() => setShowOnboarding(true)}
         onOpenSubscription={() => setShowSubscriptionModal(true)}
@@ -426,7 +442,7 @@ export function App() {
             )}
 
             {activeTab === 'scanner' && (
-              <ScannerView />
+              <ScannerView onSaveNewDeck={handleSaveDeck} />
             )}
 
             {activeTab === 'cards' && (

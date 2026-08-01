@@ -1,5 +1,28 @@
 @import "tailwindcss";
 
+:root {
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+html, body, #root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #051424;
+  color: #d4e4fa;
+}
+
+:root[data-theme='light'] body {
+  background: #f4f7fb;
+  color: #14213d;
+}
+
 @layer utilities {
   .glass-card {
     background: rgba(22, 34, 49, 0.65);
@@ -71,4 +94,16 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #424754;
+}
+
+:root[data-theme='light'] ::-webkit-scrollbar-track {
+  background: #e2e8f0;
+}
+
+:root[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+}
+
+:root[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
 }
