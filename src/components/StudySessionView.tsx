@@ -204,7 +204,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   const progressPercent = Math.round(((currentIndex + 1) / cards.length) * 100);
 
   return (
-    <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto space-y-5 pb-24 animate-fade-in">
+    <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto h-[100dvh] flex flex-col overflow-hidden animate-fade-in">
 
       {/* Exit confirm modal */}
       {showExitConfirm && (
@@ -285,78 +285,81 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Cabeçalho + progresso + botão explicar (área fixa no topo) */}
+      <div className="flex flex-col gap-3 shrink-0 pt-3">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <button
+            id="btn-back-to-dashboard"
+            onClick={handleBackRequest}
+            className="p-2 rounded-xl bg-[#122131] text-[#c2c6d6] hover:text-white transition-colors flex items-center gap-2 text-xs font-medium"
+          >
+            <ArrowLeft className="w-4 h-4" /> Sair da Sessão
+          </button>
+        </div>
+
+        {/* Progress */}
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-xs font-mono text-[#8c91a0]">
+            <span>Cartão {currentIndex + 1} de {cards.length}</span>
+            <span className="text-[#adc6ff] font-bold">{progressPercent}%</span>
+          </div>
+          <div className="w-full bg-[#122131] h-2 rounded-full overflow-hidden">
+            <div
+              className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* "Explicar Pergunta & Ver Exemplo" — acima do card, sempre visível */}
         <button
-          id="btn-back-to-dashboard"
-          onClick={handleBackRequest}
-          className="p-2 rounded-xl bg-[#122131] text-[#c2c6d6] hover:text-white transition-colors flex items-center gap-2 text-xs font-medium"
+          id="btn-explain-and-example"
+          onClick={(e) => { e.stopPropagation(); handleRequestAiExplanation(); }}
+          disabled={isLoadingExplanation}
+          className="w-full px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-blue-500/20 hover:from-amber-500/30 hover:to-blue-500/30 text-white border border-amber-400/40 text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-[1.01] transition-all cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4" /> Sair da Sessão
+          <Lightbulb className="w-4 h-4 text-amber-300 fill-amber-300/30 animate-pulse" />
+          {isLoadingExplanation ? 'Gerando explicação...' : t.explainQuestionAndExample || 'Explicar Pergunta & Ver Exemplo'}
         </button>
       </div>
 
-      {/* Progress */}
-      <div className="space-y-1.5">
-        <div className="flex justify-between text-xs font-mono text-[#8c91a0]">
-          <span>Cartão {currentIndex + 1} de {cards.length}</span>
-          <span className="text-[#adc6ff] font-bold">{progressPercent}%</span>
-        </div>
-        <div className="w-full bg-[#122131] h-2 rounded-full overflow-hidden">
-          <div
-            className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all duration-300"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-      </div>
-
-      {/* "Explicar Pergunta & Ver Exemplo" — acima do card, sempre visível */}
-      <button
-        id="btn-explain-and-example"
-        onClick={(e) => { e.stopPropagation(); handleRequestAiExplanation(); }}
-        disabled={isLoadingExplanation}
-        className="w-full px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-blue-500/20 hover:from-amber-500/30 hover:to-blue-500/30 text-white border border-amber-400/40 text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-[1.01] transition-all cursor-pointer"
-      >
-        <Lightbulb className="w-4 h-4 text-amber-300 fill-amber-300/30 animate-pulse" />
-        {isLoadingExplanation ? 'Gerando explicação...' : t.explainQuestionAndExample || 'Explicar Pergunta & Ver Exemplo'}
-      </button>
-
-      {/* ── CARD (responsivo: cresce com a altura da tela) ── */}
+      {/* ── CARD (preenche o espaço restante sem scroll) ── */}
       <div
         id="flashcard-flip-container"
         onClick={handleFlip}
-        className="min-h-[45vh] md:min-h-[55vh] lg:min-h-[62vh] cursor-pointer select-none"
+        className="flex-1 min-h-0 cursor-pointer select-none"
       >
         {!isFlipped ? (
           /* FRONT */
-          <div className="w-full min-h-[45vh] md:min-h-[55vh] lg:min-h-[62vh] p-6 sm:p-8 md:p-10 lg:p-12 flex flex-col justify-between glass-card rounded-3xl border-2 border-[#adc6ff]/20 hover:border-[#adc6ff]/40 transition-colors">
+          <div className="w-full h-full p-4 sm:p-6 md:p-8 lg:p-10 flex flex-col justify-between glass-card rounded-3xl border-2 border-[#adc6ff]/20 hover:border-[#adc6ff]/40 transition-colors">
             <div className="flex items-center justify-between">
               <span className="px-3 py-1 rounded-full bg-[#122131] text-[#adc6ff] text-xs font-mono border border-[#adc6ff]/20">
                 {currentCard.topic || deck.category}
               </span>
             </div>
 
-            <div className="my-auto text-center space-y-4">
+            <div className="my-auto text-center space-y-3 overflow-hidden">
               <p className="text-xs font-mono text-[#8c91a0] uppercase tracking-wider">Pergunta</p>
-              <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-relaxed">
+              <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-relaxed break-words">
                 {currentCard.front}
               </h3>
             </div>
 
-            <div className="text-center pt-4 border-t border-[#424754]/20 flex items-center justify-center gap-2 text-xs text-[#8c91a0]">
+            <div className="text-center pt-3 border-t border-[#424754]/20 flex items-center justify-center gap-2 text-xs text-[#8c91a0] shrink-0">
               <RotateCw className="w-4 h-4 text-[#60a5fa]" /> Clique para ver a resposta
             </div>
           </div>
         ) : (
           /* BACK */
-          <div className="w-full min-h-[45vh] md:min-h-[55vh] lg:min-h-[62vh] p-6 sm:p-8 md:p-10 lg:p-12 flex flex-col justify-between rounded-3xl border-2 border-[#60a5fa]/50 bg-[#0c1e30] transition-colors">
-            <div className="flex items-center justify-between">
+          <div className="w-full h-full p-4 sm:p-6 md:p-8 lg:p-10 flex flex-col justify-between rounded-3xl border-2 border-[#60a5fa]/50 bg-[#0c1e30] transition-colors">
+            <div className="flex items-center justify-between shrink-0">
               <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-mono border border-emerald-500/20 font-bold">
                 Resposta
               </span>
             </div>
 
-            <div className="my-auto space-y-4 overflow-y-auto max-h-[50%] pr-1">
+            <div className="my-auto space-y-3 overflow-y-auto pr-1 min-h-0">
               <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-medium text-slate-100 whitespace-pre-line leading-relaxed">
                 {currentCard.back}
               </div>
@@ -372,7 +375,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
               )}
             </div>
 
-            <div className="text-center pt-2 border-t border-[#424754]/20 text-xs text-[#8c91a0]">
+            <div className="text-center pt-2 border-t border-[#424754]/20 text-xs text-[#8c91a0] shrink-0">
               Avalie sua facilidade para calcular o intervalo SRS
             </div>
           </div>
@@ -381,7 +384,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
 
       {/* SM-2 Rating Controls — only after flip */}
       {isFlipped && (
-        <div className="grid grid-cols-3 gap-3 pt-1 animate-fade-in">
+        <div className="grid grid-cols-3 gap-3 shrink-0 animate-fade-in pb-3">
           <button
             id="rate-btn-hard"
             onClick={() => handleRate('hard')}
@@ -414,7 +417,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
 
       {/* Instruction when card not flipped */}
       {!isFlipped && (
-        <div className="text-center py-3 text-xs text-[#8c91a0] animate-fade-in">
+        <div className="text-center py-2 text-xs text-[#8c91a0] animate-fade-in shrink-0">
           <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#122131] border border-[#424754]/30">
             <RotateCw className="w-3.5 h-3.5 text-[#60a5fa]" />
             Vire o cartão para ver a resposta e avaliar
