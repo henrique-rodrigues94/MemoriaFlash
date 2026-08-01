@@ -214,13 +214,27 @@ export const StudioView: React.FC<StudioViewProps> = ({
               <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5">
                 💻 MATÉRIA / ASSUNTO:
               </label>
-              <input
-                type="text"
-                placeholder="Ex: Direito Penal, Biologia, Matemática..."
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  list="subject-suggestions"
+                  placeholder="Ex: Direito Penal, Biologia, Matemática..."
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm"
+                />
+                {/* Autocomplete: sugere matérias de decks já existentes */}
+                <datalist id="subject-suggestions">
+                  {existingSubjects.map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+                {subject.trim().length >= 2 && (
+                  <div className="absolute inset-y-0 right-3 flex items-center text-[#60a5fa]">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                )}
+              </div>
             </div>
 
             {suggestedTopics.length > 0 && (

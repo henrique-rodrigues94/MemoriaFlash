@@ -24,6 +24,7 @@ Nível de dificuldade dos cartões: ${difficulty} ('easy' - conceitos fundamenta
 Cada flashcard deve conter:
 - front: Uma PERGUNTA clara, concisa e instigante sobre o conteúdo — NUNCA repita a resposta na pergunta.
 - back: A RESPOSTA completa e diferente da pergunta, com explicação sucinta e 2-3 pontos-chave em tópicos.
+- explanation: Uma EXPLICAÇÃO DIDÁTICA do conceito com pelo menos 1 EXEMPLO PRÁTICO do mundo real (comece com "📘 Explicação:" e inclua "💡 Exemplo:").
 - topic: Subtópico específico relacionado ao card.
 - difficulty: Dificuldade estimada ('${difficulty}').
 REGRA CRÍTICA: O campo "front" deve ser uma PERGUNTA e o campo "back" deve ser a RESPOSTA. Eles jamais devem ter o mesmo texto.`;
@@ -31,10 +32,10 @@ REGRA CRÍTICA: O campo "front" deve ser uma PERGUNTA e o campo "back" deve ser 
   // O userPrompt agora inclui os tópicos selecionados explicitamente
   const userPromptFull =
     selectedTopics.length > 0
-      ? `Tema: ${prompt}\nSubtópicos prioritários: ${selectedTopics.join(', ')}\nGere ${count} flashcards com perguntas e respostas distintas entre si.`
-      : `Tema: ${prompt}\nGere ${count} flashcards com perguntas e respostas distintas entre si.`;
+      ? `Tema: ${prompt}\nSubtópicos prioritários: ${selectedTopics.join(', ')}\nGere ${count} flashcards com perguntas e respostas distintas entre si.\nINCLUA em cada card o campo "explanation" com uma explicação didática e um exemplo prático.`
+      : `Tema: ${prompt}\nGere ${count} flashcards com perguntas e respostas distintas entre si.\nINCLUA em cada card o campo "explanation" com uma explicação didática e um exemplo prático.`;
 
-  const schemaHint = `[{ "front": string, "back": string, "topic": string, "difficulty": "easy"|"medium"|"hard"|"expert" }, ...] — um array com exatamente ${count} objetos (\"cards\").`;
+  const schemaHint = `[{ "front": string, "back": string, "explanation": string, "topic": string, "difficulty": "easy"|"medium"|"hard"|"expert" }, ...] — um array com exatamente ${count} objetos (\"cards\").`;
 
   const geminiSchema = {
     type: Type.ARRAY,
@@ -43,6 +44,7 @@ REGRA CRÍTICA: O campo "front" deve ser uma PERGUNTA e o campo "back" deve ser 
       properties: {
         front: { type: Type.STRING },
         back: { type: Type.STRING },
+        explanation: { type: Type.STRING },
         topic: { type: Type.STRING },
         difficulty: { type: Type.STRING },
       },

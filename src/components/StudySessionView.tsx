@@ -48,8 +48,20 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  // Inverte pergunta/resposta ao revisar (útil para consolidar a resposta como estímulo)
+  const [invertCards, setInvertCards] = useState(false);
 
-  const currentCard = cards[currentIndex];
+  // Cards com pergunta/resposta invertidas (resposta vira pergunta e vice-versa)
+  const effectiveCards = invertCards
+    ? cards.map((c) => ({
+        ...c,
+        front: c.back,
+        back: c.front,
+        explanation: c.explanation,
+        curiosity: c.curiosity,
+      }))
+    : cards;
+  const currentCard = effectiveCards[currentIndex];
 
   const handleFlip = () => {
     setIsFlipped((prev) => !prev);
@@ -103,10 +115,20 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
     }
   };
 
-  const handleCompleteAndReturn = () => {
+  const handleCompleteAndReturn = (shouldInvert: boolean = invertCards) => {
     const updatedCardMap = new Map(cards.map((c) => [c.id, c]));
     const mergedCards = deck.cards.map((c) => updatedCardMap.get(c.id) || c);
-    const updatedDeck: Deck = { ...deck, cards: mergedCards };
+
+    // Se o usuário quiser inverter, troca front/back de todos os cards antes de salvar
+    const finalCards = shouldInvert
+      ? mergedCards.map((c) => ({
+          ...c,
+          front: c.back,
+          back: c.front,
+        }))
+      : mergedCards;
+
+    const updatedDeck: Deck = { ...deck, cards: finalCards };
     onFinishSession(updatedDeck, reviewedCount);
   };
 
@@ -148,9 +170,29 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
             <div className="text-xl font-extrabold text-emerald-400">{reviewedCount}</div>
           </div>
         </div>
+
+        {/* Opção de inverter resposta com pergunta antes de sair */}
+        <button
+          type="button"
+          onClick={() => setInvertCards((prev) => !prev)}
+          className={`w-full py-3 rounded-2xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            invertCards
+              ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
+              : 'bg-[#122131] border-[#424754]/40 text-[#8c91a0] hover:border-violet-500/40 hover:text-violet-300'
+          }`}
+        >
+          <RotateCw className={`w-4 h-4 ${invertCards ? 'text-violet-400' : ''}`} />
+          {invertCards ? '✓ Inverter Resposta com Pergunta (ativo)' : 'Inverter Resposta com Pergunta'}
+        </button>
+        {invertCards && (
+          <p className="text-[11px] text-[#8c91a0] -mt-2">
+            A resposta virará a pergunta e a pergunta virará a resposta ao salvar.
+          </p>
+        )}
+
         <button
           id="btn-finish-study-session"
-          onClick={handleCompleteAndReturn}
+          onClick={() => handleCompleteAndReturn(invertCards)}
           className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm shadow-xl shadow-blue-600/30 hover:scale-[1.02] transition-all cursor-pointer"
         >
           Salvar Progresso e Voltar
@@ -252,9 +294,6 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
         >
           <ArrowLeft className="w-4 h-4" /> Sair da Sessão
         </button>
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#adc6ff]/10 text-[#adc6ff] border border-[#adc6ff]/20 text-xs font-mono font-bold">
-          <Sparkles className="w-3.5 h-3.5 text-[#60a5fa]" /> AI ASSIST ACTIVE
-        </span>
       </div>
 
       {/* Progress */}
@@ -270,6 +309,17 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
           />
         </div>
       </div>
+
+      {/* "Explicar Pergunta & Ver Exemplo" — acima do card, sempre visível */}
+      <button
+        id="btn-explain-and-example"
+        onClick={(e) => { e.stopPropagation(); handleRequestAiExplanation(); }}
+        disabled={isLoadingExplanation}
+        className="w-full px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-blue-500/20 hover:from-amber-500/30 hover:to-blue-500/30 text-white border border-amber-400/40 text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-[1.01] transition-all cursor-pointer"
+      >
+        <Lightbulb className="w-4 h-4 text-amber-300 fill-amber-300/30 animate-pulse" />
+        {isLoadingExplanation ? 'Gerando explicação...' : t.explainQuestionAndExample || 'Explicar Pergunta & Ver Exemplo'}
+      </button>
 
       {/* ── CARD ── */}
       <div
@@ -328,21 +378,6 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
           </div>
         )}
       </div>
-
-      {/* "Explain & Example" button — only visible after flipping */}
-      {isFlipped && (
-        <div className="animate-fade-in">
-          <button
-            id="btn-explain-and-example"
-            onClick={(e) => { e.stopPropagation(); handleRequestAiExplanation(); }}
-            disabled={isLoadingExplanation}
-            className="w-full px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-blue-500/20 hover:from-amber-500/30 hover:to-blue-500/30 text-white border border-amber-400/40 text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-[1.01] transition-all cursor-pointer"
-          >
-            <Lightbulb className="w-4 h-4 text-amber-300 fill-amber-300/30 animate-pulse" />
-            {isLoadingExplanation ? 'Gerando explicação...' : t.explainQuestionAndExample || 'Explicar Pergunta & Ver Exemplo'}
-          </button>
-        </div>
-      )}
 
       {/* SM-2 Rating Controls — only after flip */}
       {isFlipped && (
