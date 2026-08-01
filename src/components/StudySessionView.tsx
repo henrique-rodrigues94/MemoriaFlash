@@ -19,40 +19,50 @@ import { apiVoiceTutor } from '../services/api';
 import { SupportedLanguage, translations } from '../lib/i18n';
 
 // Define um tamanho de fonte que se ajusta ao comprimento do texto E à altura
-// do card (cqh = 1% da altura do container do card), garantindo que o texto
-// permaneça sempre visível dentro do card, mesmo com textos muito grandes.
+// do card (cqh = 1% da altura do container do card), priorizando uma fonte
+// média bem legível e reduzindo apenas quando o texto não couber.
 function responsiveFontSize(text: string, kind: 'question' | 'answer' = 'question'): string {
   const len = (text || '').length;
   const isQuestion = kind === 'question';
 
-  // Percentual da altura do card usado como fonte-base
-  let sizeCqh: number;
+  // Tamanho-base médio legível (mínimo), o máximo (sem reduzir) e a referência
+  // de "reduzir quando necessário" em % da altura do card.
+  let basePx: number;
   let maxPx: number;
   let minPx: number;
+  let sizeCqh: number;
 
-  if (len <= 60) {
-    sizeCqh = isQuestion ? 6.5 : 4.5;
+  // Pergunta: fonte média ~40px; Resposta/Explicação: ~28px
+  if (len <= 70) {
+    basePx = isQuestion ? 40 : 28;
+    sizeCqh = isQuestion ? 6.5 : 4.6;
     maxPx = isQuestion ? 46 : 34;
-    minPx = 16;
-  } else if (len <= 110) {
-    sizeCqh = isQuestion ? 5.5 : 4;
-    maxPx = isQuestion ? 38 : 30;
-    minPx = 15;
-  } else if (len <= 180) {
-    sizeCqh = isQuestion ? 4.6 : 3.4;
-    maxPx = isQuestion ? 32 : 26;
-    minPx = 14;
-  } else if (len <= 280) {
-    sizeCqh = isQuestion ? 3.7 : 2.9;
-    maxPx = isQuestion ? 27 : 22;
-    minPx = 13;
+    minPx = isQuestion ? 16 : 13;
+  } else if (len <= 120) {
+    basePx = isQuestion ? 36 : 25;
+    sizeCqh = isQuestion ? 5.8 : 4;
+    maxPx = isQuestion ? 42 : 31;
+    minPx = isQuestion ? 15 : 13;
+  } else if (len <= 200) {
+    basePx = isQuestion ? 32 : 22;
+    sizeCqh = isQuestion ? 5 : 3.5;
+    maxPx = isQuestion ? 38 : 27;
+    minPx = isQuestion ? 14 : 12;
+  } else if (len <= 320) {
+    basePx = isQuestion ? 27 : 19;
+    sizeCqh = isQuestion ? 4.2 : 3;
+    maxPx = isQuestion ? 32 : 24;
+    minPx = isQuestion ? 13 : 12;
   } else {
-    sizeCqh = isQuestion ? 3 : 2.4;
-    maxPx = isQuestion ? 22 : 19;
-    minPx = 12;
+    basePx = isQuestion ? 23 : 17;
+    sizeCqh = isQuestion ? 3.4 : 2.6;
+    maxPx = isQuestion ? 27 : 21;
+    minPx = isQuestion ? 12 : 11;
   }
 
-  return `clamp(${minPx}px, ${sizeCqh}cqh, ${maxPx}px)`;
+  // Usa clamp entre min e base, escalando com a altura do card (cqh).
+  // Se o texto não couber, o clamp reduz automaticamente para caber.
+  return `clamp(${minPx}px, min(${basePx}px, ${sizeCqh}cqh), ${maxPx}px)`;
 }
 
 interface StudySessionViewProps {
@@ -363,16 +373,6 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
           </div>
         </div>
 
-        {/* "Explicar Pergunta & Ver Exemplo" — acima do card, sempre visível */}
-        <button
-          id="btn-explain-and-example"
-          onClick={(e) => { e.stopPropagation(); handleRequestAiExplanation(); }}
-          disabled={isLoadingExplanation}
-          className="w-full px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-blue-500/20 hover:from-amber-500/30 hover:to-blue-500/30 text-white border border-amber-400/40 text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-[1.01] transition-all cursor-pointer"
-        >
-          <Lightbulb className="w-4 h-4 text-amber-300 fill-amber-300/30 animate-pulse" />
-          {isLoadingExplanation ? 'Gerando explicação...' : t.explainQuestionAndExample || 'Explicar Pergunta & Ver Exemplo'}
-        </button>
       </div>
 
       {/* ── CARD (preenche o espaço restante sem scroll) ── */}
@@ -420,6 +420,21 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
               >
                 {currentCard.back}
               </div>
+
+              {/* Explicação + Exemplo — exibida automaticamente no verso do card */}
+              {currentCard.explanation && (
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-100">
+                  <div className="font-bold text-amber-300 flex items-center gap-1.5 mb-1.5">
+                    <Lightbulb className="w-4 h-4 fill-amber-300/30" /> Explicação & Exemplo
+                  </div>
+                  <p
+                    className="leading-relaxed whitespace-pre-line"
+                    style={{ fontSize: responsiveFontSize(currentCard.explanation, 'answer') }}
+                  >
+                    {currentCard.explanation}
+                  </p>
+                </div>
+              )}
 
               {/* Curiosity on back of card */}
               {currentCard.curiosity && (
