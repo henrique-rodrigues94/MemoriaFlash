@@ -204,7 +204,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   const progressPercent = Math.round(((currentIndex + 1) / cards.length) * 100);
 
   return (
-    <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto h-[100dvh] flex flex-col overflow-hidden animate-fade-in">
+    <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto h-[100dvh] flex flex-col gap-4 sm:gap-5 overflow-hidden animate-fade-in">
 
       {/* Exit confirm modal */}
       {showExitConfirm && (
@@ -384,7 +384,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
 
       {/* SM-2 Rating Controls — only after flip */}
       {isFlipped && (
-        <div className="grid grid-cols-3 gap-3 shrink-0 animate-fade-in pb-3">
+        <div className="grid grid-cols-3 gap-3 shrink-0 animate-fade-in pb-1 pt-1">
           <button
             id="rate-btn-hard"
             onClick={() => handleRate('hard')}
@@ -417,7 +417,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
 
       {/* Instruction when card not flipped */}
       {!isFlipped && (
-        <div className="text-center py-2 text-xs text-[#8c91a0] animate-fade-in shrink-0">
+        <div className="text-center py-2 pb-3 text-xs text-[#8c91a0] animate-fade-in shrink-0">
           <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#122131] border border-[#424754]/30">
             <RotateCw className="w-3.5 h-3.5 text-[#60a5fa]" />
             Vire o cartão para ver a resposta e avaliar
