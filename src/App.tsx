@@ -380,25 +380,27 @@ export function App() {
 
   return (
     <div className={`min-h-screen font-sans antialiased transition-colors duration-300 ${isLightTheme ? 'bg-[#f4f7fb] text-[#14213d]' : 'bg-[#051424] text-[#d4e4fa]'} ${isLightTheme ? 'selection:bg-[#60a5fa]/30 selection:text-[#0f172a]' : 'selection:bg-[#adc6ff]/30 selection:text-white'}`}>
-      {/* App Header */}
-      <Header
-        stats={stats}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        currentLanguage={currentLanguage}
-        theme={theme}
-        onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
-        onOpenLanguageSelector={() => setShowLanguageModal(true)}
-        onShowOnboarding={() => setShowOnboarding(true)}
-        onOpenSubscription={() => setShowSubscriptionModal(true)}
-        onOpenAdMob={() => setShowAdMobModal(true)}
-        onOpenAuth={() => setShowAuthModal(true)}
-        onOpenReferral={() => setShowReferralModal(true)}
-        onOpenNotifications={() => setShowNotificationsModal(true)}
-      />
+      {/* App Header — oculto durante a sessão de estudo (tela cheia) */}
+      {!activeStudyDeck && (
+        <Header
+          stats={stats}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          currentLanguage={currentLanguage}
+          theme={theme}
+          onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+          onOpenLanguageSelector={() => setShowLanguageModal(true)}
+          onShowOnboarding={() => setShowOnboarding(true)}
+          onOpenSubscription={() => setShowSubscriptionModal(true)}
+          onOpenAdMob={() => setShowAdMobModal(true)}
+          onOpenAuth={() => setShowAuthModal(true)}
+          onOpenReferral={() => setShowReferralModal(true)}
+          onOpenNotifications={() => setShowNotificationsModal(true)}
+        />
+      )}
 
       {/* Main Content Viewport */}
-      <main className="pt-20 px-4 sm:px-6 max-w-6xl mx-auto pb-24 sm:pb-28">
+      <main className={`${activeStudyDeck ? '' : 'pt-20'} px-4 sm:px-6 max-w-6xl mx-auto pb-24 sm:pb-28`}>
         {/* If Active Study Session */}
         {activeStudyDeck ? (
           <StudySessionView
