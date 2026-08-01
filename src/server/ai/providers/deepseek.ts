@@ -1,21 +1,22 @@
 import { AIProvider, AIProviderError, GenerateJSONParams } from '../types';
 import { buildJSONInstruction, extractJSON } from '../jsonUtils';
 
-// Hugging Face Inference (router OpenAI-compatible), camada gratuita com
-// limite de requisições. Crie um token grátis (read) em
-// https://huggingface.co/settings/tokens
-const MODEL = process.env.HUGGINGFACE_MODEL || 'meta-llama/Llama-3.1-8B-Instruct';
-const ENDPOINT = 'https://router.huggingface.co/v1/chat/completions';
+// DeepSeek: excelente qualidade a custo muito baixo (~$0.07/1M tokens).
+// API compatível com OpenAI — fácil de integrar.
+// Crie sua chave em: https://platform.deepseek.com/api_keys
+// Modelos: deepseek-chat (V3, melhor custo-benefício), deepseek-reasoner (R1, raciocínio)
+const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+const ENDPOINT = 'https://api.deepseek.com/chat/completions';
 
-export const huggingFaceProvider: AIProvider = {
-  id: 'huggingface',
-  label: `Hugging Face (${MODEL}, gratuito)`,
-  tier: 'free',
-  isConfigured: () => !!process.env.HUGGINGFACE_API_KEY,
+export const deepseekProvider: AIProvider = {
+  id: 'deepseek',
+  label: `DeepSeek (${MODEL})`,
+  tier: 'paid',
+  isConfigured: () => !!process.env.DEEPSEEK_API_KEY,
 
   async generateJSON(params: GenerateJSONParams): Promise<unknown> {
-    const apiKey = process.env.HUGGINGFACE_API_KEY;
-    if (!apiKey) throw new AIProviderError('HUGGINGFACE_API_KEY não configurada', 'huggingface');
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) throw new AIProviderError('DEEPSEEK_API_KEY não configurada', 'deepseek');
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), params.timeoutMs ?? 30000);
@@ -31,8 +32,12 @@ export const huggingFaceProvider: AIProvider = {
           model: MODEL,
           temperature: params.temperature ?? 0.7,
           max_tokens: params.maxOutputTokens ?? 8192,
+          response_format: { type: 'json_object' },
           messages: [
-            { role: 'system', content: params.systemPrompt + buildJSONInstruction(params.schemaHint) },
+            {
+              role: 'system',
+              content: params.systemPrompt + buildJSONInstruction(params.schemaHint),
+            },
             { role: 'user', content: params.userPrompt },
           ],
         }),
@@ -41,7 +46,12 @@ export const huggingFaceProvider: AIProvider = {
 
       if (!res.ok) {
         const body = await res.text().catch(() => '');
-        throw new AIProviderError(`Hugging Face HTTP ${res.status}: ${body}`, 'huggingface', res.status === 429, res.status);
+        throw new AIProviderError(
+          `DeepSeek HTTP ${res.status}: ${body}`,
+          'deepseek',
+          res.status === 429,
+          res.status
+        );
       }
 
       const data = await res.json();
@@ -50,7 +60,10 @@ export const huggingFaceProvider: AIProvider = {
     } catch (err: any) {
       if (err instanceof AIProviderError) throw err;
       const aborted = err?.name === 'AbortError';
-      throw new AIProviderError(aborted ? 'Hugging Face: timeout' : err?.message || 'Falha ao chamar Hugging Face', 'huggingface');
+      throw new AIProviderError(
+        aborted ? 'DeepSeek: timeout' : err?.message || 'Falha ao chamar DeepSeek',
+        'deepseek'
+      );
     } finally {
       clearTimeout(timeout);
     }

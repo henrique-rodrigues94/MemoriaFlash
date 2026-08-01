@@ -5,7 +5,10 @@ export interface Flashcard {
   front: string;
   back: string;
   topic?: string;
+  subject?: string;       // Matéria/assunto principal do deck
   difficulty?: 'easy' | 'medium' | 'hard' | 'expert';
+  explanation?: string;   // Detailed explanation with practical example
+  curiosity?: string;     // Interesting curiosity/fun fact about the topic
   reps: number;           // Repetition count in SM-2
   interval: number;       // Days until next review
   efactor: number;        // Easiness factor (default 2.5)
@@ -23,6 +26,7 @@ export interface Deck {
   accentBorder: string;
   iconName?: string;
   isPublic?: boolean;
+  createdAt?: string;     // ISO Date string
 }
 
 /** Registro de atividade de um único dia — usado no heatmap e estatísticas semanais. */
@@ -163,4 +167,4 @@ export interface TeacherClass {
   students: StudentProgress[];
 }
 
-export type ActiveTab = 'home' | 'explore' | 'create' | 'stats' | 'profile' | 'voice' | 'duel' | 'teacher';
+export type ActiveTab = 'home' | 'explore' | 'quiz' | 'scanner' | 'cards' | 'stats' | 'profile' | 'duel' | 'create';

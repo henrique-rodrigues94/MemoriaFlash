@@ -1,18 +1,35 @@
 import { Type } from '@google/genai';
 import { aiOrchestrator } from '../index';
 import { withCache, CACHE_TTL } from '../cache/aiCache';
+import { extractArrayField } from '../jsonUtils';
 
 export async function suggestTopicsTask(args: { title: string; language?: string }) {
   const { title, language = 'pt' } = args;
   const langInstruction = language === 'pt' ? 'em Português' : `in ${language}`;
 
-  const systemPrompt = `Você é um assistente pedagógico especialista em currículo educacional.`;
-  const userPrompt = `Gere de 5 a 7 tópicos e sub-temas de estudo essenciais sobre o assunto "${title}" ${langInstruction}.`;
-  const schemaHint = `{ "topics": string[] } — de 5 a 7 strings curtas.`;
+  const systemPrompt = `Você é um assistente pedagógico especialista em currículo educacional.
+Sua tarefa é sugerir subtópicos e sub-temas de estudo relevantes para um determinado assunto.
+REGRA CRÍTICA: Retorne APENAS subtópicos específicos relacionados ao assunto "${title}". 
+NÃO retorne frases genéricas como "Fundamentos de X" ou "Revisão Geral".
+Cada tópico deve ser um subtema REAL e específico do assunto solicitado.`;
+
+  const userPrompt = `Liste de 6 a 8 subtópicos e sub-temas de estudo ESPECÍFICOS e REAIS sobre o assunto "${title}" ${langInstruction}.
+Por exemplo, se o assunto for "Anatomia Humana", os subtópicos seriam: "Sistema Cardiovascular", "Sistema Nervoso Central", "Ossos do Crânio", etc.
+Se o assunto for "Direito Constitucional", seriam: "Princípios Fundamentais", "Direitos e Garantias Fundamentais", "Organização do Estado", etc.
+Retorne subtópicos ESPECÍFICOS para "${title}".`;
+
+  const schemaHint = `{ "topics": string[] } — de 6 a 8 strings com subtópicos específicos do assunto.`;
 
   const geminiSchema = {
     type: Type.OBJECT,
-    properties: { topics: { type: Type.ARRAY, items: { type: Type.STRING } } },
+    properties: {
+      topics: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
+        minItems: 6,
+        maxItems: 8,
+      },
+    },
     required: ['topics'],
   };
 
@@ -23,7 +40,9 @@ export async function suggestTopicsTask(args: { title: string; language?: string
       schemaHint,
       geminiSchema,
     });
-    const topics = (data as any)?.topics ?? (Array.isArray(data) ? data : []);
+    const topics = Array.isArray((data as any)?.topics)
+      ? (data as any).topics
+      : extractArrayField(data, ['topics', 'suggestions']);
     return { topics, providerUsed };
   });
 

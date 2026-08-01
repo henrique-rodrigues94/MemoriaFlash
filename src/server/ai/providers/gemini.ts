@@ -4,7 +4,12 @@ import { AIProvider, AIProviderError, GenerateJSONParams } from '../types';
 // Modelo válido e atual com camada gratuita generosa via Google AI Studio.
 // (O scaffold original referenciava "gemini-3.6-flash", que não existe —
 // corrigido aqui. Se a Google lançar um modelo mais novo, troque só esta linha.)
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-2.5-flash';
+
+// Lido na hora da chamada (lazy) — ver comentário em openrouter.ts.
+function getModel(): string {
+  return process.env.GEMINI_MODEL || DEFAULT_MODEL;
+}
 
 let client: GoogleGenAI | null = null;
 function getClient(): GoogleGenAI | null {
@@ -30,13 +35,17 @@ export const geminiProvider: AIProvider = {
       const config: Record<string, unknown> = {
         systemInstruction: params.systemPrompt,
         responseMimeType: 'application/json',
+        // CRÍTICO: sem isso o Gemini usa o default interno (~2k tokens) e trunca
+        // arrays grandes silenciosamente (ex: retorna 54 de 100 cards pedidos).
+        // gemini-2.5-flash suporta até 65536 tokens de saída.
+        maxOutputTokens: params.maxOutputTokens ?? parseInt(process.env.GEMINI_MAX_OUTPUT_TOKENS || '8192'),
       };
       if (params.geminiSchema) {
         config.responseSchema = params.geminiSchema;
       }
 
       const response = await ai.models.generateContent({
-        model: MODEL,
+        model: getModel(),
         contents: params.userPrompt,
         config,
       });

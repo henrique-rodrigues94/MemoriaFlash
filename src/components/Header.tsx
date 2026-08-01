@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Sparkles, School, Crown, LogIn, User as UserIcon, Globe, Gift, Bell } from 'lucide-react';
+import { Sparkles, Crown, Gift, Bell, Sun, Moon } from 'lucide-react';
 import { UserStats, ActiveTab } from '../types';
 import { auth } from '../lib/firebase';
 import { SupportedLanguage, SUPPORTED_LANGUAGES } from '../lib/i18n';
@@ -9,8 +9,9 @@ interface HeaderProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   currentLanguage: SupportedLanguage;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
   onOpenLanguageSelector: () => void;
-  onOpenVoiceSettings: () => void;
   onShowOnboarding: () => void;
   onOpenSubscription: () => void;
   onOpenAdMob: () => void;
@@ -24,8 +25,9 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
   currentLanguage,
+  theme,
+  onToggleTheme,
   onOpenLanguageSelector,
-  onOpenVoiceSettings,
   onShowOnboarding,
   onOpenSubscription,
   onOpenAdMob,
@@ -37,9 +39,10 @@ export const Header: React.FC<HeaderProps> = ({
   const isGoogleLoggedIn = currentUser && !currentUser.isAnonymous && currentUser.email;
 
   const activeLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === currentLanguage) || SUPPORTED_LANGUAGES[0];
+  const isLightTheme = theme === 'light';
 
   return (
-    <header className="fixed top-0 left-0 w-full h-16 bg-[#051424]/90 backdrop-blur-md z-40 border-b border-[#424754]/20 flex items-center justify-between px-3 sm:px-6">
+    <header className={`fixed top-0 left-0 w-full h-16 backdrop-blur-md z-40 border-b flex items-center justify-between px-3 sm:px-6 transition-colors duration-300 ${isLightTheme ? 'bg-white/90 border-slate-200 text-slate-900 shadow-sm' : 'bg-[#051424]/90 border-[#424754]/20 text-[#d4e4fa]'}`}>
       {/* Left: Avatar & Logo */}
       <div className="flex items-center gap-2 sm:gap-3">
         <button
@@ -62,11 +65,8 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => setActiveTab('home')}
           className="cursor-pointer flex items-center gap-1.5 group"
         >
-          <span className="font-bold text-lg sm:text-xl text-[#adc6ff] tracking-tight group-hover:text-white transition-colors">
+          <span className={`font-bold text-lg sm:text-xl tracking-tight transition-colors ${isLightTheme ? 'text-[#1d4ed8] group-hover:text-[#2563eb]' : 'text-[#adc6ff] group-hover:text-white'}`}>
             FlashMind
-          </span>
-          <span className="hidden sm:inline-flex items-center gap-1 bg-[#adc6ff]/10 text-[#adc6ff] text-[10px] font-mono px-2 py-0.5 rounded-full border border-[#adc6ff]/20">
-            <Sparkles className="w-3 h-3 text-[#60a5fa]" /> v2.4 SRS
           </span>
         </div>
 
@@ -74,7 +74,7 @@ export const Header: React.FC<HeaderProps> = ({
         {stats.isPro ? (
           <button
             onClick={onOpenSubscription}
-            className="px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-mono font-extrabold flex items-center gap-1.5 cursor-pointer hover:scale-105 transition-transform"
+            className={`px-2.5 py-1 rounded-full border text-[11px] font-mono font-extrabold flex items-center gap-1.5 cursor-pointer hover:scale-105 transition-transform ${isLightTheme ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border-amber-500/40'}`}
             title="Sua conta é PRO Ilimitada"
           >
             <Crown className="w-3.5 h-3.5 text-amber-400" /> PRO
@@ -82,7 +82,7 @@ export const Header: React.FC<HeaderProps> = ({
         ) : (
           <button
             onClick={onOpenSubscription}
-            className="px-2.5 py-1 rounded-full bg-[#0b1a2a] hover:bg-[#122131] border border-[#adc6ff]/20 text-[11px] font-mono font-bold text-[#adc6ff] hover:text-white flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
+            className={`px-2.5 py-1 rounded-full border text-[11px] font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm ${isLightTheme ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700 hover:text-slate-900' : 'bg-[#0b1a2a] hover:bg-[#122131] border-[#adc6ff]/20 text-[#adc6ff] hover:text-white'}`}
             title="Clique para obter mais créditos ou assinar PRO"
           >
             <Sparkles className="w-3 h-3 text-[#60a5fa]" />
@@ -124,6 +124,15 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
 
+        <button
+          onClick={onToggleTheme}
+          className={`p-2 rounded-full transition-colors cursor-pointer ${isLightTheme ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+          title={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
+          aria-label="Alternar tema"
+        >
+          {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </button>
+
         {/* Lembretes de Revisão (Push Notifications) */}
         {onOpenNotifications && (
           <button
@@ -149,34 +158,15 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Language Flag Selector */}
         <button
           onClick={onOpenLanguageSelector}
-          className="px-2.5 py-1.5 rounded-xl bg-[#122131] hover:bg-[#1c2b3c] border border-[#adc6ff]/20 text-xs font-bold text-white flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:scale-105"
+          className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:scale-105 ${isLightTheme ? 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-800' : 'bg-[#122131] hover:bg-[#1c2b3c] border-[#adc6ff]/20 text-white'}`}
           title={`Idioma atual: ${activeLangObj.nativeName}. Clique para mudar.`}
         >
           <span className="text-base leading-none">{activeLangObj.flag}</span>
           <span className="font-mono text-[11px] text-[#adc6ff] uppercase">{activeLangObj.code}</span>
         </button>
 
-        <button
-          id="tab-btn-teacher"
-          onClick={() => setActiveTab('teacher')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all ${
-            activeTab === 'teacher'
-              ? 'bg-[#3f465c] text-white border border-[#adc6ff]/30 shadow-md'
-              : 'bg-[#122131] text-[#c2c6d6] hover:bg-[#1c2b3c] hover:text-white'
-          }`}
-        >
-          <School className="w-4 h-4 text-[#D8EFEF]" />
-          <span className="hidden sm:inline">Turmas</span>
-        </button>
 
-        <button
-          id="header-settings-btn"
-          onClick={onOpenVoiceSettings}
-          className="p-2 rounded-full text-[#c2c6d6] hover:bg-[#273647]/50 hover:text-white transition-colors cursor-pointer"
-          title="Configurações do Assistente de Voz"
-        >
-          <Settings className="w-5 h-5" />
-        </button>
+
       </div>
     </header>
   );

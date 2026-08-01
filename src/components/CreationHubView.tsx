@@ -66,6 +66,7 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [isLoadingTopics, setIsLoadingTopics] = useState(false);
   const [customTopicInput, setCustomTopicInput] = useState('');
+  const [topicsUnavailable, setTopicsUnavailable] = useState(false);
 
   // AI Direct Generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -135,13 +136,19 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
     }
 
     setIsLoadingTopics(true);
+    setTopicsUnavailable(false);
+    setSuggestedTopics([]);
+    setSelectedTopics([]);
     try {
       const topics = await apiSuggestTopics(query, currentLanguage);
-      setSuggestedTopics(topics);
-      // Auto select all suggested topics by default
-      setSelectedTopics(topics);
+      if (topics.length === 0) {
+        setTopicsUnavailable(true);
+      } else {
+        setSuggestedTopics(topics);
+        setSelectedTopics(topics);
+      }
     } catch (err: any) {
-      alert(err.message || 'Erro ao sugerir tópicos');
+      setTopicsUnavailable(true);
     } finally {
       setIsLoadingTopics(false);
     }
@@ -430,6 +437,16 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
               <div className="py-4 text-center text-xs text-[#8c91a0] animate-pulse flex items-center justify-center gap-2">
                 <RefreshCw className="w-4 h-4 animate-spin text-[#60a5fa]" />
                 IA analisando o assunto e gerando sub-tópicos de estudo...
+              </div>
+            ) : topicsUnavailable ? (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-amber-300 mb-1">IA indisponível para sugestão de tópicos.</p>
+                  <p className="text-amber-200/80">Configure uma chave válida no <code className="bg-amber-500/20 px-1 rounded">.env</code>: <br/>
+                  <code className="bg-amber-500/20 px-1 rounded">GEMINI_API_KEY</code> e <code className="bg-amber-500/20 px-1 rounded">VITE_GEMINI_API_KEY</code> com uma chave de <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" className="underline text-amber-300">aistudio.google.com</a>.<br/>
+                  Enquanto isso, adicione os subtópicos manualmente no campo abaixo.</p>
+                </div>
               </div>
             ) : suggestedTopics.length > 0 ? (
               <div className="flex flex-wrap gap-2 pt-1">

@@ -4,10 +4,13 @@ dist/
 coverage/
 .DS_Store
 *.log
-.env*
-!.env
 
-# Firebase / Service Accounts — nunca commitar credenciais
+# Variáveis de ambiente
+.env
+.env.*
+!.env.example
+
+# Firebase / Service Accounts
 *serviceAccount*.json
 firebase-debug.log
 .firebase/

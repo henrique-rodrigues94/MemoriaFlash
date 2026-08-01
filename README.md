@@ -48,6 +48,7 @@ monetização via créditos (anúncios + indicação de amigos) com upgrade PRO.
 npm install
 cp .env.example .env
 # edite o .env e adicione pelo menos 1 chave de IA gratuita — veja docs/AI_PROVIDERS.md
+# (o arquivo de exemplo versionado é .env.example)
 npm run dev
 ```
 

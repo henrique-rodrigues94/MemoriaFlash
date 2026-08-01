@@ -24,6 +24,9 @@ export interface GenerateJSONParams {
   /** Schema nativo do Gemini (Type.*). Ignorado pelos demais provedores. */
   geminiSchema?: unknown;
   temperature?: number;
+  /** Máximo de tokens de saída — ESSENCIAL para decks grandes (padrão: 8192).
+   *  Para 100 cards com explanation+curiosity, use pelo menos 32768. */
+  maxOutputTokens?: number;
   /** Timeout em ms por tentativa (default definido no orquestrador). */
   timeoutMs?: number;
 }

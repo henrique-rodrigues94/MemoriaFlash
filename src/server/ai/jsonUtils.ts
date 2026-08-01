@@ -33,6 +33,24 @@ export function extractJSON(raw: string): unknown {
   throw new Error('Não foi possível extrair JSON válido da resposta do provedor');
 }
 
+export function extractArrayField(payload: unknown, candidateKeys: string[] = ['cards', 'flashcards']): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+
+  const record = payload as Record<string, unknown>;
+  for (const key of candidateKeys) {
+    const value = record[key];
+    if (Array.isArray(value)) return value;
+  }
+
+  for (const key of Object.keys(record)) {
+    const value = record[key];
+    if (Array.isArray(value)) return value;
+  }
+
+  return [];
+}
+
 function findBalancedJSONCandidates(text: string): string[] {
   const candidates: string[] = [];
   const openers = ['{', '['];

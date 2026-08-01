@@ -22,6 +22,11 @@ export class AIOrchestrator {
 
   constructor(private providers: AIProvider[]) {}
 
+  /** Expõe a lista de provedores (para gerenciamento/status). */
+  getProviders(): AIProvider[] {
+    return this.providers;
+  }
+
   private isAvailable(p: AIProvider): boolean {
     if (!p.isConfigured()) return false;
     const cd = this.cooldowns.get(p.id);
@@ -69,9 +74,9 @@ export class AIOrchestrator {
       }
     }
 
+    // Mensagem amigável para o usuário: nenhum servidor de IA disponível no momento
     throw new Error(
-      `Todos os provedores de IA disponíveis falharam. Tentados: [${attempted.join(', ') || 'nenhum configurado'}]. ` +
-        `Detalhes: ${errors.join(' | ')}`
+      'Não há servidor de IA disponível no momento. Tente novamente mais tarde.'
     );
   }
 

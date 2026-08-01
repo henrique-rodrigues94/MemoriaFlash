@@ -12,22 +12,15 @@ import { StudySessionView } from './components/StudySessionView';
 // >1MB num único arquivo). DashboardView/StudySessionView ficam eager porque
 // aparecem imediatamente na tela inicial.
 // ----------------------------------------------------------------------------
-const VoiceTutorView = lazy(() => import('./components/VoiceTutorView').then((m) => ({ default: m.VoiceTutorView })));
-const VoiceSettingsModal = lazy(() =>
-  import('./components/VoiceSettingsModal').then((m) => ({ default: m.VoiceSettingsModal }))
-);
 const DuelLobbyView = lazy(() => import('./components/DuelLobbyView').then((m) => ({ default: m.DuelLobbyView })));
 const DuelArenaView = lazy(() => import('./components/DuelArenaView').then((m) => ({ default: m.DuelArenaView })));
 const DuelResultsView = lazy(() =>
   import('./components/DuelResultsView').then((m) => ({ default: m.DuelResultsView }))
 );
-const CreationHubView = lazy(() =>
-  import('./components/CreationHubView').then((m) => ({ default: m.CreationHubView }))
-);
+const ScannerView = lazy(() => import('./components/ScannerView').then((m) => ({ default: m.ScannerView })));
+const StudioView = lazy(() => import('./components/StudioView').then((m) => ({ default: m.StudioView })));
+const QuizView = lazy(() => import('./components/QuizView').then((m) => ({ default: m.QuizView })));
 const StatsView = lazy(() => import('./components/StatsView').then((m) => ({ default: m.StatsView })));
-const TeacherOverviewView = lazy(() =>
-  import('./components/TeacherOverviewView').then((m) => ({ default: m.TeacherOverviewView }))
-);
 const DeckManagerModal = lazy(() =>
   import('./components/DeckManagerModal').then((m) => ({ default: m.DeckManagerModal }))
 );
@@ -39,9 +32,6 @@ import { TabLoadingFallback } from './components/TabLoadingFallback';
 import {
   Deck,
   UserStats,
-  VoiceSettings,
-  VoiceHistoryItem,
-  TeacherClass,
   ActiveTab,
   QuizQuestion,
 } from './types';
@@ -51,12 +41,6 @@ import {
   saveStoredDecks,
   getStoredStats,
   saveStoredStats,
-  getVoiceSettings,
-  saveVoiceSettings,
-  getVoiceHistory,
-  saveVoiceHistory,
-  getStoredClasses,
-  saveStoredClasses,
   isOnboardingDone,
   setOnboardingDone,
 } from './services/storage';
@@ -67,8 +51,6 @@ import {
   deleteDeckFromFirestore,
   syncStatsFromFirestore,
   saveStatsToFirestore,
-  syncClassesFromFirestore,
-  saveClassToFirestore,
 } from './services/firebaseStorage';
 
 const AdMobRewardedModal = lazy(() =>
@@ -110,7 +92,6 @@ import {
 export function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');
   const [showOnboarding, setShowOnboarding] = useState(!isOnboardingDone());
-  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [showAdMobModal, setShowAdMobModal] = useState(false);
   const [showInterstitial, setShowInterstitial] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -121,21 +102,20 @@ export function App() {
 
   // Auto-detected or saved language
   const [currentLanguage, setCurrentLanguage] = useState<SupportedLanguage>(detectBrowserLanguage());
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window === 'undefined') return 'dark';
+    const savedTheme = window.localStorage.getItem('flashmind-theme');
+    return savedTheme === 'light' ? 'light' : 'dark';
+  });
 
   const handleSelectLanguage = (lang: SupportedLanguage) => {
     setCurrentLanguage(lang);
-    // Sync with voice tutor settings language
-    const updatedVoice = { ...voiceSettings, language: lang };
-    setVoiceSettingsState(updatedVoice);
-    saveVoiceSettings(updatedVoice);
   };
 
   // Storage states
   const [decks, setDecks] = useState<Deck[]>(getStoredDecks());
   const [stats, setStats] = useState<UserStats>(getStoredStats());
-  const [voiceSettings, setVoiceSettingsState] = useState<VoiceSettings>(getVoiceSettings());
-  const [voiceHistory, setVoiceHistoryState] = useState<VoiceHistoryItem[]>(getVoiceHistory());
-  const [teacherClasses, setTeacherClassesState] = useState<TeacherClass[]>(getStoredClasses());
+
 
   // Active Session / Modal States
   const [activeStudyDeck, setActiveStudyDeck] = useState<Deck | null>(null);
@@ -150,6 +130,13 @@ export function App() {
     opponentPoints: number;
     wrongQuestions: QuizQuestion[];
   }>({ userPoints: 0, opponentPoints: 0, wrongQuestions: [] });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('theme-light', theme === 'light');
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem('flashmind-theme', theme);
+  }, [theme]);
 
   // Persistence & Firestore Effects
   useEffect(() => {
@@ -203,7 +190,6 @@ export function App() {
   useEffect(() => {
     let unsubDecks: (() => void) | undefined;
     let unsubStats: (() => void) | undefined;
-    let unsubClasses: (() => void) | undefined;
 
     syncDecksFromFirestore((remoteDecks) => {
       if (remoteDecks && remoteDecks.length > 0) {
@@ -221,18 +207,9 @@ export function App() {
       unsubStats = unsub;
     });
 
-    syncClassesFromFirestore((remoteClasses) => {
-      if (remoteClasses && remoteClasses.length > 0) {
-        setTeacherClassesState(remoteClasses);
-      }
-    }).then((unsub) => {
-      unsubClasses = unsub;
-    });
-
     return () => {
       if (unsubDecks) unsubDecks();
       if (unsubStats) unsubStats();
-      if (unsubClasses) unsubClasses();
     };
   }, []);
 
@@ -300,6 +277,17 @@ export function App() {
   };
 
   const handleSaveDeck = (updatedDeck: Deck) => {
+    const exists = decks.some((d) => d.id === updatedDeck.id);
+    if (exists) {
+      setDecks(decks.map((d) => (d.id === updatedDeck.id ? updatedDeck : d)));
+    } else {
+      setDecks([updatedDeck, ...decks]);
+    }
+    saveDeckToFirestore(updatedDeck);
+  };
+
+  // Salva o progresso do estudo automaticamente a cada card (mantém a sessão aberta)
+  const handleSaveStudyProgress = (updatedDeck: Deck) => {
     const exists = decks.some((d) => d.id === updatedDeck.id);
     if (exists) {
       setDecks(decks.map((d) => (d.id === updatedDeck.id ? updatedDeck : d)));
@@ -399,32 +387,38 @@ export function App() {
     maybeShowInterstitial(newStats);
   };
 
+  const isLightTheme = theme === 'light';
+
   return (
-    <div className="min-h-screen bg-[#051424] text-[#d4e4fa] font-sans antialiased selection:bg-[#adc6ff]/30 selection:text-white">
-      {/* App Header */}
-      <Header
-        stats={stats}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        currentLanguage={currentLanguage}
-        onOpenLanguageSelector={() => setShowLanguageModal(true)}
-        onOpenVoiceSettings={() => setShowVoiceSettings(true)}
-        onShowOnboarding={() => setShowOnboarding(true)}
-        onOpenSubscription={() => setShowSubscriptionModal(true)}
-        onOpenAdMob={() => setShowAdMobModal(true)}
-        onOpenAuth={() => setShowAuthModal(true)}
-        onOpenReferral={() => setShowReferralModal(true)}
-        onOpenNotifications={() => setShowNotificationsModal(true)}
-      />
+    <div className={`min-h-screen font-sans antialiased transition-colors duration-300 ${isLightTheme ? 'bg-[#f4f7fb] text-[#14213d]' : 'bg-[#051424] text-[#d4e4fa]'} ${isLightTheme ? 'selection:bg-[#60a5fa]/30 selection:text-[#0f172a]' : 'selection:bg-[#adc6ff]/30 selection:text-white'}`}>
+      {/* App Header — oculto durante a sessão de estudo (tela cheia) */}
+      {!activeStudyDeck && (
+        <Header
+          stats={stats}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          currentLanguage={currentLanguage}
+          theme={theme}
+          onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+          onOpenLanguageSelector={() => setShowLanguageModal(true)}
+          onShowOnboarding={() => setShowOnboarding(true)}
+          onOpenSubscription={() => setShowSubscriptionModal(true)}
+          onOpenAdMob={() => setShowAdMobModal(true)}
+          onOpenAuth={() => setShowAuthModal(true)}
+          onOpenReferral={() => setShowReferralModal(true)}
+          onOpenNotifications={() => setShowNotificationsModal(true)}
+        />
+      )}
 
       {/* Main Content Viewport */}
-      <main className="pt-20 px-4 sm:px-6 max-w-6xl mx-auto">
+      <main className={`${activeStudyDeck ? '' : 'pt-20 px-4 sm:px-6 max-w-6xl mx-auto pb-24 sm:pb-28'}`}>
         {/* If Active Study Session */}
         {activeStudyDeck ? (
           <StudySessionView
             deck={activeStudyDeck}
             currentLanguage={currentLanguage}
             onFinishSession={handleFinishStudySession}
+            onSaveProgress={handleSaveStudyProgress}
             onBack={() => setActiveStudyDeck(null)}
           />
         ) : (
@@ -439,7 +433,7 @@ export function App() {
                 setActiveTab={setActiveTab}
                 onStartStudySession={handleStartStudySession}
                 onManageDeck={(deck) => setManagedDeck(deck)}
-                onOpenQuickCreate={() => setActiveTab('create')}
+                onOpenQuickCreate={() => setActiveTab('cards')}
                 onOpenAdMob={() => setShowAdMobModal(true)}
                 onOpenSubscription={() => setShowSubscriptionModal(true)}
                 onOpenReferral={() => setShowReferralModal(true)}
@@ -453,35 +447,24 @@ export function App() {
                 setActiveTab={setActiveTab}
                 onStartStudySession={handleStartStudySession}
                 onManageDeck={(deck) => setManagedDeck(deck)}
-                onOpenQuickCreate={() => setActiveTab('create')}
+                onOpenQuickCreate={() => setActiveTab('cards')}
               />
             )}
 
-            {activeTab === 'create' && (
-              <CreationHubView
+            {activeTab === 'quiz' && (
+              <QuizView currentLanguage={currentLanguage} />
+            )}
+
+            {activeTab === 'scanner' && (
+              <ScannerView onSaveNewDeck={handleSaveDeck} />
+            )}
+
+            {activeTab === 'cards' && (
+              <StudioView
                 decks={decks}
                 stats={stats}
                 currentLanguage={currentLanguage}
                 onSaveNewDeck={handleSaveDeck}
-                onDeductCredit={handleDeductCredit}
-                onOpenAdMob={() => setShowAdMobModal(true)}
-                onOpenSubscription={() => setShowSubscriptionModal(true)}
-              />
-            )}
-
-            {activeTab === 'voice' && (
-              <VoiceTutorView
-                settings={voiceSettings}
-                history={voiceHistory}
-                decks={decks}
-                stats={stats}
-                currentLanguage={currentLanguage}
-                onOpenVoiceSettings={() => setShowVoiceSettings(true)}
-                onSaveHistory={(hist) => {
-                  setVoiceHistoryState(hist);
-                  saveVoiceHistory(hist);
-                }}
-                onAddCardToDeck={handleAddCardToDeck}
                 onDeductCredit={handleDeductCredit}
                 onOpenAdMob={() => setShowAdMobModal(true)}
                 onOpenSubscription={() => setShowSubscriptionModal(true)}
@@ -516,17 +499,6 @@ export function App() {
 
             {activeTab === 'stats' && <StatsView stats={stats} decks={decks} />}
 
-            {activeTab === 'teacher' && (
-              <TeacherOverviewView
-                classes={teacherClasses}
-                onSaveClass={(newCls) => {
-                  const updated = [newCls, ...teacherClasses];
-                  setTeacherClassesState(updated);
-                  saveStoredClasses(updated);
-                  saveClassToFirestore(newCls);
-                }}
-              />
-            )}
           </>
           </Suspense>
         )}
@@ -549,18 +521,6 @@ export function App() {
           carregamento é quase instantâneo (poucos KB) e o usuário acabou de
           clicar em algo, então uma tela em branco por ~alguns ms passa despercebido. */}
       <Suspense fallback={null}>
-        {/* Voice Assistant Settings Modal */}
-        {showVoiceSettings && (
-          <VoiceSettingsModal
-            settings={voiceSettings}
-            onSave={(updated) => {
-              setVoiceSettingsState(updated);
-              saveVoiceSettings(updated);
-            }}
-            onClose={() => setShowVoiceSettings(false)}
-          />
-        )}
-
         {/* Deck Manager Modal */}
         {managedDeck && (
           <DeckManagerModal

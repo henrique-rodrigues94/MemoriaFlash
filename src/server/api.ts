@@ -1,10 +1,10 @@
 import { Flashcard, QuizQuestion, RecoveryPlanDay } from '../types';
 import {
-  clientSuggestTopics,
-  clientGenerateFlashcards,
-  clientGenerateQuiz,
-  isAnyProviderConfigured,
-} from './aiClient';
+  geminiSuggestTopics,
+  geminiGenerateFlashcards,
+  geminiGenerateQuiz,
+  isGeminiClientConfigured,
+} from './geminiClient';
 
 // ─── Generate Flashcards ─────────────────────────────────────────────────────
 
@@ -37,13 +37,13 @@ export async function apiGenerateFlashcards(
     console.warn('Servidor falhou, tentando Gemini direto no browser:', serverErr);
   }
 
-  // 2ª tentativa: Groq / OpenRouter / Gemini direto no browser
-  if (isAnyProviderConfigured()) {
+  // 2ª tentativa: Gemini direto no browser
+  if (isGeminiClientConfigured()) {
     try {
-      const cards = await clientGenerateFlashcards(prompt, count, language, difficulty, selectedTopics);
+      const cards = await geminiGenerateFlashcards(prompt, count, language, difficulty, selectedTopics);
       return cards;
     } catch (clientErr) {
-      console.warn('AI client-side falhou:', clientErr);
+      console.warn('Gemini client-side falhou:', clientErr);
     }
   }
 
@@ -76,13 +76,13 @@ export async function apiSuggestTopics(title: string, language: string = 'pt'): 
     console.warn('Servidor falhou para suggest-topics, tentando browser:', serverErr);
   }
 
-  // 2ª tentativa: Groq / OpenRouter / Gemini direto no browser
-  if (isAnyProviderConfigured()) {
+  // 2ª tentativa: Gemini direto no browser
+  if (isGeminiClientConfigured()) {
     try {
-      const topics = await clientSuggestTopics(title, language);
+      const topics = await geminiSuggestTopics(title, language);
       if (topics.length > 0) return topics;
     } catch (clientErr) {
-      console.warn('AI client-side falhou para tópicos:', clientErr);
+      console.warn('Gemini client-side falhou para tópicos:', clientErr);
     }
   }
 
@@ -172,16 +172,16 @@ export async function apiGenerateQuiz(
     console.warn('Servidor falhou para generate-quiz, tentando browser:', serverErr);
   }
 
-  // 2ª tentativa: Groq / OpenRouter / Gemini direto no browser
-  if (isAnyProviderConfigured()) {
+  // 2ª tentativa: Gemini direto no browser
+  if (isGeminiClientConfigured()) {
     try {
-      return await clientGenerateQuiz(topic, count, language);
+      return await geminiGenerateQuiz(topic, count, language);
     } catch (clientErr) {
-      console.warn('AI client-side falhou para quiz:', clientErr);
+      console.warn('Gemini client-side falhou para quiz:', clientErr);
     }
   }
 
-  throw new Error('Não foi possível gerar o quiz. Configure VITE_GROQ_API_KEY, VITE_OPENROUTER_API_KEY ou VITE_GEMINI_API_KEY no .env');
+  throw new Error('Não foi possível gerar o quiz. Configure VITE_GEMINI_API_KEY no .env');
 }
 
 // ─── Recovery Plan ───────────────────────────────────────────────────────────
