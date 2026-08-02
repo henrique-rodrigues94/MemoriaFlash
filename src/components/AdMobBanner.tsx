@@ -32,7 +32,10 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({
   const remaining = rewardedAdsRemainingToday(stats);
 
   return (
-    <div className={`w-full ${sticky ? 'sticky bottom-16 z-30' : 'my-5'} p-3.5 sm:p-4 rounded-2xl bg-[#0b1a2a]/95 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl animate-fade-in relative overflow-hidden`}>
+    <div
+      style={sticky ? { position: 'fixed', bottom: '4rem', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '72rem', zIndex: 30 } : undefined}
+      className={`w-full ${sticky ? '' : 'my-5'} px-3 sm:px-6 py-2 rounded-2xl bg-[#0b1a2a]/95 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl animate-fade-in relative overflow-hidden`}
+    >
       {/* Background glow accent */}
       <div className="absolute -top-12 -right-12 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
 
