@@ -95,14 +95,17 @@ export const AdMobRewardedModal: React.FC<AdMobRewardedModalProps> = ({
         <div className="relative aspect-video rounded-2xl bg-slate-950 border border-[#424754]/40 flex flex-col items-center justify-center overflow-hidden shadow-inner">
           {isPlaying ? (
             <div className="relative w-full h-full flex flex-col justify-between p-4">
-              {/* HTML5 Sample Video Background */}
-              <video
-                ref={videoRef}
-                className="absolute inset-0 w-full h-full object-cover opacity-60"
-                src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
-                playsInline
-                muted={isMuted}
-                loop
+              {/* Fundo animado em CSS (funciona sem vídeo externo / sem bloqueio) */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-950 via-indigo-950 to-purple-950 animate-gradient-x" />
+              <div className="absolute -top-10 -left-10 w-40 h-40 rounded-full bg-blue-500/20 blur-3xl animate-pulse" />
+              <div className="absolute -bottom-10 -right-10 w-40 h-40 rounded-full bg-indigo-500/20 blur-3xl animate-pulse" />
+              {/* Padrão decorativo */}
+              <div
+                className="absolute inset-0 opacity-20"
+                style={{
+                  backgroundImage:
+                    'radial-gradient(circle at 20% 30%, rgba(96,165,250,0.6) 0, transparent 25%), radial-gradient(circle at 80% 70%, rgba(139,92,246,0.6) 0, transparent 25%)',
+                }}
               />
 
               {/* Ad Overlay Header */}
