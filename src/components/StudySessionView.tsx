@@ -216,31 +216,12 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
           <div className="text-xl font-extrabold text-emerald-400">{reviewedCount}</div>
         </div>
 
-        {/* Opção de inverter resposta com pergunta antes de sair */}
-        <button
-          type="button"
-          onClick={() => setInvertCards((prev) => !prev)}
-          className={`w-full py-3 rounded-2xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-            invertCards
-              ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
-              : 'bg-[#122131] border-[#424754]/40 text-[#8c91a0] hover:border-violet-500/40 hover:text-violet-300'
-          }`}
-        >
-          <RotateCw className={`w-4 h-4 ${invertCards ? 'text-violet-400' : ''}`} />
-          {invertCards ? '✓ Inverter Resposta com Pergunta (ativo)' : 'Inverter Resposta com Pergunta'}
-        </button>
-        {invertCards && (
-          <p className="text-[11px] text-[#8c91a0] -mt-2">
-            A resposta virará a pergunta e a pergunta virará a resposta ao salvar.
-          </p>
-        )}
-
         <button
           id="btn-finish-study-session"
-          onClick={() => handleCompleteAndReturn(invertCards)}
+          onClick={() => handleCompleteAndReturn(false)}
           className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm shadow-xl shadow-blue-600/30 hover:scale-[1.02] transition-all cursor-pointer"
         >
-          Salvar Progresso e Voltar
+          Voltar para Estudo
         </button>
       </div>
     );
@@ -344,7 +325,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
 
           <button
             type="button"
-            onClick={() => setInvertCards((prev) => !prev)}
+            onClick={() => { setInvertCards((prev) => !prev); setIsFlipped(false); }}
             title={invertCards ? 'Desativar inversão de pergunta/resposta' : 'Inverter resposta com pergunta'}
             className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               invertCards
