@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Sparkles,
   RotateCw,
   CheckCircle2,
   XCircle,
@@ -175,10 +174,16 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
     }
   };
 
-  const handleCompleteAndReturn = () => {
+  const handleCompleteAndReturn = (shouldInvert: boolean = invertCards) => {
     const updatedCardMap = new Map(cards.map((c) => [c.id, c]));
     const mergedCards = deck.cards.map((c) => updatedCardMap.get(c.id) || c);
-    const updatedDeck: Deck = { ...deck, cards: mergedCards };
+
+    // Se o usuário quiser, inverte front/back de todos os cards antes de salvar
+    const finalCards = shouldInvert
+      ? mergedCards.map((c) => ({ ...c, front: c.back, back: c.front }))
+      : mergedCards;
+
+    const updatedDeck: Deck = { ...deck, cards: finalCards };
     onFinishSession(updatedDeck, reviewedCount);
   };
 
@@ -211,12 +216,31 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
           <div className="text-xl font-extrabold text-emerald-400">{reviewedCount}</div>
         </div>
 
+        {/* Opção de inverter resposta com pergunta antes de sair */}
+        <button
+          type="button"
+          onClick={() => setInvertCards((prev) => !prev)}
+          className={`w-full py-3 rounded-2xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            invertCards
+              ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
+              : 'bg-[#122131] border-[#424754]/40 text-[#8c91a0] hover:border-violet-500/40 hover:text-violet-300'
+          }`}
+        >
+          <RotateCw className={`w-4 h-4 ${invertCards ? 'text-violet-400' : ''}`} />
+          {invertCards ? '✓ Inverter Resposta com Pergunta (ativo)' : 'Inverter Resposta com Pergunta'}
+        </button>
+        {invertCards && (
+          <p className="text-[11px] text-[#8c91a0] -mt-2">
+            A resposta virará a pergunta e a pergunta virará a resposta ao salvar.
+          </p>
+        )}
+
         <button
           id="btn-finish-study-session"
-          onClick={handleCompleteAndReturn}
+          onClick={() => handleCompleteAndReturn(invertCards)}
           className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm shadow-xl shadow-blue-600/30 hover:scale-[1.02] transition-all cursor-pointer"
         >
-          Voltar para Estudo
+          Salvar Progresso e Voltar
         </button>
       </div>
     );
@@ -346,6 +370,17 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
             />
           </div>
         </div>
+
+        {/* Botão Explicar Pergunta & Ver Exemplo — acima dos cards, sempre visível */}
+        <button
+          id="btn-explain-and-example"
+          onClick={(e) => { e.stopPropagation(); handleRequestAiExplanation(); }}
+          disabled={isLoadingExplanation}
+          className="w-full px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-blue-500/20 hover:from-amber-500/30 hover:to-blue-500/30 text-white border border-amber-400/40 text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-[1.01] transition-all cursor-pointer"
+        >
+          <Lightbulb className="w-4 h-4 text-amber-300 fill-amber-300/30 animate-pulse" />
+          {isLoadingExplanation ? 'Gerando explicação...' : t.explainQuestionAndExample || 'Explicar Pergunta & Ver Exemplo'}
+        </button>
 
       </div>
 
