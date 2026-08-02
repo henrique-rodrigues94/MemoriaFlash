@@ -29,6 +29,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
 
   // Estados Form IA
   const [subject, setSubject] = useState('');
+  const [deckName, setDeckName] = useState('');
   const [topicInput, setTopicInput] = useState('');
   const [topics, setTopics] = useState<string[]>([]);
   const [suggestedTopics, setSuggestedTopics] = useState<string[]>([]);
@@ -142,7 +143,8 @@ export const StudioView: React.FC<StudioViewProps> = ({
   const handleSaveAllAICards = () => {
     if (generatedAICards.length === 0) return;
 
-    const mainSubject = generatedAICards[0].subject || subject.trim() || 'Geral';
+    // Nome do baralho: prioriza o campo manual, senão usa a matéria
+    const mainSubject = (deckName.trim() || generatedAICards[0].subject || subject.trim() || 'Geral');
     const existingDeck = decks.find(
       (d) => d.title.toLowerCase() === mainSubject.toLowerCase()
     );
@@ -171,6 +173,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
     setGeneratedAICards([]);
     setTopics([]);
     setSubject('');
+    setDeckName('');
   };
 
   const handleRemoveAICard = (cardId: string) => {
@@ -228,7 +231,28 @@ export const StudioView: React.FC<StudioViewProps> = ({
           <div className="space-y-5 text-left">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5">
-                💻 MATÉRIA / ASSUNTO:
+                � NOME DO BARALHO:
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  list="deck-name-suggestions"
+                  placeholder="Ex: Direito Penal, Biologia..."
+                  value={deckName}
+                  onChange={(e) => setDeckName(e.target.value)}
+                  className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm"
+                />
+                <datalist id="deck-name-suggestions">
+                  {existingDeckTitles.map((s) => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5">
+                �💻 MATÉRIA / ASSUNTO:
               </label>
               <div className="relative">
                 <input

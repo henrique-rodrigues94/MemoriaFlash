@@ -66,7 +66,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Continuar o último card
               </span>
               <p className="text-xs font-semibold text-white truncate mt-0.5">
-                {firstDeckWithCard.cards[0].front}
+                {firstDeckWithCard.title}
               </p>
             </div>
             <button
