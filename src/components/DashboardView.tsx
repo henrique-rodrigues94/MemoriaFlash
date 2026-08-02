@@ -5,6 +5,8 @@ import {
   ChevronRight,
   Play,
   Plus,
+  BookOpen,
+  RotateCw,
 } from 'lucide-react';
 import { Deck, UserStats, ActiveTab } from '../types';
 import { DeckCard } from './DeckCard';
@@ -40,8 +42,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const t = translations[currentLanguage] || translations.pt;
 
+  // ── Estado inteligente do bloco de estudo rápido ────────────────────────────
+  // 1. Nenhum card cadastrado          → botão "Criar Card" (vai para aba Cards)
+  // 2. Deck com card nunca estudado    → botão "Começar a Estudar Card" (reps === 0)
+  // 3. Deck com card em andamento      → botão "Continuar Card" (já foi aberto, não concluído)
   const hasCards = decks.length > 0 && decks.some((d) => d.cards.length > 0);
   const firstDeckWithCard = decks.find((d) => d.cards.length > 0);
+  const firstDeckNeverStudied = decks.find((d) => d.cards.some((c) => !c.reps || c.reps === 0));
+  const hasStartedCards = decks.some((d) => d.cards.some((c) => (c.reps || 0) > 0));
+
+  const resumeDeck = firstDeckWithCard && firstDeckWithCard.cards.some((c) => (c.reps || 0) > 0)
+    ? firstDeckWithCard
+    : decks.find((d) => d.cards.some((c) => (c.reps || 0) > 0));
+  const startDeck = resumeDeck
+    ? undefined
+    : firstDeckWithCard || firstDeckNeverStudied;
 
   return (
     <div className="space-y-6 pb-24 max-w-5xl mx-auto">
@@ -58,42 +73,77 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Bloco Continuar o último card / Redirecionamento para a aba 'cards' */}
-        {hasCards && firstDeckWithCard ? (
+        {/* Bloco inteligente de estudo rápido — estados: sem card / começar / continuar */}
+        {!hasCards ? (
+          /* ── ESTADO 1: Nenhum card cadastrado ── */
           <div className="p-3.5 rounded-xl bg-[#0b1a2a]/80 border border-[#60a5fa]/20 flex items-center justify-between gap-3">
-            <div className="overflow-hidden">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-[#60a5fa] font-bold">
-                Continuar o último card
-              </span>
-              <p className="text-xs font-semibold text-white truncate mt-0.5">
-                {firstDeckWithCard.title}
-              </p>
-            </div>
-            <button
-              onClick={() => onStartStudySession(firstDeckWithCard)}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shrink-0 cursor-pointer shadow-md flex items-center gap-1.5"
-            >
-              <Play className="w-3.5 h-3.5 fill-current" /> Continuar
-            </button>
-          </div>
-        ) : (
-          <div className="p-3.5 rounded-xl bg-[#0b1a2a]/80 border border-[#60a5fa]/20 flex items-center justify-between gap-3">
-            <div>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-[#60a5fa] font-bold">
-                Nenhum card cadastrado
-              </span>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Gere seus primeiros flashcards com IA na aba de criação
-              </p>
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-4 h-4 text-[#60a5fa]" />
+              </div>
+              <div className="overflow-hidden">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#60a5fa] font-bold">
+                  Nenhum card ainda
+                </span>
+                <p className="text-xs text-slate-300 truncate mt-0.5">
+                  Gere seus primeiros flashcards com IA
+                </p>
+              </div>
             </div>
             <button
               onClick={() => setActiveTab('cards')}
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shrink-0 cursor-pointer shadow-md flex items-center gap-1.5"
             >
-              <Plus className="w-3.5 h-3.5" /> Criar Cards
+              <Plus className="w-3.5 h-3.5" /> Criar Card
             </button>
           </div>
-        )}
+        ) : resumeDeck ? (
+          /* ── ESTADO 2: Card em andamento (já foi aberto, não concluído) ── */
+          <div className="p-3.5 rounded-xl bg-[#0b1a2a]/80 border border-emerald-500/30 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+                <RotateCw className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div className="overflow-hidden">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold">
+                  Continuar Card
+                </span>
+                <p className="text-xs font-semibold text-white truncate mt-0.5">
+                  {resumeDeck.title}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => onStartStudySession(resumeDeck)}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition-all shrink-0 cursor-pointer shadow-md flex items-center gap-1.5"
+            >
+              <Play className="w-3.5 h-3.5 fill-current" /> Continuar
+            </button>
+          </div>
+        ) : startDeck ? (
+          /* ── ESTADO 3: Card novo (nunca estudado) ── */
+          <div className="p-3.5 rounded-xl bg-[#0b1a2a]/80 border border-[#60a5fa]/20 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+                <Play className="w-4 h-4 text-amber-400 fill-current" />
+              </div>
+              <div className="overflow-hidden">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 font-bold">
+                  Começar a Estudar Card
+                </span>
+                <p className="text-xs font-semibold text-white truncate mt-0.5">
+                  {startDeck.title}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => onStartStudySession(startDeck)}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold transition-all shrink-0 cursor-pointer shadow-md flex items-center gap-1.5"
+            >
+              <Play className="w-3.5 h-3.5 fill-current" /> Começar
+            </button>
+          </div>
+        ) : null}
       </section>
 
       {/* Decks Collection Section */}
