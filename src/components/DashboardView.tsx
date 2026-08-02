@@ -176,16 +176,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         )}
       </section>
-
-      {/* AdMob Banner for Free Users */}
-      <AdMobBanner
-        stats={stats}
-        onOpenAdMob={onOpenAdMob}
-        onOpenSubscription={onOpenSubscription}
-        onOpenReferral={onOpenReferral}
-        isPro={stats.isPro}
-        currentLanguage={currentLanguage}
-      />
     </div>
   );
 };

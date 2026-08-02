@@ -4,6 +4,7 @@ import { BottomNav } from './components/BottomNav';
 import { OnboardingModal } from './components/OnboardingModal';
 import { DashboardView } from './components/DashboardView';
 import { StudySessionView } from './components/StudySessionView';
+import { AdMobBanner } from './components/AdMobBanner';
 
 // ----------------------------------------------------------------------------
 // Code-splitting: telas/modais que não são necessários no primeiro carregamento
@@ -413,6 +414,16 @@ export function App() {
             )}
 
             {activeTab === 'stats' && <StatsView stats={stats} decks={decks} />}
+
+            {/* Banner de monetização no final de todas as abas */}
+            <AdMobBanner
+              stats={stats}
+              isPro={stats.isPro}
+              currentLanguage={currentLanguage}
+              onOpenAdMob={() => setShowAdMobModal(true)}
+              onOpenSubscription={() => setShowSubscriptionModal(true)}
+              onOpenReferral={() => setShowReferralModal(true)}
+            />
 
           </>
           </Suspense>
