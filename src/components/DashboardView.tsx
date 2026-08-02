@@ -2,13 +2,11 @@ import React from 'react';
 import {
   Brain,
   Sparkles,
-  TrendingUp,
-  Plus,
-  Clock,
   ChevronRight,
+  Play,
+  Plus,
 } from 'lucide-react';
 import { Deck, UserStats, ActiveTab } from '../types';
-import { getDueCardCount } from '../services/srsEngine';
 import { DeckCard } from './DeckCard';
 import { AdMobBanner } from './AdMobBanner';
 import { SupportedLanguage, translations } from '../lib/i18n';
@@ -42,14 +40,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const t = translations[currentLanguage] || translations.pt;
 
-  
+  const hasCards = decks.length > 0 && decks.some((d) => d.cards.length > 0);
+  const firstDeckWithCard = decks.find((d) => d.cards.length > 0);
 
   return (
     <div className="space-y-6 pb-24 max-w-5xl mx-auto">
-      {/* Banner e meta diária removidos */}
-
       {/* Quick AI Trigger Banner */}
-      <section className="bg-gradient-to-r from-[#122238] via-[#1a2e48] to-[#122238] rounded-2xl p-5 border border-[#60a5fa]/30 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+      <section className="bg-gradient-to-r from-[#122238] via-[#1a2e48] to-[#122238] rounded-2xl p-5 border border-[#60a5fa]/30 shadow-xl flex flex-col gap-4">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-[#3b82f6]/20 border border-[#3b82f6]/40 flex items-center justify-center flex-shrink-0 shadow-lg">
             <Sparkles className="w-6 h-6 text-[#60a5fa] animate-spin-slow" />
@@ -61,16 +58,43 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        <button
-          id="btn-quick-ai-create"
-          onClick={onOpenQuickCreate}
-          className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all cursor-pointer whitespace-nowrap"
-        >
-          <Plus className="w-4 h-4" /> Criar com IA
-        </button>
+        {/* Bloco Continuar o último card / Redirecionamento para a aba 'cards' */}
+        {hasCards && firstDeckWithCard ? (
+          <div className="p-3.5 rounded-xl bg-[#0b1a2a]/80 border border-[#60a5fa]/20 flex items-center justify-between gap-3">
+            <div className="overflow-hidden">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[#60a5fa] font-bold">
+                Continuar o último card
+              </span>
+              <p className="text-xs font-semibold text-white truncate mt-0.5">
+                {firstDeckWithCard.cards[0].front}
+              </p>
+            </div>
+            <button
+              onClick={() => onStartStudySession(firstDeckWithCard)}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shrink-0 cursor-pointer shadow-md flex items-center gap-1.5"
+            >
+              <Play className="w-3.5 h-3.5 fill-current" /> Continuar
+            </button>
+          </div>
+        ) : (
+          <div className="p-3.5 rounded-xl bg-[#0b1a2a]/80 border border-[#60a5fa]/20 flex items-center justify-between gap-3">
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[#60a5fa] font-bold">
+                Nenhum card cadastrado
+              </span>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Gere seus primeiros flashcards com IA na aba de criação
+              </p>
+            </div>
+            <button
+              onClick={() => setActiveTab('cards')}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shrink-0 cursor-pointer shadow-md flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" /> Criar Cards
+            </button>
+          </div>
+        )}
       </section>
-
-      {/* Barra de ações rápidas removida */}
 
       {/* Decks Collection Section */}
       <section className="space-y-4">
@@ -111,12 +135,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <h3 className="text-base font-bold text-white">Nenhum deck ainda</h3>
             </div>
-            <button
-              onClick={onOpenQuickCreate}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-blue-500/20 transition-all"
-            >
-              <Plus className="w-4 h-4" /> Criar com IA agora
-            </button>
           </div>
         )}
       </section>
@@ -130,8 +148,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         isPro={stats.isPro}
         currentLanguage={currentLanguage}
       />
-
-      {/* Memory Trend removed as requested */}
     </div>
   );
 };

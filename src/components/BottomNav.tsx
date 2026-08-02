@@ -22,7 +22,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab, c
   const navItems: NavItem[] = [
       { id: 'home', label: 'Estudar', icon: Home },
       { id: 'quiz', label: 'QUIZ', icon: HelpCircle },
-      { id: 'scanner', label: 'Scanner', icon: Camera },
+      { id: 'scanner', label: 'Scanner & Upload', icon: Camera },
       { id: 'cards', label: 'Cards', icon: Layers },
       { id: 'stats', label: t.stats, icon: BarChart2 },
   ];
