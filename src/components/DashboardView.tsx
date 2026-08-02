@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Play,
   Plus,
-  BookOpen,
   RotateCw,
 } from 'lucide-react';
 import { Deck, UserStats, ActiveTab } from '../types';
@@ -62,24 +61,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     <div className="space-y-6 pb-24 max-w-5xl mx-auto">
       {/* Quick AI Trigger Banner */}
       <section className="bg-gradient-to-r from-[#122238] via-[#1a2e48] to-[#122238] rounded-2xl p-5 border border-[#60a5fa]/30 shadow-xl flex flex-col gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[#3b82f6]/20 border border-[#3b82f6]/40 flex items-center justify-center flex-shrink-0 shadow-lg">
-            <Sparkles className="w-6 h-6 text-[#60a5fa] animate-spin-slow" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              Gerar Decks com Inteligência Artificial
-            </h3>
-          </div>
-        </div>
-
         {/* Bloco inteligente de estudo rápido — estados: sem card / começar / continuar */}
         {!hasCards ? (
           /* ── ESTADO 1: Nenhum card cadastrado ── */
           <div className="p-3.5 rounded-xl bg-[#0b1a2a]/80 border border-[#60a5fa]/20 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 overflow-hidden">
               <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
-                <BookOpen className="w-4 h-4 text-[#60a5fa]" />
+                <Sparkles className="w-4 h-4 text-[#60a5fa] animate-spin-slow" />
               </div>
               <div className="overflow-hidden">
                 <span className="text-[10px] font-mono uppercase tracking-wider text-[#60a5fa] font-bold">
