@@ -11,6 +11,8 @@ interface AdMobBannerProps {
   onOpenReferral?: () => void;
   isPro?: boolean;
   currentLanguage?: SupportedLanguage;
+  /** Quando true, o banner fica fixo acima da barra de navegação (sempre visível ao rolar). */
+  sticky?: boolean;
 }
 
 export const AdMobBanner: React.FC<AdMobBannerProps> = ({
@@ -20,6 +22,7 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({
   onOpenReferral,
   isPro,
   currentLanguage = 'pt',
+  sticky,
 }) => {
   if (isPro) return null; // PRO users have zero ads
 
@@ -29,7 +32,7 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({
   const remaining = rewardedAdsRemainingToday(stats);
 
   return (
-    <div className="w-full my-5 p-3.5 sm:p-4 rounded-2xl bg-[#0b1a2a]/90 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl animate-fade-in relative overflow-hidden">
+    <div className={`w-full ${sticky ? 'sticky bottom-16 z-30' : 'my-5'} p-3.5 sm:p-4 rounded-2xl bg-[#0b1a2a]/95 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl animate-fade-in relative overflow-hidden`}>
       {/* Background glow accent */}
       <div className="absolute -top-12 -right-12 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
 

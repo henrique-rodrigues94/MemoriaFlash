@@ -100,10 +100,12 @@ export function App() {
 
   // Auto-detected or saved language
   const [currentLanguage, setCurrentLanguage] = useState<SupportedLanguage>(detectBrowserLanguage());
+  // Tema claro é o padrão. Se o usuário já escolheu um tema antes, respeita a escolha.
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    if (typeof window === 'undefined') return 'dark';
+    if (typeof window === 'undefined') return 'light';
     const savedTheme = window.localStorage.getItem('flashmind-theme');
-    return savedTheme === 'light' ? 'light' : 'dark';
+    if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme;
+    return 'light';
   });
 
   const handleSelectLanguage = (lang: SupportedLanguage) => {
@@ -415,11 +417,12 @@ export function App() {
 
             {activeTab === 'stats' && <StatsView stats={stats} decks={decks} />}
 
-            {/* Banner de monetização no final de todas as abas */}
+            {/* Banner de monetização — fixo acima da barra de navegação, sempre visível ao rolar */}
             <AdMobBanner
               stats={stats}
               isPro={stats.isPro}
               currentLanguage={currentLanguage}
+              sticky
               onOpenAdMob={() => setShowAdMobModal(true)}
               onOpenSubscription={() => setShowSubscriptionModal(true)}
               onOpenReferral={() => setShowReferralModal(true)}

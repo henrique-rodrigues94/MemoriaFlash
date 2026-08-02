@@ -1,11 +1,12 @@
 @import "tailwindcss";
 
+/* Tema claro é o padrão. O escuro é ativado via data-theme='dark'. */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
-:root[data-theme='light'] {
-  color-scheme: light;
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 html, body, #root {
@@ -14,13 +15,13 @@ html, body, #root {
 
 body {
   margin: 0;
-  background: #051424;
-  color: #d4e4fa;
-}
-
-:root[data-theme='light'] body {
   background: #f5f9fc;
   color: #14213d;
+}
+
+:root[data-theme='dark'] body {
+  background: #051424;
+  color: #d4e4fa;
 }
 
 @layer utilities {
