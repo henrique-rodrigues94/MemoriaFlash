@@ -6,14 +6,12 @@ import {
   ArrowLeft,
   Award,
   Lightbulb,
-  X,
   AlertTriangle,
   Star,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Deck, Flashcard, RatingGrade } from '../types';
 import { calculateSM2 } from '../services/srsEngine';
-import { apiVoiceTutor } from '../services/api';
 import { SupportedLanguage, translations } from '../lib/i18n';
 
 // Define um tamanho de fonte que se ajusta ao comprimento do texto E à altura
@@ -90,9 +88,6 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   const [cards, setCards] = useState<Flashcard[]>(initialCards);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
-  const [isLoadingExplanation, setIsLoadingExplanation] = useState(false);
-  const [showExplanationModal, setShowExplanationModal] = useState(false);
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
@@ -133,7 +128,6 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
     setReviewedCount(newReviewedCount);
 
     setIsFlipped(false);
-    setAiExplanation(null);
 
     // Salva automaticamente o progresso (deck + intervalo SM-2) a cada card avaliado
     const updatedCardMap = new Map(updatedList.map((c) => [c.id, c]));
@@ -145,32 +139,6 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
     } else {
       setSessionCompleted(true);
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-    }
-  };
-
-  const handleRequestAiExplanation = async () => {
-    if (!currentCard) return;
-
-    // Use stored explanation/curiosity first if available
-    if (currentCard.explanation && !aiExplanation) {
-      setAiExplanation(currentCard.explanation);
-      setShowExplanationModal(true);
-      return;
-    }
-
-    setIsLoadingExplanation(true);
-    try {
-      const prompt = `Por favor, explique detalhadamente o conceito e forneça um EXEMPLO PRÁTICO do mundo real para esta pergunta no idioma ${currentLanguage}.\n\nPergunta / Conceito: "${currentCard.front}"\nResposta de referência: "${currentCard.back}"\n\nResponda de forma extremamente didática e clara, dividida em dois tópicos:\n\n📘 EXPLICAÇÃO DETALHADA DO CONCEITO\n💡 EXEMPLO PRÁTICO DO MUNDO REAL`;
-      const res = await apiVoiceTutor(prompt, currentCard.topic || deck.title, currentLanguage);
-      setAiExplanation(res.answer || res.aiInsight);
-      setShowExplanationModal(true);
-    } catch {
-      setAiExplanation(
-        `📘 EXPLICAÇÃO DETALHADA DO CONCEITO:\n${currentCard.front} — ${currentCard.back}.\n\n💡 EXEMPLO PRÁTICO DO MUNDO REAL:\nAplique este conceito em situações do dia a dia relacionadas ao tema "${currentCard.topic || deck.title}".`
-      );
-      setShowExplanationModal(true);
-    } finally {
-      setIsLoadingExplanation(false);
     }
   };
 
@@ -265,53 +233,7 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
         </div>
       )}
 
-      {/* Explanation Modal */}
-      {showExplanationModal && aiExplanation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-lg bg-[#0b1a2a] border border-amber-500/40 rounded-3xl p-6 text-white shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[#424754]/30 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  <Lightbulb className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-extrabold text-white">Explicação & Exemplo</h3>
-                  <p className="text-[11px] text-[#8c91a0] line-clamp-1">{currentCard.front}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowExplanationModal(false)}
-                className="p-1.5 rounded-full text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-[#122131] border border-[#adc6ff]/20 text-xs text-slate-200 whitespace-pre-line leading-relaxed max-h-[320px] overflow-y-auto">
-              {aiExplanation}
-            </div>
-
-            {/* Curiosity block if available */}
-            {currentCard.curiosity && (
-              <div className="p-4 rounded-2xl bg-violet-500/10 border border-violet-500/30 text-xs text-violet-200 space-y-1">
-                <div className="font-bold text-violet-300 flex items-center gap-1.5 mb-1">
-                  <Star className="w-4 h-4 fill-violet-400/30" /> Curiosidade
-                </div>
-                <p className="leading-relaxed">{currentCard.curiosity}</p>
-              </div>
-            )}
-
-            <button
-              onClick={() => setShowExplanationModal(false)}
-              className="w-full px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold shadow-md cursor-pointer hover:scale-105 transition-all"
-            >
-              Fechar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Cabeçalho + progresso + botão explicar (área fixa no topo) */}
+      {/* Cabeçalho + progresso (área fixa no topo) */}
       <div className="flex flex-col gap-3 shrink-0 pt-3">
         {/* Header: Sair da Sessão */}
         <div className="flex items-center justify-between">

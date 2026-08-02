@@ -35,7 +35,6 @@ import {
   saveStoredDecks,
   getStoredStats,
   saveStoredStats,
-  isOnboardingDone,
   setOnboardingDone,
   saveLastStudiedDeck,
 } from './services/storage';
@@ -86,7 +85,8 @@ import {
 
 export function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');
-  const [showOnboarding, setShowOnboarding] = useState(!isOnboardingDone());
+  // Onboarding desativado — o app abre direto na home (sem intro guiada).
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAdMobModal, setShowAdMobModal] = useState(false);
   const [showInterstitial, setShowInterstitial] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
