@@ -1,12 +1,13 @@
 {
-  "projectId": "apptelevo",
-  "appId": "1:1048793070595:web:d52649aee7c12940b3a236",
-  "apiKey": "AIzaSyD5Olh0Ar4i7U3BfECt7jVJA-jBL_-IMp8",
-  "authDomain": "apptelevo.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-flashmindai-f960cff1-4e4b-4549-85fe-8e06f57a2173",
-  "storageBucket": "apptelevo.firebasestorage.app",
-  "messagingSenderId": "1048793070595",
-  "measurementId": "",
-  "oAuthClientId": "1048793070595-sri8ulv1lr5p7gchki96n8kmb31lfsgk.apps.googleusercontent.com",
+  "projectId": "flashcardsia-a2f43",
+  "appId": "1:773874565537:web:1cd3a96a3fc6939c4fcbe0",
+  "apiKey": "AIzaSyAaRwF97HfsJFy37Y8T5Wethsv5eye7df0",
+  "authDomain": "flashcardsia-a2f43.firebaseapp.com",
+  "databaseURL": "https://flashcardsia-a2f43-default-rtdb.firebaseio.com",
+  "storageBucket": "flashcardsia-a2f43.firebasestorage.app",
+  "messagingSenderId": "773874565537",
+  "measurementId": "G-8GG9HPEWMG",
+  "firestoreDatabaseId": "",
+  "oAuthClientId": "",
   "recaptchaSiteKey": ""
 }

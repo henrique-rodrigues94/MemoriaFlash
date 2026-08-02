@@ -14,12 +14,12 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  projectId: 'apptelevo',
-  appId: '1:1048793070595:web:d52649aee7c12940b3a236',
-  apiKey: 'AIzaSyD5Olh0Ar4i7U3BfECt7jVJA-jBL_-IMp8',
-  authDomain: 'apptelevo.firebaseapp.com',
-  storageBucket: 'apptelevo.firebasestorage.app',
-  messagingSenderId: '1048793070595',
+  projectId: 'flashcardsia-a2f43',
+  appId: '1:773874565537:web:1cd3a96a3fc6939c4fcbe0',
+  apiKey: 'AIzaSyAaRwF97HfsJFy37Y8T5Wethsv5eye7df0',
+  authDomain: 'flashcardsia-a2f43.firebaseapp.com',
+  storageBucket: 'flashcardsia-a2f43.firebasestorage.app',
+  messagingSenderId: '773874565537',
 });
 
 const messaging = firebase.messaging();
