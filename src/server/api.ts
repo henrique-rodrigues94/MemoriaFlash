@@ -4,7 +4,7 @@ import {
   geminiGenerateFlashcards,
   geminiGenerateQuiz,
   isGeminiClientConfigured,
-} from './geminiClient';
+} from '../services/geminiClient';
 
 // ─── Generate Flashcards ─────────────────────────────────────────────────────
 
