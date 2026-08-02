@@ -43,6 +43,7 @@ import {
   saveStoredStats,
   isOnboardingDone,
   setOnboardingDone,
+  saveLastStudiedDeck,
 } from './services/storage';
 
 import {
@@ -254,6 +255,7 @@ export function App() {
   };
 
   const handleStartStudySession = (deck: Deck) => {
+    saveLastStudiedDeck(deck.id);
     setActiveStudyDeck(deck);
   };
 
@@ -452,11 +454,23 @@ export function App() {
             )}
 
             {activeTab === 'quiz' && (
-              <QuizView currentLanguage={currentLanguage} />
+              <QuizView
+                currentLanguage={currentLanguage}
+                stats={stats}
+                onDeductCredit={handleDeductCredit}
+                onOpenAdMob={() => setShowAdMobModal(true)}
+                onOpenSubscription={() => setShowSubscriptionModal(true)}
+              />
             )}
 
             {activeTab === 'scanner' && (
-              <ScannerView onSaveNewDeck={handleSaveDeck} />
+              <ScannerView
+                onSaveNewDeck={handleSaveDeck}
+                stats={stats}
+                onDeductCredit={handleDeductCredit}
+                onOpenAdMob={() => setShowAdMobModal(true)}
+                onOpenSubscription={() => setShowSubscriptionModal(true)}
+              />
             )}
 
             {activeTab === 'cards' && (

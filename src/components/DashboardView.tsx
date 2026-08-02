@@ -6,9 +6,12 @@ import {
   Plus,
   Clock,
   ChevronRight,
+  Play,
+  RotateCcw,
 } from 'lucide-react';
 import { Deck, UserStats, ActiveTab } from '../types';
-import { getDueCardCount } from '../services/srsEngine';
+import { getDueCardCount, computeDeckMastery } from '../services/srsEngine';
+import { getLastStudiedDeckId, getLastStudiedAt } from '../services/storage';
 import { DeckCard } from './DeckCard';
 import { AdMobBanner } from './AdMobBanner';
 import { SupportedLanguage, translations } from '../lib/i18n';
@@ -27,6 +30,23 @@ interface DashboardViewProps {
   onOpenReferral?: () => void;
 }
 
+/** Formata o tempo desde o último estudo em texto amigável ("há 5 min", "ontem"...). */
+function formatTimeAgo(iso?: string | null): string {
+  if (!iso) return '';
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '';
+  const diffMs = Date.now() - then;
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'agora mesmo';
+  if (minutes < 60) return `há ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `há ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'ontem';
+  if (days < 30) return `há ${days} dias`;
+  return `há ${Math.floor(days / 30)} mes(es)`;
+}
+
 export const DashboardView: React.FC<DashboardViewProps> = ({
   stats,
   decks,
@@ -42,11 +62,55 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const t = translations[currentLanguage] || translations.pt;
 
-  
+  // ── "Continuar de onde parou" ──
+  // Encontra o último baralho estudado a partir do id persistido em localStorage.
+  const lastStudiedId = getLastStudiedDeckId();
+  const lastStudiedAt = getLastStudiedAt();
+  const lastStudiedDeck = decks.find((d) => d.id === lastStudiedId) || null;
+  const lastStudiedDue = lastStudiedDeck ? getDueCardCount(lastStudiedDeck.cards) : 0;
+  const lastStudiedMastery = lastStudiedDeck ? computeDeckMastery(lastStudiedDeck.cards) : 0;
 
   return (
     <div className="space-y-6 pb-24 max-w-5xl mx-auto">
       {/* Banner e meta diária removidos */}
+
+      {/* Continue Studying — retoma o último baralho onde o usuário parou */}
+      {lastStudiedDeck && (
+        <section className="relative overflow-hidden rounded-2xl p-5 bg-gradient-to-r from-[#1e2b4a] via-[#243a63] to-[#122238] border border-[#adc6ff]/30 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+          {/* glow decorativo */}
+          <div className="absolute -top-16 -left-16 w-48 h-48 bg-[#60a5fa]/15 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center flex-shrink-0 shadow-lg">
+              <RotateCcw className="w-6 h-6 text-emerald-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-emerald-300/90 mb-0.5">
+                <Clock className="w-3 h-3" />
+                Última revisão {formatTimeAgo(lastStudiedAt)}
+              </div>
+              <h3 className="text-base font-bold text-white leading-tight">
+                Continuar <span className="text-[#adc6ff]">“{lastStudiedDeck.title}”</span>
+              </h3>
+              <p className="text-xs text-[#8c91a0] mt-1 flex items-center gap-1.5 flex-wrap">
+                <span className="inline-flex items-center gap-1 text-amber-300 font-semibold">
+                  {lastStudiedDue} revisões pendentes
+                </span>
+                ·
+                <span className="text-[#adc6ff]">{lastStudiedMastery}% dominado</span>
+              </p>
+            </div>
+          </div>
+
+          <button
+            id="btn-continue-last-deck"
+            onClick={() => onStartStudySession(lastStudiedDeck)}
+            className="w-full sm:w-auto px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-sm font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer hover:scale-[1.02] whitespace-nowrap"
+          >
+            <Play className="w-4 h-4 fill-white" /> Continuar Agora
+          </button>
+        </section>
+      )}
 
       {/* Quick AI Trigger Banner */}
       <section className="bg-gradient-to-r from-[#122238] via-[#1a2e48] to-[#122238] rounded-2xl p-5 border border-[#60a5fa]/30 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">

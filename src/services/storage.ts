@@ -7,149 +7,39 @@ const STORAGE_KEYS = {
   VOICE_HISTORY: 'flashmind_voice_history_v2',
   CLASSES: 'flashmind_classes_v2',
   ONBOARDING_DONE: 'flashmind_onboarding_completed',
+  DEMO_REMOVED: 'flashmind_demo_removed_v1',
+  LAST_STUDIED_DECK_ID: 'flashmind_last_studied_deck_id',
+  LAST_STUDIED_AT: 'flashmind_last_studied_at',
 };
 
-const INITIAL_DECKS: Deck[] = [
-  {
-    id: 'deck-law-basics',
-    title: 'Law Basics - Direito Constitucional',
-    category: 'Direito & Legislação',
-    description: 'Conceitos fundamentais de Direito Constitucional, remédios constitucionais e prazos processuais.',
-    color: '#adc6ff',
-    accentBorder: 'border-l-primary',
-    cards: [
-      {
-        id: 'card-law-1',
-        front: 'O que é o algoritmo SM-2 e como ele se aplica aos flashcards?',
-        back: 'O SuperMemo-2 (SM-2) é um algoritmo de repetição espaçada que calcula o intervalo ideal para revisar cada cartão com base na facilidade e no histórico de acertos do estudante.',
-        topic: 'Algoritmos SRS',
-        difficulty: 'medium',
-        reps: 1,
-        interval: 1,
-        efactor: 2.5,
-        dueDate: new Date().toISOString(),
-      },
-      {
-        id: 'card-law-2',
-        front: 'O que é Habeas Corpus e qual a sua finalidade constitucional?',
-        back: 'Garantia constitucional destinada a proteger a liberdade de locomoção contra violência, coação, ilegalidade ou abuso de poder.\n\n• Pode ser preventivo ou repressivo\n• Isento de custas processuais\n• Não exige advogado para impetração',
-        topic: 'Remédios Constitucionais',
-        difficulty: 'hard',
-        reps: 0,
-        interval: 0,
-        efactor: 2.3,
-        dueDate: new Date().toISOString(),
-      },
-      {
-        id: 'card-law-3',
-        front: 'Quais são os Princípios Fundamentais da República (Art. 1º da CF/88)?',
-        back: 'SO-CI-DI-VA-PLU:\n1. Soberania\n2. Cidadania\n3. Dignidade da pessoa humana\n4. Valores sociais do trabalho e da livre iniciativa\n5. Pluralismo político',
-        topic: 'Princípios Fundamentais',
-        difficulty: 'easy',
-        reps: 3,
-        interval: 6,
-        efactor: 2.6,
-        dueDate: new Date().toISOString(),
-      },
-      {
-        id: 'card-law-4',
-        front: 'Diferencie Mandado de Segurança Individual de Coletivo.',
-        back: 'O individual protege direito líquido e certo individual. O coletivo pode ser impetrado por partidos com representação no Congresso, entidades de classe ou sindicatos em favor de seus membros.',
-        topic: 'Remédios Constitucionais',
-        difficulty: 'medium',
-        reps: 2,
-        interval: 3,
-        efactor: 2.4,
-        dueDate: new Date().toISOString(),
-      },
-    ],
-  },
-  {
-    id: 'deck-medical-terms',
-    title: 'Medical Terms & Anatomy',
-    category: 'Medicina & Saúde',
-    description: 'Terminologia médica essencial, anatomia, fisiologia e patologia clínica.',
-    color: '#ffb786',
-    accentBorder: 'border-l-tertiary',
-    cards: [
-      {
-        id: 'card-med-1',
-        front: 'Qual a diferença entre Isquemia e Infarto?',
-        back: 'Isquemia é a redução temporária ou inadequação do fluxo sanguíneo a um tecido. Infarto é a necrose celular irreversível decorrente da falta prolongada de oxigenação.',
-        topic: 'Patologia',
-        difficulty: 'medium',
-        reps: 4,
-        interval: 12,
-        efactor: 2.7,
-        dueDate: new Date(Date.now() + 86400000 * 3).toISOString(),
-      },
-      {
-        id: 'card-med-2',
-        front: 'Descreva a função do Nó Sinoatrial (Nó SA) no coração.',
-        back: 'É o marca-passo natural do coração, responsável por gerar os impulsos elétricos primários que iniciam a contração atrial e ventricular em ritmo sinusal.',
-        topic: 'Cardiologia',
-        difficulty: 'easy',
-        reps: 5,
-        interval: 15,
-        efactor: 2.8,
-        dueDate: new Date(Date.now() + 86400000 * 5).toISOString(),
-      },
-    ],
-  },
-  {
-    id: 'deck-ux-design',
-    title: 'UX Design Principles',
-    category: 'Design & Tecnologia',
-    description: 'Heurísticas de Jakob Nielsen, Teoria da Carga Cognitiva e Design de Interação.',
-    color: '#D8EFEF',
-    accentBorder: 'border-l-soft-mint/60',
-    cards: [
-      {
-        id: 'card-ux-1',
-        front: 'O que dita a Lei de Fitts no Design de Interfaces?',
-        back: 'O tempo necessário para alcançar um alvo é proporcional à distância até ele e inversamente proporcional ao seu tamanho.\n\n• Botões primários devem ser grandes e acessíveis\n• Cantos da tela possuem tempo de acesso zero',
-        topic: 'Leis da UX',
-        difficulty: 'medium',
-        reps: 1,
-        interval: 1,
-        efactor: 2.5,
-        dueDate: new Date().toISOString(),
-      },
-      {
-        id: 'card-ux-2',
-        front: 'Qual a 1ª Heurística de Nielsen?',
-        back: 'Visibilidade do Status do Sistema: O sistema deve sempre manter os usuários informados sobre o que está acontecendo por meio de feedback apropriado em tempo razoável.',
-        topic: 'Heurísticas',
-        difficulty: 'easy',
-        reps: 3,
-        interval: 8,
-        efactor: 2.6,
-        dueDate: new Date(Date.now() + 86400000 * 2).toISOString(),
-      },
-    ],
-  },
-  {
-    id: 'deck-organic-chem',
-    title: 'Organic Chemistry',
-    category: 'Química & Biologia',
-    description: 'Mecanismos de reação SN1 vs SN2, substituição nucleofílica e estereoquímica.',
-    color: '#60a5fa',
-    accentBorder: 'border-l-primary-container',
-    cards: [
-      {
-        id: 'card-chem-1',
-        front: 'Explique a diferença entre o mecanismo SN1 e SN2 em álcoois.',
-        back: 'SN1 é monomolecular, ocorre em duas etapas com formação de carbocátion intermediário (favorecida por solventes próticos polares e substratos terciários).\nSN2 é bimolecular, ocorre em etapa única concertada com inversão de configuração (favorecida por substratos primários).',
-        topic: 'Substituição Nucleofílica',
-        difficulty: 'hard',
-        reps: 0,
-        interval: 0,
-        efactor: 2.2,
-        dueDate: new Date().toISOString(),
-      },
-    ],
-  },
-];
+// IDs dos decks de demonstração que devem ser removidos na migração
+const DEMO_DECK_IDS = new Set([
+  'deck-law-basics',
+  'deck-medical-terms',
+  'deck-ux-design',
+  'deck-organic-chem',
+]);
+
+/** Remove os decks de demonstração do localStorage se ainda estiverem presentes. */
+function removeDemoDecksIfNeeded(): void {
+  if (localStorage.getItem(STORAGE_KEYS.DEMO_REMOVED)) return;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DECKS);
+    if (raw) {
+      const decks: Deck[] = JSON.parse(raw);
+      const filtered = decks.filter((d) => !DEMO_DECK_IDS.has(d.id));
+      localStorage.setItem(STORAGE_KEYS.DECKS, JSON.stringify(filtered));
+    }
+    localStorage.setItem(STORAGE_KEYS.DEMO_REMOVED, '1');
+  } catch {
+    /* silencia erros de parse */
+  }
+}
+
+// Executa a migração uma vez ao carregar o módulo
+removeDemoDecksIfNeeded();
+
+const INITIAL_DECKS: Deck[] = [];
 
 const INITIAL_STATS: UserStats = {
   name: 'Estudante FlashMind',
@@ -280,4 +170,32 @@ export function isOnboardingDone(): boolean {
 
 export function setOnboardingDone(done: boolean): void {
   localStorage.setItem(STORAGE_KEYS.ONBOARDING_DONE, done ? 'true' : 'false');
+}
+
+/** Retorna o id do último baralho estudado (ou null se nunca estudou). */
+export function getLastStudiedDeckId(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.LAST_STUDIED_DECK_ID);
+  } catch {
+    return null;
+  }
+}
+
+/** Salva o id do baralho que acabou de ser estudado (para "Continuar de onde parou"). */
+export function saveLastStudiedDeck(deckId: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.LAST_STUDIED_DECK_ID, deckId);
+    localStorage.setItem(STORAGE_KEYS.LAST_STUDIED_AT, new Date().toISOString());
+  } catch (e) {
+    console.error('Failed to save last studied deck', e);
+  }
+}
+
+/** Retorna o timestamp (ISO) do último estudo, ou null. */
+export function getLastStudiedAt(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.LAST_STUDIED_AT);
+  } catch {
+    return null;
+  }
 }
