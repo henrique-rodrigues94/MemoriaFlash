@@ -12,11 +12,6 @@ import { StudySessionView } from './components/StudySessionView';
 // >1MB num único arquivo). DashboardView/StudySessionView ficam eager porque
 // aparecem imediatamente na tela inicial.
 // ----------------------------------------------------------------------------
-const DuelLobbyView = lazy(() => import('./components/DuelLobbyView').then((m) => ({ default: m.DuelLobbyView })));
-const DuelArenaView = lazy(() => import('./components/DuelArenaView').then((m) => ({ default: m.DuelArenaView })));
-const DuelResultsView = lazy(() =>
-  import('./components/DuelResultsView').then((m) => ({ default: m.DuelResultsView }))
-);
 const ScannerView = lazy(() => import('./components/ScannerView').then((m) => ({ default: m.ScannerView })));
 const StudioView = lazy(() => import('./components/StudioView').then((m) => ({ default: m.StudioView })));
 const QuizView = lazy(() => import('./components/QuizView').then((m) => ({ default: m.QuizView })));
@@ -33,7 +28,6 @@ import {
   Deck,
   UserStats,
   ActiveTab,
-  QuizQuestion,
 } from './types';
 
 import {
@@ -121,16 +115,6 @@ export function App() {
   // Active Session / Modal States
   const [activeStudyDeck, setActiveStudyDeck] = useState<Deck | null>(null);
   const [managedDeck, setManagedDeck] = useState<Deck | null>(null);
-
-  // Duel State
-  const [duelStage, setDuelStage] = useState<'lobby' | 'arena' | 'results'>('lobby');
-  const [duelOpponent, setDuelOpponent] = useState({ name: 'Bot Alex (IA)', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80' });
-  const [duelQuestions, setDuelQuestions] = useState<QuizQuestion[]>([]);
-  const [duelResults, setDuelResults] = useState<{
-    userPoints: number;
-    opponentPoints: number;
-    wrongQuestions: QuizQuestion[];
-  }>({ userPoints: 0, opponentPoints: 0, wrongQuestions: [] });
 
   useEffect(() => {
     document.documentElement.classList.toggle('theme-light', theme === 'light');
@@ -328,71 +312,12 @@ export function App() {
     handleSaveDeck(updatedDeck);
   };
 
-  const handleStartDuel = async (opponentType: 'ai' | 'player', topic: string) => {
-    if (opponentType === 'ai') {
-      setDuelOpponent({
-        name: 'Bot Gemini IA',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
-      });
-    } else {
-      setDuelOpponent({
-        name: 'Gabriel Santos (Online)',
-        avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&q=80',
-      });
-    }
 
-    try {
-      const qList = await apiGenerateQuiz(topic, 5, currentLanguage);
-      setDuelQuestions(qList);
-    } catch {
-      // Fallback questions if offline
-      setDuelQuestions([
-        {
-          question: 'O que caracteriza o mecanismo de repetição espaçada no algoritmo SM-2?',
-          options: [
-            'Revisar todos os cards diariamente sem distinção',
-            'Ajustar os intervalos baseando-se na facilidade de lembrança do usuário',
-            'Aleatorizar o tempo entre revisões para surpreender o cérebro',
-            'Eliminar cartões que foram errados mais de 3 vezes',
-          ],
-          correctIndex: 1,
-          explanation: 'O SM-2 calcula um Fator de Facilidade (EF) dinâmico que expande os dias entre as revisões conforme a retenção aumenta.',
-        },
-        {
-          question: 'Qual remetente tem garantia constitucional via Mandado de Segurança?',
-          options: [
-            'Qualquer cidadão sem necessidade de advogado',
-            'Direito líquido e certo não amparado por Habeas Corpus ou Habeas Data',
-            'Apenas crimes ambientais em zonas rurais',
-            'Processos trabalhistas de menor complexidade',
-          ],
-          correctIndex: 1,
-          explanation: 'O Mandado de Segurança protege direito líquido e certo contra ilegalidade de autoridade pública.',
-        },
-      ]);
-    }
-    setDuelStage('arena');
-  };
-
-  const handleFinishDuel = (
-    userPoints: number,
-    opponentPoints: number,
-    wrongQuestions: QuizQuestion[]
-  ) => {
-    setDuelResults({ userPoints, opponentPoints, wrongQuestions });
-    setDuelStage('results');
-
-    // Grant XP
-    const gained = userPoints >= opponentPoints ? 250 : 100;
-    const newStats = { ...stats, xp: stats.xp + gained };
-    setStats(newStats);
-    maybeShowInterstitial(newStats);
-  };
 
   const isLightTheme = theme === 'light';
 
   return (
-    <div className={`min-h-screen font-sans antialiased transition-colors duration-300 ${isLightTheme ? 'bg-[#f4f7fb] text-[#14213d]' : 'bg-[#051424] text-[#d4e4fa]'} ${isLightTheme ? 'selection:bg-[#60a5fa]/30 selection:text-[#0f172a]' : 'selection:bg-[#adc6ff]/30 selection:text-white'}`}>
+    <div className={`min-h-screen font-sans antialiased transition-colors duration-300 ${isLightTheme ? 'bg-[#EEF0F8] text-[#1A1F36]' : 'bg-[#051424] text-[#d4e4fa]'} ${isLightTheme ? 'selection:bg-[#4F6EF7]/20 selection:text-[#1A1F36]' : 'selection:bg-[#adc6ff]/30 selection:text-white'}`}>
       {/* App Header — oculto durante a sessão de estudo (tela cheia) */}
       {!activeStudyDeck && (
         <Header
@@ -485,32 +410,6 @@ export function App() {
               />
             )}
 
-            {activeTab === 'duel' && (
-              <>
-                {duelStage === 'lobby' && (
-                  <DuelLobbyView stats={stats} onStartDuel={handleStartDuel} />
-                )}
-                {duelStage === 'arena' && (
-                  <DuelArenaView
-                    stats={stats}
-                    opponentName={duelOpponent.name}
-                    opponentAvatar={duelOpponent.avatar}
-                    questions={duelQuestions}
-                    onFinishDuel={handleFinishDuel}
-                  />
-                )}
-                {duelStage === 'results' && (
-                  <DuelResultsView
-                    userPoints={duelResults.userPoints}
-                    opponentPoints={duelResults.opponentPoints}
-                    opponentName={duelOpponent.name}
-                    wrongQuestions={duelResults.wrongQuestions}
-                    onReturnToLobby={() => setDuelStage('lobby')}
-                  />
-                )}
-              </>
-            )}
-
             {activeTab === 'stats' && <StatsView stats={stats} decks={decks} />}
 
           </>
@@ -555,7 +454,7 @@ export function App() {
           />
         )}
 
-        {/* AdMob Interstitial (frequency-capped, shown after study/duel sessions) */}
+        {/* AdMob Interstitial (frequency-capped, shown after study sessions) */}
         {showInterstitial && <AdMobInterstitialModal onClose={() => setShowInterstitial(false)} />}
 
         {/* Referral / Indique e Ganhe Modal */}

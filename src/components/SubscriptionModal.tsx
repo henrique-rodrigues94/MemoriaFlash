@@ -224,13 +224,13 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                         <Check className="w-3.5 h-3.5 text-blue-500" /> Créditos de IA Ilimitados
                       </li>
                       <li className="flex items-center gap-2">
-                        <Check className="w-3.5 h-3.5 text-blue-500" /> Zero Anúncios (AdMob Off)
+                        <Check className="w-3.5 h-3.5 text-blue-500" /> Zero Anúncios
                       </li>
                       <li className="flex items-center gap-2">
-                        <Check className="w-3.5 h-3.5 text-blue-500" /> Tutor de Voz HD Ilimitado
+                        <Check className="w-3.5 h-3.5 text-blue-500" /> Scanner Ilimitado (PDF, foto, DOCX)
                       </li>
                       <li className="flex items-center gap-2">
-                        <Check className="w-3.5 h-3.5 text-blue-500" /> Relatórios PDF de Turmas
+                        <Check className="w-3.5 h-3.5 text-blue-500" /> Quiz Diagnóstico Ilimitado
                       </li>
                     </ul>
                   </div>

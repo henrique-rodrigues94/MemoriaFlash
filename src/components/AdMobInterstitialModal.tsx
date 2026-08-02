@@ -6,7 +6,7 @@ interface AdMobInterstitialModalProps {
 }
 
 // Anúncio intersticial: curto, exibido entre telas (fim de sessão de estudo,
-// fim de duelo). Skippable após 3s, seguindo a regra "nunca force o clique"
+// fim de sessão de estudo). Skippable após 3s, seguindo a regra "nunca force o clique"
 // e limites de frequência definidos em src/services/economy/creditsEngine.ts.
 export const AdMobInterstitialModal: React.FC<AdMobInterstitialModalProps> = ({ onClose }) => {
   const [canSkip, setCanSkip] = useState(false);

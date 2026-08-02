@@ -141,7 +141,7 @@ export const DuelResultsView: React.FC<DuelResultsViewProps> = ({
           <div className="p-5 rounded-2xl bg-[#122238] border border-[#60a5fa]/40 space-y-4 animate-fade-in">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-[#60a5fa] flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4" /> Plano Estruturado pelo Gemini 3.6
+                <Sparkles className="w-4 h-4" /> Plano Estruturado pela IA
               </span>
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-mono text-[10px] font-bold">
                 Taxa de Sucesso Estimada: {recoveryPlan.estimatedSuccessRate}%

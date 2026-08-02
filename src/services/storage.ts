@@ -8,8 +8,6 @@ const STORAGE_KEYS = {
   CLASSES: 'flashmind_classes_v2',
   ONBOARDING_DONE: 'flashmind_onboarding_completed',
   DEMO_REMOVED: 'flashmind_demo_removed_v1',
-  LAST_STUDIED_DECK_ID: 'flashmind_last_studied_deck_id',
-  LAST_STUDIED_AT: 'flashmind_last_studied_at',
 };
 
 // IDs dos decks de demonstração que devem ser removidos na migração
@@ -42,7 +40,7 @@ removeDemoDecksIfNeeded();
 const INITIAL_DECKS: Deck[] = [];
 
 const INITIAL_STATS: UserStats = {
-  name: 'Estudante MemoriaFlash',
+  name: 'Estudante FlashMind',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
   streakDays: 1,
   dailyGoalTotal: 20,
@@ -172,30 +170,12 @@ export function setOnboardingDone(done: boolean): void {
   localStorage.setItem(STORAGE_KEYS.ONBOARDING_DONE, done ? 'true' : 'false');
 }
 
-/** Retorna o id do último baralho estudado (ou null se nunca estudou). */
-export function getLastStudiedDeckId(): string | null {
-  try {
-    return localStorage.getItem(STORAGE_KEYS.LAST_STUDIED_DECK_ID);
-  } catch {
-    return null;
-  }
-}
-
-/** Salva o id do baralho que acabou de ser estudado (para "Continuar de onde parou"). */
 export function saveLastStudiedDeck(deckId: string): void {
   try {
-    localStorage.setItem(STORAGE_KEYS.LAST_STUDIED_DECK_ID, deckId);
-    localStorage.setItem(STORAGE_KEYS.LAST_STUDIED_AT, new Date().toISOString());
-  } catch (e) {
-    console.error('Failed to save last studied deck', e);
-  }
+    localStorage.setItem('flashmind_last_studied_deck', deckId);
+  } catch { /* ignore */ }
 }
 
-/** Retorna o timestamp (ISO) do último estudo, ou null. */
-export function getLastStudiedAt(): string | null {
-  try {
-    return localStorage.getItem(STORAGE_KEYS.LAST_STUDIED_AT);
-  } catch {
-    return null;
-  }
+export function getLastStudiedDeck(): string | null {
+  return localStorage.getItem('flashmind_last_studied_deck');
 }

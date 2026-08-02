@@ -554,7 +554,7 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
             >
               <Sparkles className="w-4 h-4 text-blue-300 animate-spin" />
               {isGenerating
-                ? 'Gemini 3.6 Flash Criando Flashcards...'
+                ? 'IA Criando Flashcards...'
                 : `Gerar Deck (${difficultyOptions.find((d) => d.id === difficulty)?.label}) com IA`}
             </button>
           ) : (
