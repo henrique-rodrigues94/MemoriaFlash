@@ -122,9 +122,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               Gerar Decks com Inteligência Artificial
             </h3>
-            <p className="text-xs text-[#8c91a0] mt-0.5">
-              Transforme artigos, PDFs, links do YouTube ou textos em flashcards de alta qualidade.
-            </p>
           </div>
         </div>
 
