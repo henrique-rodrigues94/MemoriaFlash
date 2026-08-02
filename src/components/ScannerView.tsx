@@ -390,7 +390,7 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
               type="file"
               multiple
               accept=".txt,.md,.json,.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
-              className="hidden"
+              className="sr-only"
               onChange={handleFilePick}
             />
           </div>
@@ -409,7 +409,7 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
             type="file"
             accept="image/*"
             capture="environment"
-            className="hidden"
+            className="sr-only"
             onChange={handleCameraPick}
           />
 

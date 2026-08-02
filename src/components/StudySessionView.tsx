@@ -120,7 +120,12 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
     if (!currentCard) return;
 
     const sm2Result = calculateSM2(currentCard, rating);
-    const updatedCard: Flashcard = { ...currentCard, ...sm2Result };
+    // Importante: usar o card ORIGINAL (não invertido) como base. `currentCard`
+    // pode ter front/back trocados quando "Inverter Resposta/Pergunta" está
+    // ativo — isso é só para exibição durante a revisão. Se salvássemos a
+    // partir de `currentCard`, a troca virava permanente no baralho real.
+    const originalCard = cards[currentIndex];
+    const updatedCard: Flashcard = { ...originalCard, ...sm2Result };
 
     const updatedList = [...cards];
     updatedList[currentIndex] = updatedCard;

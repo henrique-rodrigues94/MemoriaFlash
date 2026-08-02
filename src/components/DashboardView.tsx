@@ -58,9 +58,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               Gerar Decks com Inteligência Artificial
             </h3>
-            <p className="text-xs text-[#8c91a0] mt-0.5">
-              Transforme textos, PDFs ou fotos em flashcards de alta qualidade com IA.
-            </p>
           </div>
         </div>
 
@@ -113,9 +110,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-white">Nenhum deck ainda</h3>
-              <p className="text-xs text-[#8c91a0] mt-1 max-w-xs mx-auto">
-                Crie seu primeiro deck com IA a partir de um texto, PDF ou foto com o Scanner.
-              </p>
             </div>
             <button
               onClick={onOpenQuickCreate}
