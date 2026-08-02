@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, BrainCircuit, BarChart2, CheckCircle2, ArrowRight, X, Zap } from 'lucide-react';
+import { Sparkles, BrainCircuit, Layers, CheckCircle2, ArrowRight, X } from 'lucide-react';
 
 interface OnboardingModalProps {
   onClose: () => void;
@@ -11,30 +11,30 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onClose, onOpe
 
   const steps = [
     {
-      title: 'Estudo com Repetição Espaçada',
-      subtitle: 'O algoritmo SM-2 trabalha por você',
+      title: 'Crie Flashcards com IA',
+      subtitle: 'Gere seus decks em segundos',
       description:
-        'O FlashMind calcula o intervalo ideal para revisar cada card com base na sua facilidade de lembrança. Você revisa menos o que já sabe e mais o que ainda está difícil — fixando o conteúdo de verdade.',
-      icon: BrainCircuit,
-      badge: 'SM-2 · Repetição Espaçada',
+        'Digite uma matéria ou envie um PDF/foto pelo Scanner e o MemoriaFlash gera flashcards completos com IA, incluindo explicações e exemplos práticos. Você também pode criar cards manualmente quando quiser.',
+      icon: Sparkles,
+      badge: 'Gerador IA · Scanner',
       color: 'from-blue-600 to-indigo-600',
     },
     {
-      title: 'Crie Flashcards com IA',
-      subtitle: 'A partir de textos, PDFs e fotos',
+      title: 'Estudo com Repetição Espaçada',
+      subtitle: 'O algoritmo SM-2 trabalha por você',
       description:
-        'Digite uma matéria para gerar decks completos com IA, envie um PDF ou foto pelo Scanner, ou crie cards manualmente. O Quiz Diagnóstico identifica suas lacunas e gera um deck personalizado.',
-      icon: Sparkles,
-      badge: 'IA · Scanner · Quiz',
+        'O MemoriaFlash calcula o intervalo ideal para revisar cada card com base na sua facilidade de lembrança. Você revisa menos o que já sabe e mais o que ainda está difícil — fixando o conteúdo de verdade.',
+      icon: BrainCircuit,
+      badge: 'SM-2 · Repetição Espaçada',
       color: 'from-amber-500 to-orange-600',
     },
     {
-      title: 'Progresso e Nuvem',
-      subtitle: 'Acompanhe sua evolução em tempo real',
+      title: 'Seus Decks, Sempre Com Você',
+      subtitle: 'Sincronizado na nuvem',
       description:
-        'Veja streak de dias, taxa de retenção e progresso por deck nas Estatísticas. Seu histórico, créditos e decks ficam salvos na nuvem — acessíveis em qualquer dispositivo após o login com Google.',
-      icon: BarChart2,
-      badge: 'Stats · Nuvem · Google',
+        'Seus decks e progresso ficam salvos na nuvem e acompanham você em qualquer dispositivo. Faça login com o Google para sincronizar tudo automaticamente.',
+      icon: Layers,
+      badge: 'Nuvem · Google',
       color: 'from-cyan-500 to-blue-600',
     },
   ];
@@ -75,15 +75,6 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ onClose, onOpe
         </p>
 
         {/* Como ganhar créditos */}
-        {step === 1 && (
-          <div className="mb-6 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 flex items-start gap-2.5">
-            <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            <span>
-              Cada geração com IA custa <strong>1 crédito</strong>. Você ganha créditos assistindo vídeos curtos, por indicações ou assinando o plano PRO.
-            </span>
-          </div>
-        )}
-
         {/* Google Login */}
         {onOpenAuth && (
           <div className="pt-4 border-t border-[#424754]/30 my-4 text-center">
