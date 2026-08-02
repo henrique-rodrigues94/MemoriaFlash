@@ -37,7 +37,7 @@ export async function apiGenerateFlashcards(
     console.warn('Servidor falhou, tentando Gemini direto no browser:', serverErr);
   }
 
-  // 2ª tentativa: Groq / OpenRouter / Gemini direto no browser
+  // 2ª tentativa: Gemini direto no browser
   if (isAnyProviderConfigured()) {
     try {
       const cards = await clientGenerateFlashcards(prompt, count, language, difficulty, selectedTopics);
@@ -76,7 +76,7 @@ export async function apiSuggestTopics(title: string, language: string = 'pt'): 
     console.warn('Servidor falhou para suggest-topics, tentando browser:', serverErr);
   }
 
-  // 2ª tentativa: Groq / OpenRouter / Gemini direto no browser
+  // 2ª tentativa: Gemini direto no browser
   if (isAnyProviderConfigured()) {
     try {
       const topics = await clientSuggestTopics(title, language);
@@ -172,7 +172,7 @@ export async function apiGenerateQuiz(
     console.warn('Servidor falhou para generate-quiz, tentando browser:', serverErr);
   }
 
-  // 2ª tentativa: Groq / OpenRouter / Gemini direto no browser
+  // 2ª tentativa: Gemini direto no browser
   if (isAnyProviderConfigured()) {
     try {
       return await clientGenerateQuiz(topic, count, language);
@@ -181,7 +181,7 @@ export async function apiGenerateQuiz(
     }
   }
 
-  throw new Error('Não foi possível gerar o quiz. Configure VITE_GROQ_API_KEY, VITE_OPENROUTER_API_KEY ou VITE_GEMINI_API_KEY no .env');
+  throw new Error('Não foi possível gerar o quiz. Configure VITE_GEMINI_API_KEY no .env');
 }
 
 // ─── Recovery Plan ───────────────────────────────────────────────────────────

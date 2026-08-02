@@ -134,53 +134,12 @@ app.post('/api/gemini/scanner-process', async (req, res) => {
     // ── Passo 1: extrair texto de imagens via OCR (fallback em cadeia) ──────────
     //
     // Ordem de tentativa:
-    //   1. Groq Vision  (llama-3.2-11b-vision-preview) — gratuito, rápido
-    //   2. Gemini Vision (gemini-2.5-flash)             — gratuito com GEMINI_API_KEY
-    //   3. OCR.space                                    — 25k req/mês grátis, OCRSPACE_API_KEY
+    //   1. Gemini Vision (gemini-2.5-flash) — gratuito com GEMINI_API_KEY (principal)
+    //   2. OCR.space                        — 25k req/mês grátis, OCRSPACE_API_KEY
     //
     // Configure as chaves no .env:
-    //   GROQ_API_KEY=gsk_...          (https://console.groq.com/keys)
-    //   GEMINI_API_KEY=AIza...        (https://aistudio.google.com/apikey)
-    //   OCRSPACE_API_KEY=K8...        (https://ocr.space/ocrapi/freekey)
-
-    /** Extrai texto de UMA imagem base64 via Groq Vision (gratuito). */
-    async function ocrWithGroq(base64img: string): Promise<string> {
-      const apiKey = process.env.GROQ_API_KEY;
-      if (!apiKey) throw new Error('GROQ_API_KEY não configurada');
-
-      const [meta, data] = base64img.split(',');
-      const mimeMatch = meta.match(/data:([^;]+)/);
-      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: 'llama-3.2-11b-vision-preview',
-          max_tokens: 4096,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: 'Você é um sistema de OCR especializado em materiais educacionais. Extraia e transcreva TODO o texto visível nesta imagem — inclua títulos, parágrafos, listas, fórmulas, tabelas e qualquer conteúdo textual. Preserve a estrutura do documento. Não adicione comentários, apenas o texto extraído.',
-                },
-                { type: 'image_url', image_url: { url: `data:${mimeType};base64,${data}` } },
-              ],
-            },
-          ],
-        }),
-        signal: AbortSignal.timeout(30000),
-      });
-
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        throw new Error(`Groq Vision HTTP ${res.status}: ${body}`);
-      }
-      const json = await res.json();
-      return json?.choices?.[0]?.message?.content || '';
-    }
+    //   GEMINI_API_KEY=...   (https://aistudio.google.com/apikey)
+    //   OCRSPACE_API_KEY=... (https://ocr.space/ocrapi/freekey)
 
     /** Extrai texto de MÚLTIPLAS imagens via Gemini Vision (gratuito). */
     async function ocrWithGemini(base64images: string[]): Promise<string> {
@@ -258,24 +217,13 @@ app.post('/api/gemini/scanner-process', async (req, res) => {
         }
       }
 
-      // Se Gemini não funcionou, processa imagem por imagem com Groq + OCR.space
+      // Se Gemini não funcionou, processa imagem por imagem com OCR.space
       if (!geminiDone) {
         for (let i = 0; i < images.length; i++) {
           const img = images[i];
           let pageText = '';
 
-          // Tentativa 1: Groq Vision
-          if (!pageText && process.env.GROQ_API_KEY) {
-            try {
-              console.log(`[Scanner OCR] Imagem ${i + 1}: tentando Groq Vision…`);
-              pageText = await ocrWithGroq(img);
-              if (pageText.trim()) console.log(`[Scanner OCR] ✓ Groq extraiu imagem ${i + 1}`);
-            } catch (e) {
-              console.warn(`[Scanner OCR] Groq falhou na imagem ${i + 1}:`, (e as Error).message);
-            }
-          }
-
-          // Tentativa 2: OCR.space
+          // Tentativa: OCR.space
           if (!pageText) {
             try {
               console.log(`[Scanner OCR] Imagem ${i + 1}: tentando OCR.space…`);
@@ -297,8 +245,8 @@ app.post('/api/gemini/scanner-process', async (req, res) => {
       extractedFromImages = pageTexts.join('\n\n');
 
       if (!extractedFromImages.trim()) {
-        console.warn('[Scanner OCR] Nenhum provider de OCR disponível. Configure GROQ_API_KEY, GEMINI_API_KEY ou OCRSPACE_API_KEY.');
-        extractedFromImages = `[${images.length} imagem(ns) enviada(s) — nenhum provider de OCR configurado. Configure GROQ_API_KEY, GEMINI_API_KEY ou OCRSPACE_API_KEY no .env]`;
+        console.warn('[Scanner OCR] Nenhum provider de OCR disponível. Configure GEMINI_API_KEY ou OCRSPACE_API_KEY.');
+        extractedFromImages = `[${images.length} imagem(ns) enviada(s) — nenhum provider de OCR configurado. Configure GEMINI_API_KEY ou OCRSPACE_API_KEY no .env]`;
       }
     }
 

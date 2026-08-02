@@ -19,7 +19,7 @@ export const fetchAITopicSuggestions = async (subject: string): Promise<string[]
 };
 
 /**
- * Gera flashcards via backend (Gemini → Groq → DeepSeek → ... com fallback automático).
+ * Gera flashcards via backend (Gemini principal → ChatGPT fallback).
  * Nenhuma chave de API fica exposta no frontend.
  */
 export const generateAICards = async (

@@ -16,22 +16,12 @@ interface ImportMetaEnv {
   readonly VITE_ADMOB_NATIVE_AD_UNIT_ID?: string;
 
   // ── Provedores de IA client-side (browser) ──────────────────────────────
-  // Configure ao menos 1. Ordem de tentativa: Groq → OpenRouter → Gemini.
-  // As chaves VITE_* são expostas ao browser pelo Vite (prefixo obrigatório).
-
-  /** Groq API Key — https://console.groq.com/keys */
-  readonly VITE_GROQ_API_KEY?: string;
-  /** Modelo Groq (padrão: llama-3.3-70b-versatile) */
-  readonly VITE_GROQ_MODEL?: string;
-
-  /** OpenRouter API Key — https://openrouter.ai/keys */
-  readonly VITE_OPENROUTER_API_KEY?: string;
-  /** Modelo OpenRouter (padrão: meta-llama/llama-3.1-8b-instruct:free) */
-  readonly VITE_OPENROUTER_MODEL?: string;
+  // Configure para ativar o fallback direto no browser (usado só se o
+  // servidor falhar). As chaves VITE_* são expostas ao browser pelo Vite.
 
   /** Google Gemini API Key — https://aistudio.google.com/apikey */
   readonly VITE_GEMINI_API_KEY?: string;
-  /** Modelo Gemini (padrão: gemini-2.0-flash) */
+  /** Modelo Gemini (padrão: gemini-2.5-flash) */
   readonly VITE_GEMINI_MODEL?: string;
 }
 

@@ -2,9 +2,9 @@ import { GoogleGenAI } from '@google/genai';
 import { AIProvider, AIProviderError, GenerateJSONParams } from '../types';
 
 // Modelo válido e atual com camada gratuita generosa via Google AI Studio.
-// (O scaffold original referenciava "gemini-3.6-flash", que não existe —
-// corrigido aqui. Se a Google lançar um modelo mais novo, troque só esta linha.)
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+// (Atualizado para a linha mais recente disponível. Se a Google lançar um
+// modelo mais novo, troque só esta linha — ou use GEMINI_MODEL no .env.)
+const DEFAULT_MODEL = 'gemini-3.6-flash';
 
 // Lido na hora da chamada (lazy) — ver comentário em openrouter.ts.
 function getModel(): string {

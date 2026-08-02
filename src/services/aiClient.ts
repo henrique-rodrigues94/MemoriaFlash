@@ -1,11 +1,7 @@
 /**
- * Cliente de IA multi-provedor direto no browser.
- * Ordem de tentativa: Groq → OpenRouter → Gemini
- * Configure as chaves VITE_* no .env para ativar cada provedor.
- *
- * Groq     (grátis): https://console.groq.com/keys
- * OpenRouter (grátis): https://openrouter.ai/keys
- * Gemini   (grátis): https://aistudio.google.com/apikey
+ * Cliente de IA direto no browser (fallback quando o servidor falha).
+ * Provedor: Google Gemini (grátis).
+ * Configure VITE_GEMINI_API_KEY no .env para ativar.
  */
 
 // ─── Utilitários ─────────────────────────────────────────────────────────────
@@ -32,76 +28,6 @@ function parseJSON(raw: string): unknown {
     }
   }
   throw new Error('JSON inválido na resposta da IA');
-}
-
-// ─── Groq ────────────────────────────────────────────────────────────────────
-
-export function isGroqConfigured() { return !!getEnv('VITE_GROQ_API_KEY'); }
-
-async function callGroq(system: string, user: string, model?: string): Promise<unknown> {
-  const apiKey = getEnv('VITE_GROQ_API_KEY');
-  if (!apiKey) throw new Error('VITE_GROQ_API_KEY não configurada');
-
-  const m = model || getEnv('VITE_GROQ_MODEL') || 'llama-3.3-70b-versatile';
-
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: m,
-      temperature: 0.7,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: system + '\nResponda APENAS com JSON válido, sem markdown.' },
-        { role: 'user', content: user },
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`Groq ${res.status}: ${(err as any)?.error?.message || res.statusText}`);
-  }
-
-  const data = await res.json();
-  return parseJSON(data?.choices?.[0]?.message?.content || '');
-}
-
-// ─── OpenRouter ───────────────────────────────────────────────────────────────
-
-export function isOpenRouterConfigured() { return !!getEnv('VITE_OPENROUTER_API_KEY'); }
-
-async function callOpenRouter(system: string, user: string, model?: string): Promise<unknown> {
-  const apiKey = getEnv('VITE_OPENROUTER_API_KEY');
-  if (!apiKey) throw new Error('VITE_OPENROUTER_API_KEY não configurada');
-
-  const m = model || getEnv('VITE_OPENROUTER_MODEL') || 'meta-llama/llama-3.1-8b-instruct:free';
-
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-      'HTTP-Referer': window.location.origin,
-      'X-Title': 'MemoriaFlash',
-    },
-    body: JSON.stringify({
-      model: m,
-      temperature: 0.7,
-      messages: [
-        { role: 'system', content: system + '\nResponda APENAS com JSON válido, sem markdown.' },
-        { role: 'user', content: user },
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`OpenRouter ${res.status}: ${(err as any)?.error?.message || res.statusText}`);
-  }
-
-  const data = await res.json();
-  return parseJSON(data?.choices?.[0]?.message?.content || '');
 }
 
 // ─── Gemini ───────────────────────────────────────────────────────────────────
@@ -139,32 +65,24 @@ async function callGemini(system: string, user: string): Promise<unknown> {
   return parseJSON(text);
 }
 
-// ─── Orquestrador browser (Groq → OpenRouter → Gemini) ───────────────────────
+// ─── Orquestrador browser (Gemini) ───────────────────────────────────────────
 
 export function isAnyProviderConfigured(): boolean {
-  return isGroqConfigured() || isOpenRouterConfigured() || isGeminiConfigured();
+  return isGeminiConfigured();
 }
 
 async function callBestProvider(system: string, user: string): Promise<unknown> {
-  const providers: Array<{ name: string; fn: () => Promise<unknown>; check: () => boolean }> = [
-    { name: 'Groq',       check: isGroqConfigured,       fn: () => callGroq(system, user) },
-    { name: 'OpenRouter', check: isOpenRouterConfigured, fn: () => callOpenRouter(system, user) },
-    { name: 'Gemini',     check: isGeminiConfigured,     fn: () => callGemini(system, user) },
-  ];
-
-  const errors: string[] = [];
-  for (const p of providers) {
-    if (!p.check()) continue;
-    try {
-      const result = await p.fn();
-      console.log(`[aiClient] Respondido por ${p.name}`);
-      return result;
-    } catch (err: any) {
-      console.warn(`[aiClient] ${p.name} falhou:`, err.message);
-      errors.push(`${p.name}: ${err.message}`);
-    }
+  if (!isGeminiConfigured()) {
+    throw new Error('VITE_GEMINI_API_KEY não configurada');
   }
-  throw new Error(`Todos os provedores falharam. ${errors.join(' | ')}`);
+  try {
+    const result = await callGemini(system, user);
+    console.log('[aiClient] Respondido por Gemini');
+    return result;
+  } catch (err: any) {
+    console.warn('[aiClient] Gemini falhou:', err.message);
+    throw new Error(`Gemini: ${err.message}`);
+  }
 }
 
 // ─── Tarefas de alto nível ───────────────────────────────────────────────────
