@@ -15,8 +15,11 @@ import {
   BookOpen,
   ChevronDown,
   ChevronUp,
+  Lock,
 } from 'lucide-react';
-import { Deck } from '../types';
+import { Deck, UserStats } from '../types';
+import { hasEnoughCredits } from '../services/economy/creditsEngine';
+import { ECONOMY } from '../services/economy/economyConstants';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -34,6 +37,10 @@ type Step = 'collect' | 'confirm' | 'generating' | 'done' | 'error';
 
 interface ScannerViewProps {
   onSaveNewDeck: (deck: Deck) => void;
+  stats?: UserStats;
+  onDeductCredit?: (amount?: number) => void;
+  onOpenAdMob?: () => void;
+  onOpenSubscription?: () => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -140,7 +147,7 @@ function isDocumentFile(file: File): boolean {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function ScannerView({ onSaveNewDeck }: ScannerViewProps) {
+export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob }: ScannerViewProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -194,6 +201,14 @@ export function ScannerView({ onSaveNewDeck }: ScannerViewProps) {
 
   const processItems = async () => {
     if (!items.length) return;
+
+    // Gate de créditos
+    const cost = ECONOMY.COST_GENERATE_DECK;
+    if (stats && !hasEnoughCredits(stats, cost)) {
+      if (onOpenAdMob) onOpenAdMob();
+      return;
+    }
+
     setStep('generating');
 
     try {
@@ -266,6 +281,8 @@ export function ScannerView({ onSaveNewDeck }: ScannerViewProps) {
       };
 
       onSaveNewDeck(deck);
+      // Desconta crédito após geração bem-sucedida
+      if (stats && !stats.isPro && onDeductCredit) onDeductCredit(cost);
       setGeneratedCards(normalized);
       setStep('done');
     } catch (err: any) {
@@ -294,21 +311,56 @@ export function ScannerView({ onSaveNewDeck }: ScannerViewProps) {
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-5 text-slate-100">
 
-      {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-gradient-to-br from-purple-950/60 via-slate-900/70 to-slate-900/40 p-6 shadow-2xl backdrop-blur-md">
-        <div className="absolute -top-16 -right-16 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
+      {/* Header — roxo sólido suave, visível em tema claro e escuro */}
+      <div className="scanner-header rounded-2xl border border-purple-400/40 p-6 shadow-xl">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-purple-500/15 border border-purple-500/30 text-purple-300 rounded-2xl shadow-lg shadow-purple-500/10">
+          <div className="scanner-icon p-3 rounded-2xl border border-purple-400/40">
             <Camera className="w-7 h-7" />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-white tracking-tight">Scanner & Upload</h3>
-            <p className="text-sm text-slate-400 mt-0.5">
+            <h3 className="scanner-title text-xl font-bold tracking-tight">Scanner & Upload</h3>
+            <p className="scanner-subtitle text-sm mt-0.5">
               Fotografe páginas ou envie PDF/Word/TXT — a IA extrai e gera flashcards
             </p>
           </div>
         </div>
       </div>
+
+      {/* Banner de créditos */}
+      {stats && !stats.isPro && (
+        <div className={`rounded-xl p-3.5 flex items-center justify-between gap-3 border ${
+          (stats.aiCredits || 0) > 0
+            ? 'bg-blue-500/10 border-blue-500/30'
+            : 'bg-amber-500/10 border-amber-500/30'
+        }`}>
+          <div className="flex items-center gap-2">
+            {(stats.aiCredits || 0) > 0
+              ? <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+              : <Lock className="w-4 h-4 text-amber-400 shrink-0" />}
+            <div>
+              <p className={`text-xs font-bold ${(stats.aiCredits || 0) > 0 ? 'text-blue-300' : 'text-amber-300'}`}>
+                {(stats.aiCredits || 0) > 0
+                  ? `${stats.aiCredits} crédito${(stats.aiCredits || 0) !== 1 ? 's' : ''} disponível`
+                  : 'Sem créditos — assista um vídeo para ganhar'}
+              </p>
+              <p className="text-[11px] text-slate-400">
+                {(stats.aiCredits || 0) > 0
+                  ? `Geração custa ${ECONOMY.COST_GENERATE_DECK} crédito`
+                  : 'Assista um vídeo curto e ganhe créditos de IA'}
+              </p>
+            </div>
+          </div>
+          {(stats.aiCredits || 0) === 0 && onOpenAdMob && (
+            <button
+              type="button"
+              onClick={onOpenAdMob}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold whitespace-nowrap hover:bg-amber-500/30 transition"
+            >
+              <Play className="w-3.5 h-3.5 fill-current" /> Ganhar créditos
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ─── STEP: collect ─── */}
       {(step === 'collect' || step === 'confirm') && (
@@ -496,10 +548,14 @@ export function ScannerView({ onSaveNewDeck }: ScannerViewProps) {
               <button
                 type="button"
                 onClick={processItems}
-                className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-bold py-4 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30 text-sm"
+                disabled={!!stats && !stats.isPro && (stats.aiCredits || 0) < ECONOMY.COST_GENERATE_DECK}
+                className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-bold py-4 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <Play className="w-5 h-5" />
-                Gerar {cardCount} Flashcards com IA
+                {(!!stats && !stats.isPro && (stats.aiCredits || 0) < ECONOMY.COST_GENERATE_DECK) ? (
+                  <><Lock className="w-5 h-5" /> Sem Créditos — Assista um Anúncio</>
+                ) : (
+                  <><Play className="w-5 h-5" /> Gerar {cardCount} Flashcards com IA</>
+                )}
               </button>
             </>
           )}

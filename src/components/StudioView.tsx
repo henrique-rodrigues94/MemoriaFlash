@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, PlusCircle, CheckCircle2, Loader2, Plus, X, Trash2, BookOpen, Save, HelpCircle } from 'lucide-react';
+import { Sparkles, PlusCircle, CheckCircle2, Loader2, Plus, X, Trash2, BookOpen, Save, HelpCircle, Play, Lock } from 'lucide-react';
 import { Deck, UserStats, Flashcard } from '../types';
 import { SupportedLanguage } from '../lib/i18n';
 import { ManualCardForm } from './ManualCardForm';
 import { fetchAITopicSuggestions, generateAICards } from '../lib/aiGenerator';
+import { hasEnoughCredits, applySpendCredits } from '../services/economy/creditsEngine';
+import { ECONOMY } from '../services/economy/economyConstants';
 
 interface StudioViewProps {
   decks: Deck[];
@@ -17,7 +19,11 @@ interface StudioViewProps {
 
 export const StudioView: React.FC<StudioViewProps> = ({
   decks,
+  stats,
   onSaveNewDeck,
+  onDeductCredit,
+  onOpenAdMob,
+  onOpenSubscription,
 }) => {
   const [activeMode, setActiveMode] = useState<'ia' | 'manual'>('ia');
 
@@ -108,11 +114,21 @@ export const StudioView: React.FC<StudioViewProps> = ({
       return;
     }
 
+    // Gate de créditos: 1 crédito por geração
+    const cost = ECONOMY.COST_GENERATE_DECK;
+    if (!hasEnoughCredits(stats, cost)) {
+      // Abre modal de anúncio recompensado para ganhar créditos
+      if (onOpenAdMob) onOpenAdMob();
+      return;
+    }
+
     setIsLoading(true);
     setSuccessMsg(null);
 
     try {
       const cards = await generateAICards(subject.trim(), topics, cardCount);
+      // Desconta crédito após geração bem-sucedida
+      if (onDeductCredit) onDeductCredit(cost);
       setGeneratedAICards(cards);
     } catch (error: any) {
       console.error(error);
@@ -311,15 +327,57 @@ export const StudioView: React.FC<StudioViewProps> = ({
               </select>
             </div>
 
+            {/* Banner de créditos */}
+            {!stats.isPro && (
+              <div className={`rounded-xl p-3.5 flex items-center justify-between gap-3 mt-2 border ${
+                (stats.aiCredits || 0) > 0
+                  ? 'bg-blue-500/10 border-blue-500/30'
+                  : 'bg-amber-500/10 border-amber-500/30'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {(stats.aiCredits || 0) > 0 ? (
+                    <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+                  ) : (
+                    <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                  )}
+                  <div>
+                    <p className={`text-xs font-bold ${(stats.aiCredits || 0) > 0 ? 'text-blue-300' : 'text-amber-300'}`}>
+                      {(stats.aiCredits || 0) > 0
+                        ? `${stats.aiCredits} crédito${(stats.aiCredits || 0) !== 1 ? 's' : ''} disponível`
+                        : 'Sem créditos — assista um vídeo para ganhar'}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      {(stats.aiCredits || 0) > 0
+                        ? `Cada geração custa ${ECONOMY.COST_GENERATE_DECK} crédito`
+                        : 'Créditos são necessários para usar a IA'}
+                    </p>
+                  </div>
+                </div>
+                {(stats.aiCredits || 0) === 0 && onOpenAdMob && (
+                  <button
+                    type="button"
+                    onClick={onOpenAdMob}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold whitespace-nowrap hover:bg-amber-500/30 transition"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" /> Ganhar créditos
+                  </button>
+                )}
+              </div>
+            )}
+
             <button
               type="button"
               onClick={handleGenerateCards}
-              disabled={isLoading}
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-sm shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all mt-4 disabled:opacity-50"
+              disabled={isLoading || (!stats.isPro && (stats.aiCredits || 0) < ECONOMY.COST_GENERATE_DECK)}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-sm shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all mt-4 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" /> Criando Flashcards com IA...
+                </>
+              ) : (!stats.isPro && (stats.aiCredits || 0) < ECONOMY.COST_GENERATE_DECK) ? (
+                <>
+                  <Lock className="w-5 h-5" /> Sem Créditos — Assista um Anúncio
                 </>
               ) : (
                 <>

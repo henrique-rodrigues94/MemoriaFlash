@@ -1,14 +1,20 @@
 import React, { useState } from 'react';
-import { Target, Sparkles, Plus, ArrowRight, RefreshCw, Zap, Check, X } from 'lucide-react';
+import { Target, Sparkles, Plus, ArrowRight, RefreshCw, Zap, Check, X, Play, Lock } from 'lucide-react';
 import { apiGenerateQuiz, apiQuizDiagnostic } from '../services/api';
 import { SupportedLanguage, translations } from '../lib/i18n';
-import { QuizQuestion, Flashcard } from '../types';
+import { QuizQuestion, Flashcard, UserStats } from '../types';
+import { hasEnoughCredits } from '../services/economy/creditsEngine';
+import { ECONOMY } from '../services/economy/economyConstants';
 
 interface Props {
   currentLanguage?: SupportedLanguage;
+  stats?: UserStats;
+  onDeductCredit?: (amount?: number) => void;
+  onOpenAdMob?: () => void;
+  onOpenSubscription?: () => void;
 }
 
-export function QuizView({ currentLanguage = 'pt' }: Props) {
+export function QuizView({ currentLanguage = 'pt', stats, onDeductCredit, onOpenAdMob }: Props) {
   const t = translations[currentLanguage] || translations.pt;
   const [subject, setSubject] = useState('');
   const [topics, setTopics] = useState<string[]>([]);
@@ -38,6 +44,14 @@ export function QuizView({ currentLanguage = 'pt' }: Props) {
 
   const startDiagnostic = async () => {
     if (!subject.trim()) return alert('Digite a Matéria/Assunto para iniciar o Quiz Diagnóstico.');
+
+    // Gate de créditos: 1 crédito por quiz diagnóstico
+    const cost = ECONOMY.COST_GENERATE_DECK;
+    if (stats && !hasEnoughCredits(stats, cost)) {
+      if (onOpenAdMob) onOpenAdMob();
+      return;
+    }
+
     setIsGeneratingQuiz(true);
     setQuizQuestions([]);
     setCurrentQuizIndex(0);
@@ -45,6 +59,8 @@ export function QuizView({ currentLanguage = 'pt' }: Props) {
     setDiagnosticResult(null);
     try {
       const qList = await apiGenerateQuiz(subject.trim(), 4, currentLanguage);
+      // Desconta crédito após sucesso
+      if (stats && !stats.isPro && onDeductCredit) onDeductCredit(cost);
       setQuizQuestions(qList);
     } catch (err: any) {
       alert(err.message || 'Erro ao gerar quiz diagnóstico');
@@ -169,13 +185,44 @@ export function QuizView({ currentLanguage = 'pt' }: Props) {
               A IA gerará 4 questões sobre <strong className="text-slate-200">"{subject || 'seu assunto'}"</strong>. Ao responder, a IA fará uma análise imediata das suas lacunas e criará flashcards focando exatamente nos tópicos onde você precisa melhorar!
             </p>
 
+            {/* Banner de créditos quiz */}
+            {stats && !stats.isPro && (
+              <div className={`rounded-xl p-3 flex items-center justify-between gap-2 border ${
+                (stats.aiCredits || 0) > 0
+                  ? 'bg-blue-500/10 border-blue-500/30'
+                  : 'bg-amber-500/10 border-amber-500/40'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {(stats.aiCredits || 0) > 0
+                    ? <Sparkles className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    : <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                  <span className={`text-xs font-semibold ${(stats.aiCredits || 0) > 0 ? 'text-blue-300' : 'text-amber-300'}`}>
+                    {(stats.aiCredits || 0) > 0
+                      ? `${stats.aiCredits} crédito${(stats.aiCredits || 0) !== 1 ? 's' : ''} — custa ${ECONOMY.COST_GENERATE_DECK} por quiz`
+                      : 'Sem créditos — assista um vídeo para ganhar'}
+                  </span>
+                </div>
+                {(stats.aiCredits || 0) === 0 && onOpenAdMob && (
+                  <button
+                    type="button"
+                    onClick={onOpenAdMob}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-bold whitespace-nowrap hover:bg-amber-500/30 transition"
+                  >
+                    <Play className="w-3 h-3 fill-current" /> Ganhar
+                  </button>
+                )}
+              </div>
+            )}
+
             <button
               onClick={startDiagnostic}
-              disabled={isGeneratingQuiz || !subject.trim()}
-              className="w-full mt-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+              disabled={isGeneratingQuiz || !subject.trim() || (!!stats && !stats.isPro && (stats.aiCredits || 0) < ECONOMY.COST_GENERATE_DECK)}
+              className="w-full mt-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {isGeneratingQuiz ? (
                 <><RefreshCw className="w-4 h-4 animate-spin" /> Gerando Quiz Diagnóstico...</>
+              ) : (!!stats && !stats.isPro && (stats.aiCredits || 0) < ECONOMY.COST_GENERATE_DECK) ? (
+                <><Lock className="w-4 h-4" /> Sem Créditos — Assista um Anúncio</>
               ) : (
                 <><Sparkles className="w-4 h-4" /> Iniciar Quiz Diagnóstico Agora</>
               )}
