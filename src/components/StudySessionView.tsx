@@ -371,17 +371,6 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
           </div>
         </div>
 
-        {/* Botão Explicar Pergunta & Ver Exemplo — acima dos cards, sempre visível */}
-        <button
-          id="btn-explain-and-example"
-          onClick={(e) => { e.stopPropagation(); handleRequestAiExplanation(); }}
-          disabled={isLoadingExplanation}
-          className="w-full px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-blue-500/20 hover:from-amber-500/30 hover:to-blue-500/30 text-white border border-amber-400/40 text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-[1.01] transition-all cursor-pointer"
-        >
-          <Lightbulb className="w-4 h-4 text-amber-300 fill-amber-300/30 animate-pulse" />
-          {isLoadingExplanation ? 'Gerando explicação...' : t.explainQuestionAndExample || 'Explicar Pergunta & Ver Exemplo'}
-        </button>
-
       </div>
 
       {/* ── CARD (preenche o espaço restante sem scroll) ── */}
