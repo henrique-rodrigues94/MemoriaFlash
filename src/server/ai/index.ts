@@ -13,19 +13,17 @@ import { AIProvider } from './types';
 // ============================================================================
 // FILA DE PROVEDORES
 // ─────────────────────────────────────────────────────────────────────────────
-// Gratuitos (em ordem de qualidade/velocidade):
-//   1. Gemini 2.5 Flash  — melhor qualidade gratuita, suporta 32k tokens out
-//   2. Groq Llama 3.3    — ultra-rápido, bom para respostas curtas
-//   3. DeepSeek Chat     — qualidade excelente, preço muito baixo
-//   4. OpenRouter :free  — agrega modelos gratuitos de vários labs
-//   5. Hugging Face      — fallback open-source
-//   6. Cohere            — fallback trial
-//   7. FreeLLM           — sem chave, último recurso sem custo
+//   1. Google Gemini (gratuito)  — PROVEDOR PRINCIPAL (camada gratuita AI Studio)
+//   2. OpenAI ChatGPT            — FALLBACK IMEDIATO (usa OPENAI_API_KEY)
+//   3. Groq Llama 3.3            — ultra-rápido, gratuito
+//   4. DeepSeek Chat             — qualidade excelente, preço muito baixo
+//   5. OpenRouter :free          — agrega modelos gratuitos de vários labs
+//   6. Hugging Face              — fallback open-source
+//   7. Cohere                    — fallback trial
+//   8. FreeLLM                   — sem chave, último recurso sem custo
+//   9. Anthropic Claude          — última rede de segurança paga
 //
-// Pagos (usados quando AI_PRIORITIZE_PAID=true ou todos gratuitos falharem):
-//   8. OpenAI GPT-4o-mini
-//   9. Anthropic Claude
-//
+// Se AI_PRIORITIZE_PAID=true, todos os pagos vão para o início da fila.
 // ============================================================================
 
 const freeProviders: AIProvider[] = [
@@ -45,9 +43,16 @@ const paidProviders: AIProvider[] = [
 
 const prioritizePaid = process.env.AI_PRIORITIZE_PAID === 'true';
 
+// Ordem padrão: Gemini gratuito primeiro (principal), ChatGPT logo em seguida
+// como fallback, e o restante como rede de segurança extra.
 const orderedProviders: AIProvider[] = prioritizePaid
   ? [...paidProviders, ...freeProviders]
-  : [...freeProviders, ...paidProviders];
+  : [
+      geminiProvider,
+      openaiProvider,
+      ...freeProviders.filter((p) => p.id !== 'gemini'),
+      ...paidProviders.filter((p) => p.id !== 'openai'),
+    ];
 
 export const aiOrchestrator = new AIOrchestrator(orderedProviders);
 

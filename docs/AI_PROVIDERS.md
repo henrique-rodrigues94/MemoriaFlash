@@ -15,28 +15,31 @@ endpoint sempre responde algo utilizável — o app nunca trava esperando IA.
 
 ## Ordem padrão (edite em `src/server/ai/index.ts`)
 
-1. **Google Gemini** (`gemini-2.5-flash`) — camada gratuita generosa via AI Studio
-2. **Groq** (`llama-3.3-70b-versatile`) — inferência ultrarrápida, gratuita
-3. **OpenRouter** (modelos `:free`) — agrega dezenas de modelos gratuitos
-4. **Hugging Face** (Inference Router) — gratuito com rate limit
-5. **Cohere** (`command-r`) — trial key gratuita
-6. *(opcional, pago)* **OpenAI** — só entra se `OPENAI_API_KEY` estiver configurada
-7. **Gerador local** — sempre disponível, zero dependência de rede (última linha de defesa)
+1. **Google Gemini** (`gemini-2.5-flash`) — **PROVEDOR PRINCIPAL** (gratuito via AI Studio)
+2. **OpenAI ChatGPT** (`gpt-4o-mini`) — **FALLBACK IMEDIATO** (usado quando o Gemini falha)
+3. **Groq** (`llama-3.3-70b-versatile`) — inferência ultrarrápida, gratuita
+4. **DeepSeek Chat** — qualidade excelente, preço muito baixo
+5. **OpenRouter** (modelos `:free`) — agrega dezenas de modelos gratuitos
+6. **Hugging Face** (Inference Router) — gratuito com rate limit
+7. **Cohere** (`command-r`) — trial key gratuita
+8. **FreeLLM** — sem chave, último recurso sem custo
+9. **Anthropic Claude** — última rede de segurança paga (opcional)
 
-## Como obter cada chave gratuita
+## Como obter cada chave
 
-| Provedor | Link para criar chave | Variável no `.env` |
-|---|---|---|
-| Google Gemini | https://aistudio.google.com/apikey | `GEMINI_API_KEY` |
-| Groq | https://console.groq.com/keys | `GROQ_API_KEY` |
-| OpenRouter | https://openrouter.ai/keys | `OPENROUTER_API_KEY` |
-| Hugging Face | https://huggingface.co/settings/tokens | `HUGGINGFACE_API_KEY` |
-| Cohere | https://dashboard.cohere.com/api-keys | `COHERE_API_KEY` |
-| OpenAI (pago, opcional) | https://platform.openai.com/api-keys | `OPENAI_API_KEY` |
+| Provedor | Papel | Link para criar chave | Variável no `.env` |
+|---|---|---|---|
+| Google Gemini | Principal (gratuito) | https://aistudio.google.com/apikey | `GEMINI_API_KEY` |
+| OpenAI ChatGPT | Fallback imediato (pago) | https://platform.openai.com/api-keys | `OPENAI_API_KEY` |
+| Groq | Rede de segurança (grátis) | https://console.groq.com/keys | `GROQ_API_KEY` |
+| OpenRouter | Rede de segurança (grátis) | https://openrouter.ai/keys | `OPENROUTER_API_KEY` |
+| Hugging Face | Rede de segurança (grátis) | https://huggingface.co/settings/tokens | `HUGGINGFACE_API_KEY` |
+| Cohere | Rede de segurança (grátis) | https://dashboard.cohere.com/api-keys | `COHERE_API_KEY` |
+| Anthropic (pago, opcional) | Última defesa | https://console.anthropic.com/ | `ANTHROPIC_API_KEY` |
 
-Você **não precisa configurar todos** — configure pelo menos 1 (recomendado:
-Gemini + Groq, que juntos cobrem a maioria dos casos) e o sistema funciona.
-Quanto mais provedores configurados, maior a resiliência.
+Você **não precisa configurar todos** — o mínimo recomendado é **Gemini
+(principal) + OpenAI (fallback)**. Quanto mais provedores configurados,
+maior a resiliência.
 
 ## Verificando o status dos provedores
 
