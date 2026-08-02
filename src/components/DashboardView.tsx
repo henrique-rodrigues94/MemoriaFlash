@@ -84,6 +84,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Seus Decks de Estudo
             </h2>
           </div>
+          {decks.length > 4 && (
+            <button
+              onClick={() => setActiveTab('explore')}
+              className="flex items-center gap-1 text-xs text-[#60a5fa] hover:text-white transition font-semibold"
+            >
+              Ver todos ({decks.length}) <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -96,6 +104,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             />
           ))}
         </div>
+
+        {/* Empty state — nenhum deck ainda */}
+        {decks.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-[#60a5fa]/30 bg-[#0b1a2a]/60 p-8 text-center space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-[#3b82f6]/10 border border-[#60a5fa]/30 flex items-center justify-center mx-auto">
+              <Brain className="w-7 h-7 text-[#60a5fa]" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white">Nenhum deck ainda</h3>
+            </div>
+            <button
+              onClick={onOpenQuickCreate}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-blue-500/20 transition-all"
+            >
+              <Plus className="w-4 h-4" /> Criar com IA agora
+            </button>
+          </div>
+        )}
       </section>
 
       {/* AdMob Banner for Free Users */}
