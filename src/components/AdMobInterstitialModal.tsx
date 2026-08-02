@@ -46,7 +46,7 @@ export const AdMobInterstitialModal: React.FC<AdMobInterstitialModalProps> = ({ 
         <div className="w-14 h-14 rounded-2xl bg-blue-500/20 border border-blue-400/30 mx-auto flex items-center justify-center">
           <Sparkles className="w-7 h-7 text-blue-300" />
         </div>
-        <h3 className="text-base font-extrabold">FlashMind AI Network</h3>
+        <h3 className="text-base font-extrabold">MemoriaFlash Network</h3>
         <p className="text-xs text-[#8c91a0]">
           Continue estudando com repetição espaçada e IA. Considere o plano PRO para remover anúncios.
         </p>

@@ -1,5 +1,5 @@
 // ============================================================================
-// FlashMind AI — Camada de IA multi-provedor (Adapter Pattern)
+// MemoriaFlash — Camada de IA multi-provedor (Adapter Pattern)
 // ----------------------------------------------------------------------------
 // Nenhuma rota do servidor chama uma API de IA diretamente. Toda chamada passa
 // pelo AIOrchestrator, que tenta uma lista ordenada de provedores GRATUITOS e

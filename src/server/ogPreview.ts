@@ -33,7 +33,7 @@ export function injectReferralMeta(html: string, rawCode: string): string {
   const code = sanitizeReferralCode(rawCode);
   if (!code) return html;
 
-  const title = 'Você foi convidado para o FlashMind AI! 🧠';
+  const title = 'Você foi convidado para o MemoriaFlash! 🧠';
   const description = `Um amigo te convidou para estudar com flashcards + IA gratuitamente e já reservou créditos de bônus para vocês dois (código ${code}).`;
 
   const safeTitle = escapeHtml(title);

@@ -42,8 +42,8 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
 
     const testText =
       form.language === 'en'
-        ? 'Hello! I am your FlashMind AI study assistant. All voice synthesis APIs are completely free.'
-        : 'Olá! Eu sou o assistente de inteligência artificial do FlashMind. Todas as opções de voz são cem por cento gratuitas!';
+        ? 'Hello! I am your MemoriaFlash AI study assistant. All voice synthesis APIs are completely free.'
+        : 'Olá! Eu sou o assistente de inteligência artificial do MemoriaFlash. Todas as opções de voz são cem por cento gratuitas!';
 
     const utterance = new SpeechSynthesisUtterance(testText);
     utterance.rate = form.speechSpeed || 1.1;
@@ -103,7 +103,7 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
           <div className="text-xs">
             <div className="font-bold text-emerald-300">APIs 100% Gratuitas & Nativas</div>
             <p className="text-[#8c91a0] text-[11px]">
-              O FlashMind utiliza o sintetizador <strong className="text-white">Web Speech API</strong> do navegador e o <strong className="text-white">Gemini 3.6 Flash</strong> sem custos adicionais.
+              O MemoriaFlash utiliza o sintetizador <strong className="text-white">Web Speech API</strong> do navegador e o <strong className="text-white">Gemini 3.6 Flash</strong> sem custos adicionais.
             </p>
           </div>
         </div>
@@ -111,7 +111,7 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
         {/* Wake Word */}
         <div className="flex items-center justify-between p-4 rounded-2xl bg-[#122131] border border-[#424754]/30">
           <div>
-            <div className="text-xs font-bold text-white">Comando de Ativação ("Ok FlashMind")</div>
+            <div className="text-xs font-bold text-white">Comando de Ativação ("Ok MemoriaFlash")</div>
             <div className="text-[11px] text-[#8c91a0]">Escuta contínua via microfone local.</div>
           </div>
           <button

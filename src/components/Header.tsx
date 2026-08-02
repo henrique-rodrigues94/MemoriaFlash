@@ -66,7 +66,7 @@ export const Header: React.FC<HeaderProps> = ({
           className="cursor-pointer flex items-center gap-1.5 group"
         >
           <span className={`font-bold text-lg sm:text-xl tracking-tight transition-colors ${isLightTheme ? 'text-[#1d4ed8] group-hover:text-[#2563eb]' : 'text-[#adc6ff] group-hover:text-white'}`}>
-            FlashMind
+            MemoriaFlash
           </span>
         </div>
 

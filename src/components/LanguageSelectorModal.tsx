@@ -83,7 +83,7 @@ export const LanguageSelectorModal: React.FC<LanguageSelectorModalProps> = ({
 
         {/* Footer info */}
         <p className="text-[10px] text-center text-[#8c91a0]">
-          O FlashMind adapta a interface e as vozes do tutor ao idioma selecionado.
+          O MemoriaFlash adapta a interface e as vozes do tutor ao idioma selecionado.
         </p>
       </div>
     </div>

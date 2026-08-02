@@ -83,7 +83,7 @@ async function callOpenRouter(system: string, user: string, model?: string): Pro
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
       'HTTP-Referer': window.location.origin,
-      'X-Title': 'FlashMind AI',
+      'X-Title': 'MemoriaFlash',
     },
     body: JSON.stringify({
       model: m,
@@ -197,7 +197,7 @@ export async function clientGenerateFlashcards(
     ? ` Foque OBRIGATORIAMENTE nos subtópicos: ${selectedTopics.join(', ')}.`
     : '';
 
-  const system = `Você é o FlashMind AI, especialista em flashcards educativos de alta retenção (SRS SM-2).
+  const system = `Você é o MemoriaFlash, especialista em flashcards educativos de alta retenção (SRS SM-2).
 Crie exatamente ${count} flashcards sobre "${prompt}" ${lang}.${topicsStr}
 Nível de dificuldade: ${difficulty}.
 REGRA CRÍTICA: "front" = PERGUNTA específica e objetiva. "back" = RESPOSTA completa e diferente da pergunta.

@@ -384,7 +384,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`FlashMind AI full-stack server running on http://0.0.0.0:${PORT}`);
+    console.log(`MemoriaFlash full-stack server running on http://0.0.0.0:${PORT}`);
     console.log('Provedores de IA configurados:', aiOrchestrator.getStatus().filter((p) => p.configured).map((p) => p.id).join(', ') || '(nenhum — usando apenas o gerador local)');
     startCronJobs();
   });

@@ -27,10 +27,10 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ stats, onClose }) 
 
   const handleShare = async () => {
     if (!link) return;
-    const shareText = `Estou usando o FlashMind AI para estudar com flashcards + IA. Use meu link e ganhe créditos grátis: ${link}`;
+    const shareText = `Estou usando o MemoriaFlash para estudar com flashcards + IA. Use meu link e ganhe créditos grátis: ${link}`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'FlashMind AI', text: shareText, url: link });
+        await navigator.share({ title: 'MemoriaFlash', text: shareText, url: link });
       } catch {
         /* usuário cancelou o compartilhamento */
       }

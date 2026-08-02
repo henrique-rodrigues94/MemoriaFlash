@@ -221,7 +221,7 @@ export const TeacherOverviewView: React.FC<TeacherOverviewViewProps> = ({
 
             <div className="p-6 bg-white rounded-2xl mx-auto w-48 h-48 flex items-center justify-center shadow-2xl">
               <div className="w-36 h-36 border-4 border-black p-2 flex flex-col items-center justify-center text-black font-mono text-[10px] font-bold text-center">
-                <span>FLASHMIND AI</span>
+                <span>MEMORIAFLASH</span>
                 <span className="text-base my-2">{selectedClass.code}</span>
                 <span>SCAN TO JOIN</span>
               </div>

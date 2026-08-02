@@ -101,7 +101,7 @@ export const DuelLobbyView: React.FC<DuelLobbyViewProps> = ({ stats, onStartDuel
               Matchmaking Rápido PvP
             </h3>
             <p className="text-xs text-[#8c91a0]">
-              Encontre um oponente ao vivo na rede do FlashMind AI em salas públicas.
+              Encontre um oponente ao vivo na rede do MemoriaFlash em salas públicas.
             </p>
           </div>
 

@@ -18,7 +18,7 @@ export async function generateFlashcardsTask(args: {
       ? ` Foque OBRIGATORIAMENTE nos seguintes subtópicos: ${selectedTopics.join(', ')}.`
       : '';
 
-  const systemPrompt = `Você é o FlashMind AI, um assistente especialista em criação de flashcards educativos de alta retenção baseados no método de repetição espaçada (SRS SM-2).
+  const systemPrompt = `Você é o MemoriaFlash, um assistente especialista em criação de flashcards educativos de alta retenção baseados no método de repetição espaçada (SRS SM-2).
 Crie exatamente ${count} flashcards sobre o tema/conteúdo "${prompt}" ${langInstruction}.${topicsStr}
 Nível de dificuldade dos cartões: ${difficulty} ('easy' - conceitos fundamentais, 'medium' - aplicação prática, 'hard' - exceções e aprofundamento, 'expert' - alto nível técnico e bancas de concurso).
 Cada flashcard deve conter:

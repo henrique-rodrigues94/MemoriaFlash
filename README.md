@@ -1,4 +1,4 @@
-# 🧠 FlashMind AI
+# 🧠 MemoriaFlash
 
 Plataforma de estudos com flashcards inteligentes, repetição espaçada (SM-2),
 tutor de voz, modo duelo (PvP) e modo professor — com geração de conteúdo por

@@ -26,7 +26,7 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   const notification = payload.notification || {};
-  const title = notification.title || 'FlashMind AI';
+  const title = notification.title || 'MemoriaFlash';
   const options = {
     body: notification.body || 'Você tem cartões esperando por revisão.',
     icon: '/icon-192.png',

@@ -124,7 +124,7 @@ export const AdMobRewardedModal: React.FC<AdMobRewardedModalProps> = ({
                 <div className="w-10 h-10 rounded-xl bg-blue-600/40 border border-blue-400/50 mx-auto flex items-center justify-center animate-pulse">
                   <Sparkles className="w-5 h-5 text-blue-300" />
                 </div>
-                <h4 className="text-xs font-extrabold text-white tracking-wide">FlashMind AI Network</h4>
+                <h4 className="text-xs font-extrabold text-white tracking-wide">MemoriaFlash Network</h4>
                 <p className="text-[10px] text-slate-200">
                   Potencialize sua memória com Repetição Espaçada e IA.
                 </p>

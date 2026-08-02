@@ -61,7 +61,7 @@ export async function runDailyReminderJob(): Promise<ReminderJobResult> {
       }
 
       const sendResult = await sendPushToUser(uid, {
-        title: 'FlashMind AI — Hora de revisar!',
+        title: 'MemoriaFlash — Hora de revisar!',
         body,
         data: { url: '/', tag: 'daily-reminder' },
       });

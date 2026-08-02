@@ -18,7 +18,7 @@ notificationsRouter.post('/test', async (req, res) => {
 
     const decoded = await adminAuth.verifyIdToken(idToken);
     const result = await sendPushToUser(decoded.uid, {
-      title: 'FlashMind AI 🔔',
+      title: 'MemoriaFlash 🔔',
       body: 'Notificação de teste — se você está vendo isso, os lembretes estão funcionando!',
       data: { url: '/', tag: 'test-notification' },
     });

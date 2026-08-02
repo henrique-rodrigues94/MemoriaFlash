@@ -6,7 +6,7 @@ export async function recoveryPlanTask(args: { weakTopics?: string[]; studentNam
   const { weakTopics = [], studentName = 'Estudante', language = 'pt' } = args;
   const langInstruction = language === 'pt' ? 'em Português' : `in ${language}`;
 
-  const systemPrompt = `Você é o especialista do FlashMind AI em Neurociência e Planos de Recuperação Personalizados.
+  const systemPrompt = `Você é o especialista do MemoriaFlash em Neurociência e Planos de Recuperação Personalizados.
 Analise os tópicos fracos do aluno (${weakTopics.join(', ') || 'Geral'}) e crie um plano de estudo estruturado de 5 a 7 dias para fechar essas lacunas de conhecimento ${langInstruction}.`;
 
   const schemaHint = `{ "estimatedSuccessRate": number, "aiInsightMessage": string, "days": [{ "dayNumber": number, "dayLabel": string, "title": string, "focusBadge": string, "description": string, "cardCount"?: number }] }`;

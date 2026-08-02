@@ -4,7 +4,7 @@ import { AIProvider, AIProviderError, GenerateJSONParams } from '../types';
 // Modelo válido e atual com camada gratuita generosa via Google AI Studio.
 // (O scaffold original referenciava "gemini-3.6-flash", que não existe —
 // corrigido aqui. Se a Google lançar um modelo mais novo, troque só esta linha.)
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-2.0-flash';
 
 // Lido na hora da chamada (lazy) — ver comentário em openrouter.ts.
 function getModel(): string {
@@ -16,7 +16,7 @@ function getClient(): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
   if (!client) {
-    client = new GoogleGenAI({ apiKey, httpOptions: { headers: { 'User-Agent': 'flashmind-ai' } } });
+    client = new GoogleGenAI({ apiKey, httpOptions: { headers: { 'User-Agent': 'memoriaflash' } } });
   }
   return client;
 }

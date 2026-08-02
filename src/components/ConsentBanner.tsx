@@ -52,7 +52,7 @@ export const ConsentBanner: React.FC<{ onOpenPrivacyPolicy?: () => void }> = ({ 
           </div>
           <div className="text-xs text-[#c2c6d6] leading-relaxed">
             Usamos cookies e armazenamento local essenciais para o app funcionar, e — com sua permissão — para
-            estatísticas de uso e anúncios personalizados que mantêm o FlashMind gratuito.{' '}
+            estatísticas de uso e anúncios personalizados que mantêm o MemoriaFlash gratuito.{' '}
             {onOpenPrivacyPolicy && (
               <button onClick={onOpenPrivacyPolicy} className="underline text-[#60a5fa] hover:text-white cursor-pointer">
                 Ver Política de Privacidade

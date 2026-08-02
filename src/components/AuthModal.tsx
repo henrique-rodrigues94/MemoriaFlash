@@ -38,7 +38,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       if (user) {
         onUpdateStats({
-          name: user.displayName || stats.name || 'Estudante FlashMind',
+          name: user.displayName || stats.name || 'Estudante MemoriaFlash',
           avatar: user.photoURL || stats.avatar,
         });
 
@@ -97,7 +97,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <Sparkles className="w-8 h-8" />
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-white">
-            Conta FlashMind AI
+            Conta MemoriaFlash
           </h2>
           <p className="text-xs text-[#8c91a0]">
             Acesse seus baralhos, estatísticas e sincronize em múltiplos dispositivos

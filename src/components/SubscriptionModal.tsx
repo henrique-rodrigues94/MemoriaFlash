@@ -57,7 +57,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               <Crown className="w-5 h-5" />
             </div>
             <div>
-              <h2 className={`text-xl font-extrabold ${isLightTheme ? 'text-slate-900' : 'text-white'}`}>Planos FlashMind AI PRO</h2>
+              <h2 className={`text-xl font-extrabold ${isLightTheme ? 'text-slate-900' : 'text-white'}`}>Planos MemoriaFlash PRO</h2>
               <p className={`text-xs ${isLightTheme ? 'text-slate-500' : 'text-[#8c91a0]'}`}>
                 Desbloqueie o poder total da IA e estude sem interrupções
               </p>
@@ -269,7 +269,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
               <div className="w-36 h-36 bg-white rounded-xl mx-auto p-2 flex items-center justify-center shadow-lg">
                 <div className="w-32 h-32 border-2 border-black p-2 flex flex-col items-center justify-center text-black font-mono text-[9px] font-bold text-center">
-                  <span>FLASHMIND PRO</span>
+                  <span>MEMORIAFLASH PRO</span>
                   <span className="text-xs my-1 font-extrabold">PIX-PRO-2026</span>
                   <span>PAGUE E ATIVE JA</span>
                 </div>
@@ -302,7 +302,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               <Crown className="w-9 h-9" />
             </div>
 
-            <h3 className={`text-xl font-extrabold ${isLightTheme ? 'text-slate-900' : 'text-white'}`}>Parabéns! Você agora é FlashMind PRO!</h3>
+            <h3 className={`text-xl font-extrabold ${isLightTheme ? 'text-slate-900' : 'text-white'}`}>Parabéns! Você agora é MemoriaFlash PRO!</h3>
             <p className={`text-xs ${isLightTheme ? 'text-slate-600' : 'text-slate-300'}`}>
               Seus créditos de IA agora são <strong className={isLightTheme ? 'text-amber-600' : 'text-amber-300'}>ILIMITADOS</strong>, todos os anúncios AdMob foram desativados e seu selo VIP está ativo.
             </p>

@@ -37,8 +37,8 @@ export const openRouterProvider: AIProvider = {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
-          'HTTP-Referer': process.env.APP_URL || 'https://flashmind.ai',
-          'X-Title': 'FlashMind AI',
+          'HTTP-Referer': process.env.APP_URL || 'https://memoriaflash.app',
+          'X-Title': 'MemoriaFlash',
         },
         body: JSON.stringify({
           model: getModel(),

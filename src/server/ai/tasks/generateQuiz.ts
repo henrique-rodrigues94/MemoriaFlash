@@ -6,7 +6,7 @@ export async function generateQuizTask(args: { topic?: string; count?: number; l
   const { topic = 'Conhecimentos Gerais e Ciência', count = 5, language = 'pt' } = args;
   const langInstruction = language === 'pt' ? 'em Português' : `in ${language}`;
 
-  const systemPrompt = `Você é o gerador de questões do FlashMind Duel Arena.
+  const systemPrompt = `Você é o gerador de questões do MemoriaFlash Duel Arena.
 Gere ${count} perguntas de múltipla escolha competitivas sobre o tema "${topic}" ${langInstruction}.
 Cada questão deve ter exatamente 4 alternativas (A, B, C, D) e indicar o índice correto (0 para A, 1 para B, 2 para C, 3 para D).`;
 

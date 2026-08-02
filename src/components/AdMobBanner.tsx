@@ -39,7 +39,7 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({
         </div>
         <div>
           <h4 className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
-            Mantenha o FlashMind 100% Grátis
+            Mantenha o MemoriaFlash 100% Grátis
           </h4>
           <p className="text-[11px] text-[#8c91a0]">
             {canWatch ? (

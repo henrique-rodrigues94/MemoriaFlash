@@ -99,7 +99,7 @@ export async function geminiGenerateFlashcards(
       ? ` Foque OBRIGATORIAMENTE nos subtópicos: ${selectedTopics.join(', ')}.`
       : '';
 
-  const systemPrompt = `Você é o FlashMind AI, especialista em criação de flashcards educativos de alta retenção (SRS SM-2).
+  const systemPrompt = `Você é o MemoriaFlash, especialista em criação de flashcards educativos de alta retenção (SRS SM-2).
 Crie exatamente ${count} flashcards sobre "${prompt}" ${langInstruction}.${topicsStr}
 Nível de dificuldade: ${difficulty}.
 REGRA CRÍTICA: "front" deve ser uma PERGUNTA e "back" deve ser a RESPOSTA — jamais iguais.

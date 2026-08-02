@@ -11,7 +11,7 @@ export async function quizDiagnosticTask(args: {
   const { topic, userAnswers = [], count = 6, difficulty = 'medium', language = 'pt' } = args;
   const langInstruction = language === 'pt' ? 'em Português' : `in ${language}`;
 
-  const systemPrompt = `Você é o mentor diagnóstico do FlashMind AI.
+  const systemPrompt = `Você é o mentor diagnóstico do MemoriaFlash.
 O aluno realizou um quiz de avaliação inicial sobre "${topic}".
 Respostas do aluno:
 ${JSON.stringify(userAnswers, null, 2)}
