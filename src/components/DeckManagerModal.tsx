@@ -189,12 +189,23 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
                         </button>
                       </div>
                     </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                        🏷️ {c.topic || 'Sem tópico'}
+                      </span>
+                    </div>
                     <div>
                       <strong className="text-[#8c91a0]">P:</strong> {c.front}
                     </div>
                     <div>
-                      <strong className="text-[#8c91a0]">R:</strong> {c.back}
+                      <strong className="text-[#8c91a0]">R:</strong> <span className="whitespace-pre-line">{c.back}</span>
                     </div>
+                    {c.explanation && (
+                      <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-100/90 whitespace-pre-line">
+                        <strong className="text-amber-400">💡 Explicação & Exemplo:</strong>
+                        <div className="mt-1">{c.explanation}</div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
