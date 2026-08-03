@@ -396,14 +396,14 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
               <input
                 type="text"
                 value={deckTitle}
-                onChange={(e) => setDeckTitle(e.target.value)}
+                onChange={(e) => setDeckTitle(e.target.value.toUpperCase())}
                 onBlur={() => {
                   if (deckTitle.trim() && suggestedTopics.length === 0) {
                     handleSuggestTopics(deckTitle);
                   }
                 }}
-                placeholder="Ex: Direito Constitucional, Anatomia Humana, Python para Ciência de Dados..."
-                className="flex-1 bg-[#0b1a2a] border border-[#424754]/50 rounded-2xl p-3.5 text-xs text-white focus:outline-none focus:border-[#60a5fa]"
+                placeholder="EX: DIREITO CONSTITUCIONAL, ANATOMIA HUMANA, PYTHON..."
+                className="flex-1 bg-[#0b1a2a] border border-[#424754]/50 rounded-2xl p-3.5 text-xs text-white focus:outline-none focus:border-[#60a5fa] uppercase"
               />
 
               <button
@@ -743,9 +743,9 @@ export const CreationHubView: React.FC<CreationHubViewProps> = ({
               <input
                 type="text"
                 value={deckTitle}
-                onChange={(e) => setDeckTitle(e.target.value)}
-                placeholder="Ex: Anatomia Humana II"
-                className="w-full mt-1 bg-[#0b1a2a] border border-[#424754]/40 rounded-xl p-3 text-xs text-white focus:outline-none"
+                onChange={(e) => setDeckTitle(e.target.value.toUpperCase())}
+                placeholder="EX: ANATOMIA HUMANA II"
+                className="w-full mt-1 bg-[#0b1a2a] border border-[#424754]/40 rounded-xl p-3 text-xs text-white focus:outline-none uppercase"
               />
             </div>
           </div>

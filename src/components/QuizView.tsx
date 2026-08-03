@@ -122,9 +122,9 @@ export function QuizView({ currentLanguage = 'pt', stats, onDeductCredit, onOpen
           <input
             type="text"
             value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            placeholder="Ex: Direito Constitucional, Anatomia Humana, Python para Ciência de Dados..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition"
+            onChange={(e) => setSubject(e.target.value.toUpperCase())}
+            placeholder="EX: DIREITO CONSTITUCIONAL, ANATOMIA HUMANA, PYTHON..."
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition uppercase"
           />
         </div>
 

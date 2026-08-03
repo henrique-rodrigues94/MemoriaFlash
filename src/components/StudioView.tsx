@@ -65,8 +65,8 @@ export const StudioView: React.FC<StudioViewProps> = ({
       // Matéria = a MATÉRIA dos cards (subject), não o tópico/categoria.
       const firstCardSubject = initialDeck.cards.find((c) => c.subject)?.subject || '';
       const fallbackSubject = firstCardSubject || initialDeck.category || initialDeck.title || '';
-      setSubject(fallbackSubject);
-      setDeckName(initialDeck.title || '');
+      setSubject(fallbackSubject.toUpperCase());
+      setDeckName((initialDeck.title || '').toUpperCase());
       setDeckNamePersonalized(true); // o nome veio preenchido, não sobrescrever
       if (onConsumedInitialDeck) onConsumedInitialDeck();
     }
@@ -74,10 +74,12 @@ export const StudioView: React.FC<StudioViewProps> = ({
   }, [initialDeck?.id]);
 
   // Ao digitar a matéria, sincroniza o nome do baralho (se não foi personalizado)
+  // Nome do baralho e matéria são sempre armazenados em LETRAS MAIÚSCULAS.
   const handleSubjectChange = (value: string) => {
-    setSubject(value);
+    const upper = value.toUpperCase();
+    setSubject(upper);
     if (!deckNamePersonalized) {
-      setDeckName(value.trim());
+      setDeckName(upper.trim());
     }
   };
 
@@ -271,13 +273,13 @@ export const StudioView: React.FC<StudioViewProps> = ({
                 <input
                   type="text"
                   list="deck-name-suggestions"
-                  placeholder="Ex: Direito Penal, Biologia..."
+                  placeholder="Ex: DIREITO PENAL, BIOLOGIA..."
                   value={deckName}
                   onChange={(e) => {
-                    setDeckName(e.target.value);
+                    setDeckName(e.target.value.toUpperCase());
                     setDeckNamePersonalized(true);
                   }}
-                  className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm"
+                  className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm uppercase"
                 />
                 <datalist id="deck-name-suggestions">
                   {existingDeckTitles.map((s) => (
@@ -295,7 +297,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
                 <input
                   type="text"
                   list="subject-suggestions"
-                  placeholder="Ex: Direito Penal, Biologia, Matemática..."
+                  placeholder="Ex: DIREITO PENAL, BIOLOGIA, MATEMÁTICA..."
                   value={subject}
                   onChange={(e) => handleSubjectChange(e.target.value)}
                   className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm"

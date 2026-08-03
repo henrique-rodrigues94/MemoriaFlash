@@ -62,11 +62,11 @@ export const ManualCardForm: React.FC<ManualCardFormProps> = ({
         </label>
         <input
           type="text"
-          placeholder="Digite ou selecione um baralho existente..."
+          placeholder="DIGITE OU SELECIONE UM BARALHO EXISTENTE..."
           value={deckName}
-          onChange={(e) => setDeckName(e.target.value)}
+          onChange={(e) => setDeckName(e.target.value.toUpperCase())}
           list="existing-decks-list"
-          className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm font-semibold"
+          className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm font-semibold uppercase"
         />
         <datalist id="existing-decks-list">
           {existingDecks.map((deckTitle, i) => (
@@ -82,11 +82,11 @@ export const ManualCardForm: React.FC<ManualCardFormProps> = ({
         </label>
         <input
           type="text"
-          placeholder="Ex: Direito Penal, Biologia..."
+          placeholder="EX: DIREITO PENAL, BIOLOGIA..."
           value={subject}
-          onChange={(e) => setSubject(e.target.value)}
+          onChange={(e) => setSubject(e.target.value.toUpperCase())}
           list="subjects-list"
-          className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm"
+          className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm uppercase"
         />
         <datalist id="subjects-list">
           {subjects.map((sub, i) => (

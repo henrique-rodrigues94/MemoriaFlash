@@ -512,9 +512,9 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
                 <input
                   type="text"
                   value={subject}
-                  onChange={e => setSubject(e.target.value)}
-                  placeholder="Ex: Direito Constitucional, Anatomia, Python…"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition text-sm"
+                  onChange={e => setSubject(e.target.value.toUpperCase())}
+                  placeholder="EX: DIREITO CONSTITUCIONAL, ANATOMIA, PYTHON…"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition text-sm uppercase"
                 />
               </div>
 
