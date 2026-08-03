@@ -8,6 +8,7 @@ import {
   Lightbulb,
   AlertTriangle,
   Star,
+  Sparkles,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Deck, Flashcard, RatingGrade } from '../types';
@@ -79,11 +80,23 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
 }) => {
   const t = translations[currentLanguage] || translations.pt;
 
-  const dueCards = deck.cards.filter((c) => {
+  // Tópicos únicos do baralho (usados para filtro de estudo)
+  const uniqueTopics = Array.from(new Set(deck.cards.map((c) => c.topic || c.subject || deck.category).filter(Boolean)));
+
+  // ── Seleção de tópicos a estudar ────────────────────────────────────────────
+  // Padrão: TODOS selecionados. O usuário pode desmarcar para estudar só alguns.
+  const [selectedTopics, setSelectedTopics] = useState<string[]>(uniqueTopics);
+  const [showTopicPicker, setShowTopicPicker] = useState(true);
+
+  const filteredCards = selectedTopics.length > 0
+    ? deck.cards.filter((c) => selectedTopics.includes(c.topic || c.subject || deck.category))
+    : deck.cards;
+
+  const dueCards = filteredCards.filter((c) => {
     if (!c.dueDate) return true;
     return new Date(c.dueDate) <= new Date();
   });
-  const initialCards = dueCards.length > 0 ? dueCards : [...deck.cards];
+  const initialCards = dueCards.length > 0 ? dueCards : [...filteredCards];
 
   const [cards, setCards] = useState<Flashcard[]>(initialCards);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -163,6 +176,23 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
     }
   };
 
+  // Inicia a sessão com os cards filtrados pelos tópicos selecionados
+  const handleStartStudy = () => {
+    const chosen = selectedTopics.length > 0
+      ? deck.cards.filter((c) => selectedTopics.includes(c.topic || c.subject || deck.category))
+      : deck.cards;
+    const chosenDue = chosen.filter((c) => {
+      if (!c.dueDate) return true;
+      return new Date(c.dueDate) <= new Date();
+    });
+    const list = chosenDue.length > 0 ? chosenDue : [...chosen];
+    setCards(list);
+    setCurrentIndex(0);
+    setSessionCompleted(false);
+    setReviewedCount(0);
+    setShowTopicPicker(false);
+  };
+
   // ── Session Complete Screen ──
   if (sessionCompleted || !currentCard) {
     return (
@@ -196,6 +226,70 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   }
 
   const progressPercent = Math.round(((currentIndex + 1) / cards.length) * 100);
+
+  // ── Tela de seleção de tópicos (antes de começar a sessão) ──
+  if (showTopicPicker && uniqueTopics.length > 0) {
+    const totalSelected = selectedTopics.length;
+    return (
+      <div className="max-w-xl mx-auto py-8 px-4 text-center space-y-5 animate-fade-in">
+        <div className="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-[#122131] to-[#273647] border border-[#adc6ff]/30 flex items-center justify-center">
+          <Sparkles className="w-7 h-7 text-[#60a5fa]" />
+        </div>
+        <div>
+          <h2 className="text-xl font-extrabold text-white">Escolha os Tópicos</h2>
+          <p className="text-sm text-[#8c91a0] mt-1">
+            Selecione quais tópicos você quer estudar agora no baralho <strong className="text-[#adc6ff]">{deck.title}</strong>.
+          </p>
+        </div>
+
+        {/* Toggle todos */}
+        <button
+          onClick={() => setSelectedTopics(totalSelected === uniqueTopics.length ? [] : [...uniqueTopics])}
+          className="w-full py-2.5 rounded-xl bg-[#122131] border border-[#adc6ff]/30 text-[#adc6ff] text-xs font-bold hover:bg-[#1c2b3c] transition-colors cursor-pointer"
+        >
+          {totalSelected === uniqueTopics.length ? '✓ Todos selecionados' : 'Selecionar todos'}
+        </button>
+
+        {/* Lista de tópicos */}
+        <div className="space-y-2">
+          {uniqueTopics.map((topic) => {
+            const isSelected = selectedTopics.includes(topic);
+            const count = deck.cards.filter((c) => (c.topic || c.subject || deck.category) === topic).length;
+            return (
+              <button
+                key={topic}
+                onClick={() => setSelectedTopics((prev) => isSelected ? prev.filter((t) => t !== topic) : [...prev, topic])}
+                className={`w-full p-3.5 rounded-xl border flex items-center justify-between gap-3 text-left transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-[#3b82f6]/15 border-[#3b82f6]/40'
+                    : 'bg-[#122131]/70 border-[#424754]/40 hover:border-[#60a5fa]/40'
+                }`}
+              >
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <span className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${
+                    isSelected ? 'bg-[#3b82f6] border-[#3b82f6] text-white' : 'border-[#424754]'
+                  }`}>
+                    {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
+                  </span>
+                  <span className="text-sm font-semibold text-white truncate">{topic}</span>
+                </div>
+                <span className="text-[10px] font-mono text-[#8c91a0] flex-shrink-0">{count} card{count !== 1 ? 's' : ''}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="pt-2">
+          <button
+            onClick={handleStartStudy}
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm shadow-xl shadow-blue-600/30 hover:scale-[1.02] transition-all cursor-pointer"
+          >
+            Começar Estudo ({initialCards.length} card{initialCards.length !== 1 ? 's' : ''})
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto h-[100dvh] flex flex-col gap-4 sm:gap-5 overflow-hidden animate-fade-in px-3 sm:px-6 py-3">
