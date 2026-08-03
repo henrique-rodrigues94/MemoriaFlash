@@ -388,6 +388,10 @@ nav[class*="fixed bottom-0"] {
 :root[data-theme='light'] .text-amber-400,
 :root[data-theme='light'] .text-amber-500,
 :root[data-theme='light'] .text-amber-600 { color: #b45309; }
+/* Explicação & Exemplo (amarelo âmbar) — escurece no tema claro */
+:root[data-theme='light'] .text-\[\#fbbf24\] { color: #b45309; }
+:root[data-theme='light'] .text-\[\#fbbf24\]\/90 { color: rgba(180, 83, 9, 0.92); }
+:root[data-theme='light'] .text-amber-100\/90 { color: rgba(146, 64, 14, 0.92); }
 
 :root[data-theme='light'] .text-blue-200,
 :root[data-theme='light'] .text-blue-300,
