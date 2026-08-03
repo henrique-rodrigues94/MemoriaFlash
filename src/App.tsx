@@ -15,7 +15,7 @@ import { AdMobBanner } from './components/AdMobBanner';
 // ----------------------------------------------------------------------------
 const ScannerView = lazy(() => import('./components/ScannerView').then((m) => ({ default: m.ScannerView })));
 const StudioView = lazy(() => import('./components/StudioView').then((m) => ({ default: m.StudioView })));
-const QuizView = lazy(() => import('./components/QuizView').then((m) => ({ default: m.QuizView })));
+const StudyPlanView = lazy(() => import('./components/StudyPlanView').then((m) => ({ default: m.StudyPlanView })));
 const StatsView = lazy(() => import('./components/StatsView').then((m) => ({ default: m.StatsView })));
 const DeckManagerModal = lazy(() =>
   import('./components/DeckManagerModal').then((m) => ({ default: m.DeckManagerModal }))
@@ -68,7 +68,6 @@ const LanguageSelectorModal = lazy(() =>
 );
 import { ConsentBanner } from './components/ConsentBanner';
 import { detectBrowserLanguage, SupportedLanguage, translations } from './lib/i18n';
-import { apiGenerateQuiz } from './services/api';
 import { auth, onAuthStateChanged, ensureAuthenticated } from './lib/firebase';
 import {
   applyRewardedAdWatched,
@@ -391,12 +390,9 @@ export function App() {
             )}
 
             {activeTab === 'quiz' && (
-              <QuizView
+              <StudyPlanView
+                decks={decks}
                 currentLanguage={currentLanguage}
-                stats={stats}
-                onDeductCredit={handleDeductCredit}
-                onOpenAdMob={() => setShowAdMobModal(true)}
-                onOpenSubscription={() => setShowSubscriptionModal(true)}
               />
             )}
 

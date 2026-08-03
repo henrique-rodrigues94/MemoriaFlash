@@ -24,7 +24,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab, c
       { id: 'cards', label: 'Cards', icon: Layers },
       { id: 'scanner', label: 'Scanner & Upload', icon: Camera },
       { id: 'stats', label: t.stats, icon: BarChart2 },
-      { id: 'quiz', label: 'Quiz', icon: HelpCircle },
+      { id: 'quiz', label: 'Plano ES', icon: HelpCircle },
   ];
 
   return (
