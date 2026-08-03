@@ -15,6 +15,10 @@ interface StudioViewProps {
   onDeductCredit?: (amount?: number) => void;
   onOpenAdMob?: () => void;
   onOpenSubscription?: () => void;
+  /** Deck para pré-preencher os campos (ex: vindo do Gerenciador de Deck). */
+  initialDeck?: Deck | null;
+  /** Chamado após consumir o initialDeck (para limpar o estado no App). */
+  onConsumedInitialDeck?: () => void;
 }
 
 export const StudioView: React.FC<StudioViewProps> = ({
@@ -24,6 +28,8 @@ export const StudioView: React.FC<StudioViewProps> = ({
   onDeductCredit,
   onOpenAdMob,
   onOpenSubscription,
+  initialDeck,
+  onConsumedInitialDeck,
 }) => {
   const [activeMode, setActiveMode] = useState<'ia' | 'manual'>('ia');
 
@@ -52,12 +58,25 @@ export const StudioView: React.FC<StudioViewProps> = ({
   // já editou o nome manualmente (deckNamePersonalizado=true), não sobrescreve.
   const [deckNamePersonalized, setDeckNamePersonalized] = useState(false);
 
+  // Pré-preenche os campos com o deck vindo do Gerenciador de Deck (botão
+  // "+ Adicionar Cartão"). Só executa quando o initialDeck chega/passa a existir.
   useEffect(() => {
-    if (!deckNamePersonalized) {
-      setDeckName(subject.trim());
+    if (initialDeck) {
+      setSubject(initialDeck.category || initialDeck.title || '');
+      setDeckName(initialDeck.title || '');
+      setDeckNamePersonalized(true); // o nome veio preenchido, não sobrescrever
+      if (onConsumedInitialDeck) onConsumedInitialDeck();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject]);
+  }, [initialDeck?.id]);
+
+  // Ao digitar a matéria, sincroniza o nome do baralho (se não foi personalizado)
+  const handleSubjectChange = (value: string) => {
+    setSubject(value);
+    if (!deckNamePersonalized) {
+      setDeckName(value.trim());
+    }
+  };
 
   useEffect(() => {
     if (subject.trim().length < 2) {
@@ -275,7 +294,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
                   list="subject-suggestions"
                   placeholder="Ex: Direito Penal, Biologia, Matemática..."
                   value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
+                  onChange={(e) => handleSubjectChange(e.target.value)}
                   className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm"
                 />
                 {/* Autocomplete: sugere matérias de decks já existentes */}

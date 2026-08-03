@@ -121,6 +121,8 @@ export function App() {
   // Active Session / Modal States
   const [activeStudyDeck, setActiveStudyDeck] = useState<Deck | null>(null);
   const [managedDeck, setManagedDeck] = useState<Deck | null>(null);
+  // Deck cujos campos devem ser pré-preenchidos no gerador da aba Cards
+  const [deckToPopulate, setDeckToPopulate] = useState<Deck | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle('theme-light', theme === 'light');
@@ -413,6 +415,8 @@ export function App() {
                 decks={decks}
                 stats={stats}
                 currentLanguage={currentLanguage}
+                initialDeck={deckToPopulate}
+                onConsumedInitialDeck={() => setDeckToPopulate(null)}
                 onSaveNewDeck={handleSaveDeck}
                 onDeductCredit={handleDeductCredit}
                 onOpenAdMob={() => setShowAdMobModal(true)}
@@ -462,7 +466,11 @@ export function App() {
             onSaveDeck={handleSaveDeck}
             onDeleteDeck={handleDeleteDeck}
             onClose={() => setManagedDeck(null)}
-            onOpenCards={() => setActiveTab('cards')}
+            onOpenCards={() => {
+              setManagedDeck(null);
+              setDeckToPopulate(managedDeck);
+              setActiveTab('cards');
+            }}
           />
         )}
 
