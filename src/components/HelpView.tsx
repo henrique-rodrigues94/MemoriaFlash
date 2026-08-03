@@ -75,13 +75,13 @@ const SECTIONS: HelpSection[] = [
   },
   {
     icon: <Brain className="w-5 h-5 text-rose-400" />,
-    title: 'Plano de Estudos',
+    title: 'Inteligência Artificial',
     description:
-      'Monte uma rotina inteligente: defina seu objetivo (Concurso, Faculdade ou ENEM), o tempo diário e as matérias.',
+      'O MemoriaFlash usa IA para gerar flashcards, explicações com exemplos, sugestões de tópicos e análise do seu desempenho.',
     items: [
-      'O cronograma distribui o tempo pelas matérias conforme a prioridade.',
-      'Cada sessão tem cronômetro Pomodoro e flashcards da matéria.',
-      'A IA sugere revisões com base no desempenho e nos cards atrasados.',
+      'A IA gera cards completos com pergunta, resposta, explicação e curiosidade.',
+      'Durante o estudo, use "Explicar Pergunta & Ver Exemplo" para ver o conteúdo didático.',
+      'As sugestões de tópicos ajudam a detalhar melhor o assunto antes de gerar.',
     ],
   },
   {

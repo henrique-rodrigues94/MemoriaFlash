@@ -215,9 +215,21 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
           <div className="text-xl font-extrabold text-emerald-400">{reviewedCount}</div>
         </div>
 
+        {/* Opção de inverter resposta com pergunta antes de salvar */}
+        <label className="flex items-center justify-center gap-2 text-xs font-semibold text-[#c2c6d6] cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={invertCards}
+            onChange={(e) => setInvertCards(e.target.checked)}
+            className="w-4 h-4 accent-violet-500"
+          />
+          <RotateCw className={`w-4 h-4 ${invertCards ? 'text-violet-400' : 'text-[#8c91a0]'}`} />
+          Inverter resposta com pergunta
+        </label>
+
         <button
           id="btn-finish-study-session"
-          onClick={() => handleCompleteAndReturn(false)}
+          onClick={() => handleCompleteAndReturn(invertCards)}
           className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm shadow-xl shadow-blue-600/30 hover:scale-[1.02] transition-all cursor-pointer"
         >
           Voltar para Estudo

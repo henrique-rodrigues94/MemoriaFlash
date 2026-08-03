@@ -246,7 +246,6 @@ export const StatsView: React.FC<StatsViewProps> = ({ stats, decks }) => {
                         <span className="text-white font-bold">
                           {entry.cardsReviewed} cartões
                         </span>
-                        <span className="text-[#60a5fa] font-mono">+{entry.xpEarned} XP</span>
                         <span className="text-[#8c91a0]">{entry.minutesStudied} min</span>
                       </div>
                     </div>
