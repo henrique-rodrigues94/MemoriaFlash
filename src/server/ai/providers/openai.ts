@@ -6,12 +6,17 @@ import { extractJSON } from '../jsonUtils';
 // (ex: em produção, quando qualidade > custo). Caso contrário, só entra em
 // ação se TODOS os provedores gratuitos falharem — upgrade transparente sem
 // alterar nenhuma linha de código do app.
-const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const DEFAULT_MODEL = 'gpt-4o-mini';
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
+
+// Lido na hora da chamada (lazy) para respeitar o .env carregado no boot.
+function getModel(): string {
+  return process.env.OPENAI_MODEL || DEFAULT_MODEL;
+}
 
 export const openaiProvider: AIProvider = {
   id: 'openai',
-  label: `OpenAI (${MODEL}, pago)`,
+  label: 'OpenAI ChatGPT (pago)',
   tier: 'paid',
   isConfigured: () => !!process.env.OPENAI_API_KEY,
 
@@ -30,7 +35,7 @@ export const openaiProvider: AIProvider = {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: MODEL,
+          model: getModel(),
           temperature: params.temperature ?? 0.7,
           max_tokens: params.maxOutputTokens ?? 8192,
           response_format: { type: 'json_object' },

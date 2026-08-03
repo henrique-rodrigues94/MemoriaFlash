@@ -5,12 +5,17 @@ import { buildJSONInstruction, extractJSON } from '../jsonUtils';
 // API compatível com OpenAI — fácil de integrar.
 // Crie sua chave em: https://platform.deepseek.com/api_keys
 // Modelos: deepseek-chat (V3, melhor custo-benefício), deepseek-reasoner (R1, raciocínio)
-const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+const DEFAULT_MODEL = 'deepseek-chat';
 const ENDPOINT = 'https://api.deepseek.com/chat/completions';
+
+// Lido na hora da chamada (lazy) para respeitar o .env carregado no boot.
+function getModel(): string {
+  return process.env.DEEPSEEK_MODEL || DEFAULT_MODEL;
+}
 
 export const deepseekProvider: AIProvider = {
   id: 'deepseek',
-  label: `DeepSeek (${MODEL})`,
+  label: 'DeepSeek (pago, custo baixo)',
   tier: 'paid',
   isConfigured: () => !!process.env.DEEPSEEK_API_KEY,
 
@@ -29,7 +34,7 @@ export const deepseekProvider: AIProvider = {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: MODEL,
+          model: getModel(),
           temperature: params.temperature ?? 0.7,
           max_tokens: params.maxOutputTokens ?? 8192,
           response_format: { type: 'json_object' },
