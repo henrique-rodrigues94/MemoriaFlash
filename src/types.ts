@@ -87,7 +87,7 @@ export interface QuizQuestion {
 
 // ─── Plano de Estudos (StudyPlan) ────────────────────────────────────────────
 
-export type StudyGoalType = 'concurso' | 'faculdade' | 'certificacao' | 'enem' | 'idiomas' | 'personalizado';
+export type StudyGoalType = 'concurso' | 'faculdade' | 'enem' | 'personalizado';
 
 export interface StudyPlanGoal {
   type: StudyGoalType;
