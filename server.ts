@@ -38,6 +38,28 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Endpoint: captura de erros do frontend — apenas LOG no terminal, sem resposta
+// sensível ao cliente. Usado pelo errorLogger.ts (sendBeacon/fetch keepalive).
+app.post('/api/log', (req, res) => {
+  try {
+    const data = req.body || {};
+    const ts = data.ts || new Date().toISOString();
+    const type = data.type || 'frontend';
+    if (type === 'frontend-batch') {
+      const errors = Array.isArray(data.errors) ? data.errors : [];
+      for (const e of errors.slice(0, 50)) {
+        console.error(`[frontend:${e?.type || 'error'}] ${ts}`, e?.message || '(sem mensagem)', e?.url ? `@ ${e.url}` : '');
+      }
+    } else {
+      console.error(`[frontend:${type}] ${ts}`, data.message || '(sem mensagem)', data.url ? `@ ${data.url}` : '');
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[api/log] erro ao processar log do frontend:', err);
+    res.json({ ok: false });
+  }
+});
+
 // Status dos provedores de IA (útil para depuração e para um painel admin futuro).
 // Não expõe as chaves, apenas quais estão configuradas/disponíveis/em cooldown.
 app.get('/api/ai/status', (_req, res) => {
@@ -337,5 +359,14 @@ async function startServer() {
     startCronJobs();
   });
 }
+
+// ── Log global de erros não tratados (processo) ─────────────────────────────
+// Só aparece no terminal — nunca expõe nada ao usuário.
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err?.stack || err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason instanceof Error ? reason.stack || reason.message : reason);
+});
 
 startServer();

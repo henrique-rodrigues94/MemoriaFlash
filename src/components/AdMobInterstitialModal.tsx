@@ -1,16 +1,23 @@
+// 📁 flashmind-ai/src/components/AdMobInterstitialModal.tsx
 import React, { useEffect, useState } from 'react';
 import { X, Sparkles } from 'lucide-react';
+import { SupportedLanguage, translations } from '../lib/i18n';
 
 interface AdMobInterstitialModalProps {
   onClose: () => void;
+  currentLanguage?: SupportedLanguage;
 }
 
-// Anúncio intersticial: curto, exibido entre telas (fim de sessão de estudo,
-// fim de sessão de estudo). Skippable após 3s, seguindo a regra "nunca force o clique"
-// e limites de frequência definidos em src/services/economy/creditsEngine.ts.
-export const AdMobInterstitialModal: React.FC<AdMobInterstitialModalProps> = ({ onClose }) => {
+// Anúncio intersticial: skippable após 3s, seguindo a regra "nunca force o clique"
+// e os limites de frequência definidos em src/services/economy/creditsEngine.ts.
+export const AdMobInterstitialModal: React.FC<AdMobInterstitialModalProps> = ({
+  onClose,
+  currentLanguage = 'pt',
+}) => {
   const [canSkip, setCanSkip] = useState(false);
   const [countdown, setCountdown] = useState(3);
+
+  const t = translations[currentLanguage] || translations.pt;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -33,7 +40,7 @@ export const AdMobInterstitialModal: React.FC<AdMobInterstitialModalProps> = ({ 
           <button
             onClick={onClose}
             className="absolute top-3 right-3 p-1.5 rounded-full bg-slate-800/70 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
-            title="Fechar"
+            title={t.adClose}
           >
             <X className="w-4 h-4" />
           </button>
@@ -46,11 +53,9 @@ export const AdMobInterstitialModal: React.FC<AdMobInterstitialModalProps> = ({ 
         <div className="w-14 h-14 rounded-2xl bg-blue-500/20 border border-blue-400/30 mx-auto flex items-center justify-center">
           <Sparkles className="w-7 h-7 text-blue-300" />
         </div>
-        <h3 className="text-base font-extrabold">MemoriaFlash Network</h3>
-        <p className="text-xs text-[#8c91a0]">
-          Continue estudando com repetição espaçada e IA. Considere o plano PRO para remover anúncios.
-        </p>
-        <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500">Anúncio</div>
+        <h3 className="text-base font-extrabold">{t.adInterstitialTitle}</h3>
+        <p className="text-xs text-[#8c91a0]">{t.adInterstitialBody}</p>
+        <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500">{t.adLabel}</div>
       </div>
     </div>
   );

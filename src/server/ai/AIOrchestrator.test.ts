@@ -75,7 +75,7 @@ describe('AIOrchestrator — fallback multi-provedor', () => {
     });
     const orchestrator = new AIOrchestrator([a, b]);
 
-    await expect(orchestrator.generateJSON(dummyParams)).rejects.toThrow(/falha a/);
+    await expect(orchestrator.generateJSON(dummyParams)).rejects.toThrow(/Não há servidor de IA disponível/);
   });
 
   it('coloca provedor em cooldown após rate limit (429) e não tenta ele de novo até o cooldown passar', async () => {

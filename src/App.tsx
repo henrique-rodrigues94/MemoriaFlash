@@ -67,7 +67,7 @@ const LanguageSelectorModal = lazy(() =>
   import('./components/LanguageSelectorModal').then((m) => ({ default: m.LanguageSelectorModal }))
 );
 import { ConsentBanner } from './components/ConsentBanner';
-import { detectBrowserLanguage, SupportedLanguage } from './lib/i18n';
+import { detectBrowserLanguage, SupportedLanguage, translations } from './lib/i18n';
 import { apiGenerateQuiz } from './services/api';
 import { auth, onAuthStateChanged, ensureAuthenticated } from './lib/firebase';
 import {
@@ -92,6 +92,7 @@ export function App() {
   const [showOnboarding, setShowOnboarding] = useState(!isOnboardingDone());
   const [showAdMobModal, setShowAdMobModal] = useState(false);
   const [showInterstitial, setShowInterstitial] = useState(false);
+  const [rewardToast, setRewardToast] = useState<{ credits: number; visible: boolean }>({ credits: 0, visible: false });
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showReferralModal, setShowReferralModal] = useState(false);
@@ -210,11 +211,15 @@ export function App() {
     saveStatsToFirestore(updatedStats);
   };
 
-  const handleRewardEarned = () => {
-    const { updated } = applyRewardedAdWatched(stats);
+  const handleRewardEarned = (creditsEarned?: number) => {
+    const { updated, creditsEarned: earned } = applyRewardedAdWatched(stats);
     setStats(updated);
     saveStoredStats(updated);
     saveStatsToFirestore(updated);
+    // Mostra toast de recompensa por 3 segundos
+    const amount = creditsEarned ?? earned;
+    setRewardToast({ credits: amount, visible: true });
+    setTimeout(() => setRewardToast((prev) => ({ ...prev, visible: false })), 3000);
   };
 
   const maybeShowInterstitial = (baseStats: UserStats) => {
@@ -471,7 +476,22 @@ export function App() {
         )}
 
         {/* AdMob Interstitial (frequency-capped, shown after study sessions) */}
-        {showInterstitial && <AdMobInterstitialModal onClose={() => setShowInterstitial(false)} />}
+        {showInterstitial && (
+          <AdMobInterstitialModal
+            onClose={() => setShowInterstitial(false)}
+            currentLanguage={currentLanguage}
+          />
+        )}
+
+        {/* Toast de recompensa de anúncio */}
+        {rewardToast.visible && (
+          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] animate-fade-in">
+            <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600 text-white text-sm font-bold shadow-xl shadow-emerald-500/30 border border-emerald-400/40">
+              <span className="text-lg">🎉</span>
+              {(translations[currentLanguage] || translations.pt).adRewardToast.replace('{credits}', String(rewardToast.credits))}
+            </div>
+          </div>
+        )}
 
         {/* Referral / Indique e Ganhe Modal */}
         {showReferralModal && <ReferralModal stats={stats} onClose={() => setShowReferralModal(false)} />}

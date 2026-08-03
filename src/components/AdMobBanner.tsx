@@ -1,8 +1,17 @@
+// 📁 flashmind-ai/src/components/AdMobBanner.tsx
 import React from 'react';
 import { Play, Crown, Ban } from 'lucide-react';
 import { SupportedLanguage, translations } from '../lib/i18n';
 import { UserStats } from '../types';
 import { canWatchRewardedAd, computeNextAdReward, rewardedAdsRemainingToday } from '../services/economy/creditsEngine';
+
+/** Substitui placeholders como {credits}, {remaining} */
+function fmt(template: string, vars: Record<string, string | number>): string {
+  return Object.entries(vars).reduce(
+    (acc, [k, v]) => acc.replaceAll(`{${k}}`, String(v)),
+    template
+  );
+}
 
 interface AdMobBannerProps {
   stats: UserStats;
@@ -11,7 +20,7 @@ interface AdMobBannerProps {
   onOpenReferral?: () => void;
   isPro?: boolean;
   currentLanguage?: SupportedLanguage;
-  /** Quando true, o banner fica fixo acima da barra de navegação (sempre visível ao rolar). */
+  /** Quando true, o banner fica fixo acima da barra de navegação. */
   sticky?: boolean;
 }
 
@@ -24,7 +33,7 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({
   currentLanguage = 'pt',
   sticky,
 }) => {
-  if (isPro) return null; // PRO users have zero ads
+  if (isPro) return null;
 
   const t = translations[currentLanguage] || translations.pt;
   const canWatch = canWatchRewardedAd(stats);
@@ -33,7 +42,11 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({
 
   return (
     <div
-      style={sticky ? { position: 'fixed', bottom: '4rem', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '72rem', zIndex: 30 } : undefined}
+      style={
+        sticky
+          ? { position: 'fixed', bottom: '4rem', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '72rem', zIndex: 30 }
+          : undefined
+      }
       className={`w-full ${sticky ? '' : 'my-5'} px-3 sm:px-6 py-2 rounded-2xl bg-[#0b1a2a]/95 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl animate-fade-in relative overflow-hidden`}
     >
       {/* Background glow accent */}
@@ -41,23 +54,19 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({
 
       <div className="flex items-center gap-3">
         <div className="px-2 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono text-[9px] font-extrabold uppercase flex-shrink-0 tracking-wider">
-          Anúncio
+          {t.adLabel}
         </div>
         <div>
           <h4 className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
-            Mantenha o MemoriaFlash 100% Grátis
+            {t.adBannerTitle}
           </h4>
           <p className="text-[11px] text-[#8c91a0]">
             {canWatch ? (
               <>
-                Assista a um vídeo curto para ganhar{' '}
-                <strong className="text-[#60a5fa] font-semibold">+{rewardAmount} Créditos de IA</strong> ·{' '}
-                {remaining} restantes hoje
+                {fmt(t.adBannerWatch, { credits: rewardAmount, remaining })}
               </>
             ) : (
-              <span className="text-slate-400">
-                Limite diário de anúncios atingido. Volte amanhã ou indique um amigo para ganhar mais créditos.
-              </span>
+              <span className="text-slate-400">{t.adBannerLimitReached}</span>
             )}
           </p>
         </div>
@@ -75,11 +84,12 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({
         >
           {canWatch ? (
             <>
-              <Play className="w-3.5 h-3.5 fill-current text-white" /> Assistir (+{rewardAmount})
+              <Play className="w-3.5 h-3.5 fill-current text-white" />
+              {fmt(t.adBannerWatchBtn, { credits: rewardAmount })}
             </>
           ) : (
             <>
-              <Ban className="w-3.5 h-3.5" /> Limite atingido
+              <Ban className="w-3.5 h-3.5" /> {t.adBannerLimitBtn}
             </>
           )}
         </button>
@@ -88,16 +98,16 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({
           <button
             onClick={onOpenReferral}
             className="px-3.5 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all"
-            title="Indique amigos e ganhe créditos"
+            title={t.adBannerReferBtn}
           >
-            Indicar
+            {t.adBannerReferBtn}
           </button>
         )}
 
         <button
           onClick={onOpenSubscription}
           className="px-3.5 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all"
-          title="Remover Anúncios e Virar PRO"
+          title={t.proPlan}
         >
           <Crown className="w-3.5 h-3.5" /> PRO
         </button>
