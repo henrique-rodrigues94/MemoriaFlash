@@ -4,6 +4,7 @@ import { Deck, UserStats, Flashcard } from '../types';
 import { SupportedLanguage } from '../lib/i18n';
 import { ManualCardForm } from './ManualCardForm';
 import { fetchAITopicSuggestions, generateAICards } from '../lib/aiGenerator';
+import { findClosestMatch } from '../lib/spellCheck';
 import { hasEnoughCredits, applySpendCredits } from '../services/economy/creditsEngine';
 import { ECONOMY } from '../services/economy/economyConstants';
 
@@ -51,12 +52,27 @@ export const StudioView: React.FC<StudioViewProps> = ({
 
   // Listas para Autocomplete
   const existingDeckTitles = Array.from(new Set(decks.map((d) => d.title)));
-  const existingSubjects = Array.from(new Set(decks.map((d) => d.category || d.title)));
+  // Matérias existentes: categorias, títulos e os "subject" dos cards (campo
+  // real de matéria). Isso garante que "geografia" (subject dos cards) apareça
+  // como candidato mesmo se a categoria do deck for outra.
+  const existingSubjects = Array.from(
+    new Set(
+      decks.flatMap((d) => [
+        d.category || d.title,
+        ...d.cards.map((c) => c.subject).filter((s): s is string => !!s),
+      ])
+    )
+  );
 
   // Auto-sync do nome do baralho: quando o usuário digita a matéria, o campo
   // "Nome do Baralho" é preenchido automaticamente com ela — mas se o usuário
   // já editou o nome manualmente (deckNamePersonalizado=true), não sobrescreve.
   const [deckNamePersonalized, setDeckNamePersonalized] = useState(false);
+
+  // Correção ortográfica — "Você quis dizer?" quando o usuário digita errado
+  // (ex: "geogafia" → sugere "geografia"). Baseado nas matérias/decks existentes.
+  const [subjectSuggestion, setSubjectSuggestion] = useState<string | null>(null);
+  const [deckNameSuggestion, setDeckNameSuggestion] = useState<string | null>(null);
 
   // Pré-preenche os campos com o deck vindo do Gerenciador de Deck (botão
   // "+ Adicionar Cartão"). Só executa quando o initialDeck chega/passa a existir.
@@ -78,9 +94,18 @@ export const StudioView: React.FC<StudioViewProps> = ({
   const handleSubjectChange = (value: string) => {
     const upper = value.toUpperCase();
     setSubject(upper);
+    setSubjectSuggestion(findClosestMatch(upper, existingSubjects));
     if (!deckNamePersonalized) {
       setDeckName(upper.trim());
+      setDeckNameSuggestion(findClosestMatch(upper, existingDeckTitles));
     }
+  };
+
+  const handleDeckNameChange = (value: string) => {
+    const upper = value.toUpperCase();
+    setDeckName(upper);
+    setDeckNamePersonalized(true);
+    setDeckNameSuggestion(findClosestMatch(upper, existingDeckTitles));
   };
 
   useEffect(() => {
@@ -275,12 +300,23 @@ export const StudioView: React.FC<StudioViewProps> = ({
                   list="deck-name-suggestions"
                   placeholder="Ex: DIREITO PENAL, BIOLOGIA..."
                   value={deckName}
-                  onChange={(e) => {
-                    setDeckName(e.target.value.toUpperCase());
-                    setDeckNamePersonalized(true);
-                  }}
+                  onChange={(e) => handleDeckNameChange(e.target.value)}
                   className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm uppercase"
                 />
+                {deckNameSuggestion && deckNameSuggestion.toUpperCase() !== deckName.trim().toUpperCase() && (
+                  <div className="mt-2 px-3.5 py-2.5 rounded-xl bg-[#122131] border border-blue-500/30 flex items-center gap-2 text-xs animate-fade-in">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                    <span className="text-[#c2c6d6]">Você quis dizer</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeckNameChange(deckNameSuggestion)}
+                      className="font-extrabold text-[#60a5fa] hover:text-white underline decoration-dotted underline-offset-2 cursor-pointer"
+                    >
+                      {deckNameSuggestion.toUpperCase()}
+                    </button>
+                    <span className="text-[#8c91a0]">?</span>
+                  </div>
+                )}
                 <datalist id="deck-name-suggestions">
                   {existingDeckTitles.map((s) => (
                     <option key={s} value={s} />
@@ -301,8 +337,20 @@ export const StudioView: React.FC<StudioViewProps> = ({
                   value={subject}
                   onChange={(e) => handleSubjectChange(e.target.value)}
                   className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm"
-                />
-                {/* Autocomplete: sugere matérias de decks já existentes */}
+                />                {subjectSuggestion && subjectSuggestion.toUpperCase() !== subject.trim().toUpperCase() && (
+                  <div className="mt-2 px-3.5 py-2.5 rounded-xl bg-[#122131] border border-blue-500/30 flex items-center gap-2 text-xs animate-fade-in">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                    <span className="text-[#c2c6d6]">Você quis dizer</span>
+                    <button
+                      type="button"
+                      onClick={() => handleSubjectChange(subjectSuggestion)}
+                      className="font-extrabold text-[#60a5fa] hover:text-white underline decoration-dotted underline-offset-2 cursor-pointer"
+                    >
+                      {subjectSuggestion.toUpperCase()}
+                    </button>
+                    <span className="text-[#8c91a0]">?</span>
+                  </div>
+                )}                {/* Autocomplete: sugere matérias de decks já existentes */}
                 <datalist id="subject-suggestions">
                   {existingSubjects.map((s) => (
                     <option key={s} value={s} />

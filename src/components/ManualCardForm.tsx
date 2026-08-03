@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { PlusCircle, HelpCircle, CheckCircle2, Layers } from 'lucide-react';
+import { PlusCircle, HelpCircle, CheckCircle2, Layers, Sparkles } from 'lucide-react';
 import { Flashcard } from '../types';
+import { findClosestMatch } from '../lib/spellCheck';
 
 interface ManualCardFormProps {
   existingDecks: string[];
@@ -18,6 +19,22 @@ export const ManualCardForm: React.FC<ManualCardFormProps> = ({
   const [topic, setTopic] = useState('');
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
+
+  // Correção ortográfica — "Você quis dizer?" (ex: "geogafia" → "geografia").
+  const [deckNameSuggestion, setDeckNameSuggestion] = useState<string | null>(null);
+  const [subjectSuggestion, setSubjectSuggestion] = useState<string | null>(null);
+
+  const handleDeckNameChange = (value: string) => {
+    const upper = value.toUpperCase();
+    setDeckName(upper);
+    setDeckNameSuggestion(findClosestMatch(upper, existingDecks));
+  };
+
+  const handleSubjectChange = (value: string) => {
+    const upper = value.toUpperCase();
+    setSubject(upper);
+    setSubjectSuggestion(findClosestMatch(upper, subjects));
+  };
 
   const handleAddCard = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,10 +81,24 @@ export const ManualCardForm: React.FC<ManualCardFormProps> = ({
           type="text"
           placeholder="DIGITE OU SELECIONE UM BARALHO EXISTENTE..."
           value={deckName}
-          onChange={(e) => setDeckName(e.target.value.toUpperCase())}
+          onChange={(e) => handleDeckNameChange(e.target.value)}
           list="existing-decks-list"
           className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm font-semibold uppercase"
         />
+        {deckNameSuggestion && deckNameSuggestion.toUpperCase() !== deckName.trim().toUpperCase() && (
+          <div className="mt-2 px-3.5 py-2.5 rounded-xl bg-[#122131] border border-blue-500/30 flex items-center gap-2 text-xs animate-fade-in">
+            <Sparkles className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+            <span className="text-[#c2c6d6]">Você quis dizer</span>
+            <button
+              type="button"
+              onClick={() => handleDeckNameChange(deckNameSuggestion)}
+              className="font-extrabold text-[#60a5fa] hover:text-white underline decoration-dotted underline-offset-2 cursor-pointer"
+            >
+              {deckNameSuggestion.toUpperCase()}
+            </button>
+            <span className="text-[#8c91a0]">?</span>
+          </div>
+        )}
         <datalist id="existing-decks-list">
           {existingDecks.map((deckTitle, i) => (
             <option key={i} value={deckTitle} />
@@ -84,10 +115,24 @@ export const ManualCardForm: React.FC<ManualCardFormProps> = ({
           type="text"
           placeholder="EX: DIREITO PENAL, BIOLOGIA..."
           value={subject}
-          onChange={(e) => setSubject(e.target.value.toUpperCase())}
+          onChange={(e) => handleSubjectChange(e.target.value)}
           list="subjects-list"
           className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm uppercase"
         />
+        {subjectSuggestion && subjectSuggestion.toUpperCase() !== subject.trim().toUpperCase() && (
+          <div className="mt-2 px-3.5 py-2.5 rounded-xl bg-[#122131] border border-blue-500/30 flex items-center gap-2 text-xs animate-fade-in">
+            <Sparkles className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+            <span className="text-[#c2c6d6]">Você quis dizer</span>
+            <button
+              type="button"
+              onClick={() => handleSubjectChange(subjectSuggestion)}
+              className="font-extrabold text-[#60a5fa] hover:text-white underline decoration-dotted underline-offset-2 cursor-pointer"
+            >
+              {subjectSuggestion.toUpperCase()}
+            </button>
+            <span className="text-[#8c91a0]">?</span>
+          </div>
+        )}
         <datalist id="subjects-list">
           {subjects.map((sub, i) => (
             <option key={i} value={sub} />
