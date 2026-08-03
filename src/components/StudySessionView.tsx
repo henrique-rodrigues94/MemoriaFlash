@@ -233,6 +233,17 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
     const totalSelected = selectedTopics.length;
     return (
       <div className="max-w-xl mx-auto py-8 px-4 text-center space-y-5 animate-fade-in">
+        {/* Botão Sair no topo */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={handleBackRequest}
+            className="p-2 rounded-xl bg-[#122131] text-[#c2c6d6] hover:text-white transition-colors flex items-center gap-2 text-xs font-medium cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" /> Sair
+          </button>
+          <span className="text-[10px] font-mono text-[#8c91a0]">{deck.title}</span>
+        </div>
+
         <div className="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-[#122131] to-[#273647] border border-[#adc6ff]/30 flex items-center justify-center">
           <Sparkles className="w-7 h-7 text-[#60a5fa]" />
         </div>
