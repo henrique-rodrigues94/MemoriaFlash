@@ -53,13 +53,12 @@ interface StudyPlanViewProps {
   currentLanguage?: string;
 }
 
-type GoalType = 'concurso' | 'faculdade' | 'enem' | 'personalizado';
+type GoalType = 'concurso' | 'faculdade' | 'enem';
 
 const GOAL_OPTIONS: { type: GoalType; label: string; icon: string }[] = [
   { type: 'concurso', label: 'Concurso', icon: '🏛️' },
   { type: 'faculdade', label: 'Faculdade', icon: '🎓' },
   { type: 'enem', label: 'ENEM', icon: '📝' },
-  { type: 'personalizado', label: 'Personalizado', icon: '⭐' },
 ];
 
 const TIME_OPTIONS = [15, 30, 45, 60, 120];
