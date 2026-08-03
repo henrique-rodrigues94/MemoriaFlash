@@ -62,7 +62,10 @@ export const StudioView: React.FC<StudioViewProps> = ({
   // "+ Adicionar Cartão"). Só executa quando o initialDeck chega/passa a existir.
   useEffect(() => {
     if (initialDeck) {
-      setSubject(initialDeck.category || initialDeck.title || '');
+      // Matéria = a MATÉRIA dos cards (subject), não o tópico/categoria.
+      const firstCardSubject = initialDeck.cards.find((c) => c.subject)?.subject || '';
+      const fallbackSubject = firstCardSubject || initialDeck.category || initialDeck.title || '';
+      setSubject(fallbackSubject);
       setDeckName(initialDeck.title || '');
       setDeckNamePersonalized(true); // o nome veio preenchido, não sobrescrever
       if (onConsumedInitialDeck) onConsumedInitialDeck();
