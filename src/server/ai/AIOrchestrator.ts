@@ -1,6 +1,9 @@
 import { AIProvider, AIProviderError, GenerateJSONParams, ProviderStatus } from './types';
 
-const RATE_LIMIT_COOLDOWN_MS = 10 * 60 * 1000; // 10 min quando o provedor diz "429 / quota excedida"
+const RATE_LIMIT_COOLDOWN_MS = 60 * 1000; // 60s quando o provedor diz "429 / quota excedida"
+// (APIs gratuitas — Gemini e Groq — resetam a cota em segundos, não minutos;
+//  um cooldown de 10 min deixava o app sem IA mesmo quando a cota já tinha
+//  voltado. O provider Groq ainda tenta internamente esperar e retentar.)
 const GENERIC_ERROR_COOLDOWN_MS = 90 * 1000; // 1.5 min para outros erros (timeout, 5xx, etc.)
 
 interface CooldownEntry {
