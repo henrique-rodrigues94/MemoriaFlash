@@ -7,6 +7,8 @@ interface DeckManagerModalProps {
   onSaveDeck: (updated: Deck) => void;
   onDeleteDeck: (deckId: string) => void;
   onClose: () => void;
+  /** Abre a aba Cards (gerador) para adicionar cartões ao deck. */
+  onOpenCards?: () => void;
 }
 
 export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
@@ -14,6 +16,7 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
   onSaveDeck,
   onDeleteDeck,
   onClose,
+  onOpenCards,
 }) => {
   const [cards, setCards] = useState<Flashcard[]>([...deck.cards]);
   const [title, setTitle] = useState(deck.title);
@@ -109,7 +112,14 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
               Lista de Cartões ({cards.length})
             </h4>
             <button
-              onClick={() => setShowAddForm(!showAddForm)}
+              onClick={() => {
+                if (onOpenCards) {
+                  onClose();
+                  onOpenCards();
+                } else {
+                  setShowAddForm(!showAddForm);
+                }
+              }}
               className="text-xs text-[#60a5fa] hover:underline flex items-center gap-1 font-bold"
             >
               <Plus className="w-4 h-4" /> Adicionar Cartão

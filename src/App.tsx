@@ -462,6 +462,7 @@ export function App() {
             onSaveDeck={handleSaveDeck}
             onDeleteDeck={handleDeleteDeck}
             onClose={() => setManagedDeck(null)}
+            onOpenCards={() => setActiveTab('cards')}
           />
         )}
 
