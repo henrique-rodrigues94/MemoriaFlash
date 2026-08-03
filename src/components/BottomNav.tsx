@@ -1,7 +1,7 @@
 import React from 'react';
 import { Home, HelpCircle, Camera, Layers, BarChart2 } from 'lucide-react';
 import { ActiveTab } from '../types';
-import { SupportedLanguage, translations } from '../lib/i18n';
+import { SupportedLanguage } from '../lib/i18n';
 
 interface BottomNavProps {
   activeTab: ActiveTab;
@@ -17,14 +17,12 @@ interface NavItem {
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab, currentLanguage }) => {
-  const t = translations[currentLanguage] || translations.pt;
-
   const navItems: NavItem[] = [
       { id: 'home', label: 'Estudar', icon: Home },
       { id: 'cards', label: 'Cards', icon: Layers },
       { id: 'scanner', label: 'Scanner & Upload', icon: Camera },
-      { id: 'stats', label: t.stats, icon: BarChart2 },
-      { id: 'quiz', label: 'Plano ES', icon: HelpCircle },
+      { id: 'quiz', label: 'Plano de Estudo', icon: HelpCircle },
+      { id: 'stats', label: 'Estatísticas', icon: BarChart2 },
   ];
 
   return (
