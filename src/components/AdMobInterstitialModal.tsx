@@ -1,4 +1,4 @@
-// 📁 flashmind-ai/src/components/AdMobInterstitialModal.tsx
+// 📁 memoriaflash/src/components/AdMobInterstitialModal.tsx
 import React, { useEffect, useState } from 'react';
 import { X, Sparkles } from 'lucide-react';
 import { SupportedLanguage, translations } from '../lib/i18n';

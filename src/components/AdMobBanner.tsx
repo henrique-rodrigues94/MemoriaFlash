@@ -1,4 +1,4 @@
-// 📁 flashmind-ai/src/components/AdMobBanner.tsx
+// 📁 memoriaflash/src/components/AdMobBanner.tsx
 import React from 'react';
 import { Play, Crown, Ban } from 'lucide-react';
 import { SupportedLanguage, translations } from '../lib/i18n';

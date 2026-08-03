@@ -23,6 +23,10 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [editFront, setEditFront] = useState('');
   const [editBack, setEditBack] = useState('');
+  const [editTopic, setEditTopic] = useState('');
+  const [editSubject, setEditSubject] = useState('');
+  const [editExplanation, setEditExplanation] = useState('');
+  const [editDifficulty, setEditDifficulty] = useState<Flashcard['difficulty']>('medium');
 
   // Add new card state
   const [newFront, setNewFront] = useState('');
@@ -52,12 +56,26 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
     setEditingCardId(c.id);
     setEditFront(c.front);
     setEditBack(c.back);
+    setEditTopic(c.topic || '');
+    setEditSubject(c.subject || '');
+    setEditExplanation(c.explanation || '');
+    setEditDifficulty(c.difficulty || 'medium');
   };
 
   const handleSaveEditCard = (cId: string) => {
     setCards(
       cards.map((c) =>
-        c.id === cId ? { ...c, front: editFront, back: editBack } : c
+        c.id === cId
+          ? {
+              ...c,
+              front: editFront,
+              back: editBack,
+              topic: editTopic,
+              subject: editSubject,
+              explanation: editExplanation,
+              difficulty: editDifficulty,
+            }
+          : c
       )
     );
     setEditingCardId(null);
@@ -158,25 +176,98 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
                 className="p-3.5 rounded-xl bg-[#0b1a2a] border border-[#424754]/30 space-y-2 text-xs"
               >
                 {editingCardId === c.id ? (
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      value={editFront}
-                      onChange={(e) => setEditFront(e.target.value)}
-                      className="w-full bg-[#122131] border border-[#424754]/40 rounded-lg p-2 text-xs text-white"
-                    />
-                    <textarea
-                      rows={2}
-                      value={editBack}
-                      onChange={(e) => setEditBack(e.target.value)}
-                      className="w-full bg-[#122131] border border-[#424754]/40 rounded-lg p-2 text-xs text-white"
-                    />
-                    <button
-                      onClick={() => handleSaveEditCard(c.id)}
-                      className="px-3 py-1 bg-emerald-500 text-white rounded-lg text-xs font-bold"
-                    >
-                      Salvar Alteração
-                    </button>
+                  <div className="space-y-3 border border-emerald-500/40 rounded-xl p-3 bg-[#122131]/70">
+                    {/* Pergunta */}
+                    <div>
+                      <label className="text-[10px] font-bold text-[#8c91a0] uppercase">Pergunta (frente)</label>
+                      <textarea
+                        rows={2}
+                        value={editFront}
+                        onChange={(e) => setEditFront(e.target.value)}
+                        className="w-full mt-1 bg-[#0b1a2a] border border-[#424754]/40 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-[#60a5fa]"
+                      />
+                    </div>
+
+                    {/* Resposta */}
+                    <div>
+                      <label className="text-[10px] font-bold text-[#8c91a0] uppercase">Resposta (verso)</label>
+                      <textarea
+                        rows={3}
+                        value={editBack}
+                        onChange={(e) => setEditBack(e.target.value)}
+                        className="w-full mt-1 bg-[#0b1a2a] border border-[#424754]/40 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-[#60a5fa]"
+                      />
+                    </div>
+
+                    {/* Tópico e Matéria (mesma linha) */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-[#8c91a0] uppercase">🏷️ Tópico</label>
+                        <input
+                          type="text"
+                          value={editTopic}
+                          onChange={(e) => setEditTopic(e.target.value)}
+                          className="w-full mt-1 bg-[#0b1a2a] border border-[#424754]/40 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-[#60a5fa]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-[#8c91a0] uppercase">💻 Matéria</label>
+                        <input
+                          type="text"
+                          value={editSubject}
+                          onChange={(e) => setEditSubject(e.target.value)}
+                          className="w-full mt-1 bg-[#0b1a2a] border border-[#424754]/40 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-[#60a5fa]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Dificuldade */}
+                    <div>
+                      <label className="text-[10px] font-bold text-[#8c91a0] uppercase">Dificuldade</label>
+                      <div className="flex gap-2 mt-1">
+                        {(['easy', 'medium', 'hard', 'expert'] as const).map((d) => (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => setEditDifficulty(d)}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer capitalize ${
+                              editDifficulty === d
+                                ? 'bg-[#60a5fa]/25 border-[#60a5fa]/50 text-[#60a5fa]'
+                                : 'bg-[#0b1a2a] border-[#424754]/40 text-[#8c91a0] hover:border-[#60a5fa]/40'
+                            }`}
+                          >
+                            {d}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Explicação & Exemplo */}
+                    <div>
+                      <label className="text-[10px] font-bold text-amber-400 uppercase">💡 Explicação & Exemplo</label>
+                      <textarea
+                        rows={3}
+                        value={editExplanation}
+                        onChange={(e) => setEditExplanation(e.target.value)}
+                        className="w-full mt-1 bg-[#0b1a2a] border border-amber-500/30 rounded-lg p-2 text-xs text-amber-100/90 focus:outline-none focus:border-amber-500/60"
+                      />
+                    </div>
+
+                    {/* Ações */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        onClick={() => handleSaveEditCard(c.id)}
+                        className="flex-1 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5 inline mr-1" /> Salvar Alteração
+                      </button>
+                      <button
+                        onClick={() => setEditingCardId(null)}
+                        className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <>

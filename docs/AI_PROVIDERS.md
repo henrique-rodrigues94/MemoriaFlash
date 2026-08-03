@@ -1,6 +1,6 @@
 # Provedores de IA — Fallback Multi-Provedor
 
-O FlashMind AI nunca depende de um único provedor de IA. Todas as 6 rotas de
+O MemoriaFlash nunca depende de um único provedor de IA. Todas as 6 rotas de
 IA (`/api/gemini/*`) passam pelo `AIOrchestrator`
 (`src/server/ai/AIOrchestrator.ts`), que tenta uma fila de provedores
 **gratuitos** em ordem e faz fallback automático quando um deles:

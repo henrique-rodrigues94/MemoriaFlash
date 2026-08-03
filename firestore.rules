@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // ============================================================================
-// REGRAS DE SEGURANÇA DO FIRESTORE — FlashMind AI
+// REGRAS DE SEGURANÇA DO FIRESTORE — MemoriaFlash
 // ----------------------------------------------------------------------------
 // ATENÇÃO: as regras originais deste projeto eram `allow read, write: if true`
 // em TODAS as coleções — ou seja, qualquer pessoa na internet, autenticada ou

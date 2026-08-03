@@ -1,4 +1,4 @@
-// 📁 flashmind-ai/src/lib/i18n.test.ts
+// 📁 memoriaflash/src/lib/i18n.test.ts
 import { describe, it, expect } from 'vitest';
 import { translations, SUPPORTED_LANGUAGES, detectBrowserLanguage, SupportedLanguage } from './i18n';
 

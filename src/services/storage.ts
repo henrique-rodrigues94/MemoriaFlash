@@ -40,7 +40,7 @@ removeDemoDecksIfNeeded();
 const INITIAL_DECKS: Deck[] = [];
 
 const INITIAL_STATS: UserStats = {
-  name: 'Estudante FlashMind',
+  name: 'Estudante MemoriaFlash',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
   streakDays: 1,
   dailyGoalTotal: 20,

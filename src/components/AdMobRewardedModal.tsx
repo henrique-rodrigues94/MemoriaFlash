@@ -1,4 +1,4 @@
-// 📁 flashmind-ai/src/components/AdMobRewardedModal.tsx
+// 📁 memoriaflash/src/components/AdMobRewardedModal.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, CheckCircle2, Sparkles, X, Volume2, VolumeX, ShieldCheck, Award, RefreshCw, Flame } from 'lucide-react';
 import { SupportedLanguage, translations } from '../lib/i18n';

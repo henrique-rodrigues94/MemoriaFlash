@@ -1,6 +1,6 @@
 // ============================================================================
 // Estratégia de anúncios por região (tiers de eCPM) — baseada na documentação
-// de monetização do FlashMind AI. Sem uma API paga de geolocalização, usamos
+// de monetização do MemoriaFlash. Sem uma API paga de geolocalização, usamos
 // o idioma/locale do navegador como proxy razoável do país do usuário (o
 // mesmo sinal que o AdMob usa para segmentar demanda). Ao empacotar o app
 // nativamente (Capacitor/Expo), troque esta heurística por Play

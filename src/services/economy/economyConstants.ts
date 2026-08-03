@@ -1,5 +1,5 @@
 // ============================================================================
-// Regras de negócio da economia de créditos do FlashMind AI.
+// Regras de negócio da economia de créditos do MemoriaFlash.
 // Centralizar aqui evita "números mágicos" espalhados pelos componentes e
 // facilita ajustar a estratégia de monetização sem caçar cada tela.
 // ============================================================================
