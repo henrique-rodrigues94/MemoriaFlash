@@ -96,7 +96,17 @@ app.post('/api/gemini/suggest-topics', async (req, res) => {
 
 // Gerenciamento de provedores de IA: limpa cooldowns (após aguardar o reset
 // do rate limit, ex.: reset diário do OpenRouter free ou janela do Groq).
-app.post('/api/ai/reset-cooldowns', (_req, res) => {
+// Protegido por token admin (header `x-admin-token` == ADMIN_TOKEN do .env).
+// Se ADMIN_TOKEN não estiver configurado, o endpoint fica desativado (503).
+app.post('/api/ai/reset-cooldowns', (req, res) => {
+  const adminToken = process.env.ADMIN_TOKEN;
+  if (!adminToken) {
+    return res.status(503).json({ error: 'ADMIN_TOKEN não configurado no servidor.' });
+  }
+  const provided = req.headers['x-admin-token'];
+  if (typeof provided !== 'string' || provided !== adminToken) {
+    return res.status(401).json({ error: 'Não autorizado.' });
+  }
   aiOrchestrator.getProviders().forEach((p) => aiOrchestrator.resetCooldown(p.id));
   res.json({ ok: true, status: aiOrchestrator.getStatus() });
 });

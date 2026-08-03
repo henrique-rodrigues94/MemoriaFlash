@@ -78,93 +78,11 @@ export interface UserStats {
   referralCreditsEarned?: number;
 }
 
-export interface VoiceSettings {
-  wakeWordEnabled: boolean;
-  voicePersona: 'female' | 'male' | 'neutral' | 'custom';
-  selectedVoiceURI?: string;
-  speechSpeed: number;
-  speechPitch?: number;
-  language: string;
-  sensitivityEnabled: boolean;
-  onDevicePrivacy: boolean;
-}
-
-export interface VoiceHistoryItem {
-  id: string;
-  timestamp: string;
-  userMessage: string;
-  aiResponse: string;
-  voicePersona: string;
-  status: 'success' | 'warning' | 'error';
-  suggestedCard?: {
-    front: string;
-    back: string;
-  };
-}
-
 export interface QuizQuestion {
   question: string;
   options: string[];
   correctIndex: number;
   explanation: string;
-}
-
-export interface DuelState {
-  id: string;
-  opponentName: string;
-  opponentBadge: string;
-  opponentAvatar: string;
-  userPoints: number;
-  opponentPoints: number;
-  currentRound: number;
-  totalRounds: number;
-  isUserTurn: boolean;
-  currentTurnName: string;
-  questionIndex: number;
-  questions: QuizQuestion[];
-  timeLeft: number;
-  status: 'lobby' | 'playing' | 'completed';
-  winner?: 'user' | 'opponent' | 'tie';
-  rewardXP: number;
-  rewardCoins: number;
-}
-
-export interface WeaknessCategory {
-  title: string;
-  subCategory: string;
-  errorFrequency: number;
-  avgResponseTimeSec: number;
-  severity: 'CRITICAL' | 'MODERATE' | 'LOW';
-}
-
-export interface RecoveryPlanDay {
-  dayNumber: number;
-  dayLabel: string;
-  title: string;
-  focusBadge: string;
-  description: string;
-  cardCount?: number;
-}
-
-export interface StudentProgress {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  masteryPercent: number;
-  studyTimeFormatted: string;
-  lastActive: string;
-}
-
-export interface TeacherClass {
-  id: string;
-  name: string;
-  category: string;
-  studentCount: number;
-  averageMasteryPercent: number;
-  bgImageUrl: string;
-  code: string;
-  students: StudentProgress[];
 }
 
 export type ActiveTab = 'home' | 'explore' | 'quiz' | 'scanner' | 'cards' | 'stats' | 'profile' | 'create';

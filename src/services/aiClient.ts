@@ -87,49 +87,6 @@ async function callBestProvider(system: string, user: string): Promise<unknown> 
 
 // ─── Tarefas de alto nível ───────────────────────────────────────────────────
 
-export async function clientSuggestTopics(title: string, language = 'pt'): Promise<string[]> {
-  const lang = language === 'pt' ? 'em Português' : `in ${language}`;
-
-  const system = `Você é um assistente pedagógico especialista em currículo educacional.
-Retorne APENAS JSON com o campo "topics": array de 6 a 8 subtópicos ESPECÍFICOS e REAIS do assunto.
-NÃO use frases genéricas como "Fundamentos de X". Cada item deve ser um subtema real e nomeado.`;
-
-  const user = `Liste 6 a 8 subtópicos específicos sobre "${title}" ${lang}.
-Exemplo — se for "Anatomia Humana": ["Sistema Cardiovascular","Sistema Nervoso Central","Ossos do Crânio","Músculos Esqueléticos","Sistema Digestório","Sistema Respiratório"]
-Exemplo — se for "Direito Constitucional": ["Princípios Fundamentais","Direitos e Garantias Fundamentais","Organização do Estado","Processo Legislativo","Controle de Constitucionalidade"]
-Responda APENAS: { "topics": ["...", "..."] }`;
-
-  const data = await callBestProvider(system, user) as any;
-  return data?.topics ?? [];
-}
-
-export async function clientGenerateFlashcards(
-  prompt: string,
-  count = 25,
-  language = 'pt',
-  difficulty = 'medium',
-  selectedTopics: string[] = []
-): Promise<any[]> {
-  const lang = language === 'pt' ? 'em Português' : `in ${language}`;
-  const topicsStr = selectedTopics.length > 0
-    ? ` Foque OBRIGATORIAMENTE nos subtópicos: ${selectedTopics.join(', ')}.`
-    : '';
-
-  const system = `Você é o MemoriaFlash, especialista em flashcards educativos de alta retenção (SRS SM-2).
-Crie exatamente ${count} flashcards sobre "${prompt}" ${lang}.${topicsStr}
-Nível de dificuldade: ${difficulty}.
-REGRA CRÍTICA: "front" = PERGUNTA específica e objetiva. "back" = RESPOSTA completa e diferente da pergunta.
-Os campos front e back JAMAIS podem ter o mesmo texto.
-Responda APENAS com JSON: { "cards": [{"front":"...","back":"...","topic":"...","difficulty":"${difficulty}"},...] }`;
-
-  const user = selectedTopics.length > 0
-    ? `Tema: ${prompt}\nSubtópicos: ${selectedTopics.join(', ')}\nGere ${count} flashcards com perguntas e respostas distintas.`
-    : `Tema: ${prompt}\nGere ${count} flashcards com perguntas e respostas distintas e detalhadas.`;
-
-  const data = await callBestProvider(system, user) as any;
-  return Array.isArray(data) ? data : (data?.cards ?? []);
-}
-
 export async function clientGenerateQuiz(topic: string, count = 4, language = 'pt'): Promise<any[]> {
   const lang = language === 'pt' ? 'em Português' : `in ${language}`;
 
@@ -141,6 +98,3 @@ Responda APENAS com JSON: { "quiz": [{"question":"...","options":["A","B","C","D
   const data = await callBestProvider(system, user) as any;
   return Array.isArray(data) ? data : (data?.quiz ?? []);
 }
-
-// Exporta geminiClient compat
-export { clientSuggestTopics as geminiSuggestTopics, clientGenerateFlashcards as geminiGenerateFlashcards, clientGenerateQuiz as geminiGenerateQuiz };

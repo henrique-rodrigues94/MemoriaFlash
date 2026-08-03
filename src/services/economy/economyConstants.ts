@@ -32,8 +32,6 @@ export const ECONOMY = {
 
   // --- Custo de ações em créditos de IA ---
   COST_GENERATE_DECK: 1, // por flashcard, ou por lote — ver uso no componente
-  COST_VOICE_COMMAND: 1,
-  COST_DUEL_AI_CARDS: 1,
 } as const;
 
 export function todayKey(date: Date = new Date()): string {

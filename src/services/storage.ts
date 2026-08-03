@@ -1,11 +1,8 @@
-import { Deck, UserStats, VoiceSettings, VoiceHistoryItem, TeacherClass } from '../types';
+import { Deck, UserStats } from '../types';
 
 const STORAGE_KEYS = {
   DECKS: 'flashmind_decks_v2',
   STATS: 'flashmind_stats_v2',
-  VOICE_SETTINGS: 'flashmind_voice_settings_v2',
-  VOICE_HISTORY: 'flashmind_voice_history_v2',
-  CLASSES: 'flashmind_classes_v2',
   ONBOARDING_DONE: 'flashmind_onboarding_completed',
   DEMO_REMOVED: 'flashmind_demo_removed_v1',
 };
@@ -54,20 +51,6 @@ const INITIAL_STATS: UserStats = {
   isPro: false,
 };
 
-const INITIAL_VOICE_SETTINGS: VoiceSettings = {
-  wakeWordEnabled: true,
-  voicePersona: 'female',
-  speechSpeed: 1.2,
-  speechPitch: 1.0,
-  language: 'pt',
-  sensitivityEnabled: true,
-  onDevicePrivacy: false,
-};
-
-const INITIAL_VOICE_HISTORY: VoiceHistoryItem[] = [];
-
-const INITIAL_CLASSES: TeacherClass[] = [];
-
 export function getStoredDecks(): Deck[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.DECKS);
@@ -105,60 +88,6 @@ export function saveStoredStats(stats: UserStats): void {
     localStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(stats));
   } catch (e) {
     console.error('Failed to save stats', e);
-  }
-}
-
-export function getVoiceSettings(): VoiceSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.VOICE_SETTINGS);
-    if (!raw) return INITIAL_VOICE_SETTINGS;
-    return JSON.parse(raw);
-  } catch {
-    return INITIAL_VOICE_SETTINGS;
-  }
-}
-
-export function saveVoiceSettings(settings: VoiceSettings): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.VOICE_SETTINGS, JSON.stringify(settings));
-  } catch (e) {
-    console.error('Failed to save voice settings', e);
-  }
-}
-
-export function getVoiceHistory(): VoiceHistoryItem[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.VOICE_HISTORY);
-    if (!raw) return INITIAL_VOICE_HISTORY;
-    return JSON.parse(raw);
-  } catch {
-    return INITIAL_VOICE_HISTORY;
-  }
-}
-
-export function saveVoiceHistory(history: VoiceHistoryItem[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.VOICE_HISTORY, JSON.stringify(history));
-  } catch (e) {
-    console.error('Failed to save voice history', e);
-  }
-}
-
-export function getStoredClasses(): TeacherClass[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.CLASSES);
-    if (!raw) return INITIAL_CLASSES;
-    return JSON.parse(raw);
-  } catch {
-    return INITIAL_CLASSES;
-  }
-}
-
-export function saveStoredClasses(classes: TeacherClass[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(classes));
-  } catch (e) {
-    console.error('Failed to save classes', e);
   }
 }
 

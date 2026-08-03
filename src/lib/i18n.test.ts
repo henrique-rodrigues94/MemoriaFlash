@@ -5,7 +5,7 @@ import { translations, SUPPORTED_LANGUAGES, detectBrowserLanguage, SupportedLang
 // Chaves obrigatórias — se uma chave sumir de um idioma, o teste quebra imediatamente.
 const REQUIRED_KEYS: (keyof typeof translations.pt)[] = [
   // Navegação
-  'home', 'decks', 'aiStudio', 'voiceTutor', 'duel', 'stats', 'login', 'credits', 'proPlan',
+  'home', 'decks', 'aiStudio', 'stats', 'login', 'credits', 'proPlan',
   // Dashboard
   'welcome', 'welcomeSub', 'studyNow', 'createDeck', 'aiGenerator',
   'dailyGoal', 'streakDays', 'masteredCards', 'hoursStudied', 'retention',
