@@ -221,27 +221,6 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Dificuldade */}
-                    <div>
-                      <label className="text-[10px] font-bold text-[#8c91a0] uppercase">Dificuldade</label>
-                      <div className="flex gap-2 mt-1">
-                        {(['easy', 'medium', 'hard', 'expert'] as const).map((d) => (
-                          <button
-                            key={d}
-                            type="button"
-                            onClick={() => setEditDifficulty(d)}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer capitalize ${
-                              editDifficulty === d
-                                ? 'bg-[#60a5fa]/25 border-[#60a5fa]/50 text-[#60a5fa]'
-                                : 'bg-[#0b1a2a] border-[#424754]/40 text-[#8c91a0] hover:border-[#60a5fa]/40'
-                            }`}
-                          >
-                            {d}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
                     {/* Explicação & Exemplo */}
                     <div>
                       <label className="text-[10px] font-bold text-amber-400 uppercase">💡 Explicação & Exemplo</label>
