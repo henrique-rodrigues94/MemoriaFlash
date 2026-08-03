@@ -80,8 +80,9 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
 }) => {
   const t = translations[currentLanguage] || translations.pt;
 
-  // Tópicos únicos do baralho (usados para filtro de estudo)
-  const uniqueTopics = Array.from(new Set(deck.cards.map((c) => c.topic || c.subject || deck.category).filter(Boolean)));
+  // Tópicos únicos do baralho (usados para filtro de estudo) — ordenados alfabeticamente
+  const uniqueTopics = Array.from(new Set(deck.cards.map((c) => c.topic || c.subject || deck.category).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
   // ── Seleção de tópicos a estudar ────────────────────────────────────────────
   // Padrão: TODOS selecionados. O usuário pode desmarcar para estudar só alguns.
