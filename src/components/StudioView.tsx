@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, PlusCircle, CheckCircle2, Loader2, Plus, X, Trash2, BookOpen, Save, HelpCircle, Play, Lock } from 'lucide-react';
+import { Sparkles, PlusCircle, CheckCircle2, Loader2, Plus, X, Trash2, BookOpen, Save, HelpCircle, Play, Lock, Lightbulb } from 'lucide-react';
 import { Deck, UserStats, Flashcard } from '../types';
 import { SupportedLanguage } from '../lib/i18n';
 import { ManualCardForm } from './ManualCardForm';
@@ -46,6 +46,18 @@ export const StudioView: React.FC<StudioViewProps> = ({
   // Listas para Autocomplete
   const existingDeckTitles = Array.from(new Set(decks.map((d) => d.title)));
   const existingSubjects = Array.from(new Set(decks.map((d) => d.category || d.title)));
+
+  // Auto-sync do nome do baralho: quando o usuário digita a matéria, o campo
+  // "Nome do Baralho" é preenchido automaticamente com ela — mas se o usuário
+  // já editou o nome manualmente (deckNamePersonalizado=true), não sobrescreve.
+  const [deckNamePersonalized, setDeckNamePersonalized] = useState(false);
+
+  useEffect(() => {
+    if (!deckNamePersonalized) {
+      setDeckName(subject.trim());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subject]);
 
   useEffect(() => {
     if (subject.trim().length < 2) {
@@ -239,7 +251,10 @@ export const StudioView: React.FC<StudioViewProps> = ({
                   list="deck-name-suggestions"
                   placeholder="Ex: Direito Penal, Biologia..."
                   value={deckName}
-                  onChange={(e) => setDeckName(e.target.value)}
+                  onChange={(e) => {
+                    setDeckName(e.target.value);
+                    setDeckNamePersonalized(true);
+                  }}
                   className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm"
                 />
                 <datalist id="deck-name-suggestions">
@@ -513,8 +528,18 @@ export const StudioView: React.FC<StudioViewProps> = ({
                   <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5" /> Resposta:
                   </span>
-                  <p className="text-sm text-[#adc6ff]">{card.back}</p>
+                  <p className="text-sm text-[#adc6ff] whitespace-pre-line">{card.back}</p>
                 </div>
+
+                {/* Explicação & Exemplo */}
+                {card.explanation && (
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Lightbulb className="w-3.5 h-3.5" /> Explicação & Exemplo:
+                    </span>
+                    <p className="text-sm text-[#fbbf24]/90 whitespace-pre-line">{card.explanation}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>

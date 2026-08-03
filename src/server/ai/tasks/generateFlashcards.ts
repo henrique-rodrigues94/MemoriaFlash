@@ -48,7 +48,7 @@ REGRA CRÍTICA: O campo "front" deve ser uma PERGUNTA e o campo "back" deve ser 
         topic: { type: Type.STRING },
         difficulty: { type: Type.STRING },
       },
-      required: ['front', 'back', 'topic'],
+      required: ['front', 'back', 'topic', 'explanation'],
     },
   };
 
