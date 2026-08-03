@@ -15,7 +15,7 @@ import { AdMobBanner } from './components/AdMobBanner';
 // ----------------------------------------------------------------------------
 const ScannerView = lazy(() => import('./components/ScannerView').then((m) => ({ default: m.ScannerView })));
 const StudioView = lazy(() => import('./components/StudioView').then((m) => ({ default: m.StudioView })));
-const StudyPlanView = lazy(() => import('./components/StudyPlanView').then((m) => ({ default: m.StudyPlanView })));
+const HelpView = lazy(() => import('./components/HelpView').then((m) => ({ default: m.HelpView })));
 const StatsView = lazy(() => import('./components/StatsView').then((m) => ({ default: m.StatsView })));
 const DeckManagerModal = lazy(() =>
   import('./components/DeckManagerModal').then((m) => ({ default: m.DeckManagerModal }))
@@ -390,8 +390,7 @@ export function App() {
             )}
 
             {activeTab === 'quiz' && (
-              <StudyPlanView
-                decks={decks}
+              <HelpView
                 currentLanguage={currentLanguage}
               />
             )}
