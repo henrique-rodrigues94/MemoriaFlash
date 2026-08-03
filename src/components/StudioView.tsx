@@ -603,11 +603,11 @@ export const StudioView: React.FC<StudioViewProps> = ({
                   <p className="text-sm text-[#adc6ff] whitespace-pre-line">{card.back}</p>
                 </div>
 
-                {/* Explicação & Exemplo */}
+                {/* Explicação & Curiosidade */}
                 {card.explanation && (
                   <div className="space-y-1">
                     <span className="text-[11px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Lightbulb className="w-3.5 h-3.5" /> Explicação & Exemplo:
+                      <Lightbulb className="w-3.5 h-3.5" /> Explicação & Curiosidade:
                     </span>
                     <p className="text-sm text-[#fbbf24]/90 whitespace-pre-line">{card.explanation}</p>
                   </div>

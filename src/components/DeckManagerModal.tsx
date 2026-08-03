@@ -221,9 +221,9 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Explicação & Exemplo */}
+                    {/* Explicação & Curiosidade */}
                     <div>
-                      <label className="text-[10px] font-bold text-amber-400 uppercase">💡 Explicação & Exemplo</label>
+                      <label className="text-[10px] font-bold text-amber-400 uppercase">💡 Explicação & Curiosidade</label>
                       <textarea
                         rows={3}
                         value={editExplanation}
@@ -282,7 +282,7 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
                     </div>
                     {c.explanation && (
                       <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-100/90 whitespace-pre-line">
-                        <strong className="text-amber-400">💡 Explicação & Exemplo:</strong>
+                        <strong className="text-amber-400">💡 Explicação & Curiosidade:</strong>
                         <div className="mt-1">{c.explanation}</div>
                       </div>
                     )}
