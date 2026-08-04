@@ -37,9 +37,12 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
     if (!newFront.trim() || !newBack.trim()) return;
     const card: Flashcard = {
       id: `card-${Date.now()}`,
-      front: newFront,
-      back: newBack,
-      topic: deck.title,
+      front: newFront.trim(),
+      back: newBack.trim(),
+      // Sem tópico próprio: cai no fallback do deck.category (mesmo usado na
+      // sessão de estudo), evitando criar um "tópico fantasma" igual ao
+      // título do deck e fragmentar o filtro de tópicos.
+      subject: deck.category,
       difficulty: 'medium',
       reps: 0,
       interval: 0,
@@ -82,13 +85,17 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
   };
 
   const handleDeleteCard = (cId: string) => {
+    if (!confirm('Excluir este cartão? Essa ação não pode ser desfeita depois de salvar.')) return;
     setCards(cards.filter((c) => c.id !== cId));
+    // Se o card excluído estava em edição, fecha o formulário de edição.
+    if (editingCardId === cId) setEditingCardId(null);
   };
 
   const handleSaveAll = () => {
+    const trimmedTitle = title.trim();
     const updated: Deck = {
       ...deck,
-      title,
+      title: trimmedTitle || deck.title, // nunca salva título vazio
       category: deck.category,
       cards,
     };

@@ -93,7 +93,18 @@ export async function tryClaimPendingReferral(): Promise<ClaimReferralResult | n
       clearPendingReferralCode();
       return { success: true, message: data.message, welcomeBonus: data.welcomeBonus };
     }
-    clearPendingReferralCode();
+
+    // CORREÇÃO: antes, QUALQUER falha (inclusive erro transitório do servidor,
+    // ex: 500/503 por config do Firebase Admin ainda não pronta) descartava o
+    // código pendente para sempre — o usuário perdia o bônus de indicação
+    // mesmo que uma nova tentativa mais tarde funcionasse. Agora só
+    // descartamos em rejeições DEFINITIVAS do servidor (código inválido,
+    // autoindicação, já resgatado antes) — erros de servidor mantêm o código
+    // pendente para tentar de novo no próximo login.
+    const isDefinitiveRejection = res.status === 400 || res.status === 404 || res.status === 409;
+    if (isDefinitiveRejection) {
+      clearPendingReferralCode();
+    }
     return { success: false, message: data.error || 'Não foi possível validar o código de indicação.' };
   } catch (err) {
     console.warn('Falha ao resgatar indicação (tentaremos novamente mais tarde):', err);

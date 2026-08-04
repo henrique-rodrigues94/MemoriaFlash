@@ -50,25 +50,28 @@ export const StatsView: React.FC<StatsViewProps> = ({ stats, decks }) => {
 
   const maxHeatmapCount = Math.max(1, ...heatmapDays.map((d) => d.count));
 
-  // Previsão SM-2 real: conta cards com dueDate nos próximos N dias
+  // Previsão SM-2 real: cumulativa — "cards due dentro de N dias" (padrão de
+  // qualquer app de SRS). ANTES: comparava apenas a data EXATA de vencimento,
+  // então um card vencendo em 2 dias nunca aparecia nem em "Amanhã" (1d) nem
+  // em "3 dias" — ficava invisível em todos os buckets. Agora cada bucket é
+  // cumulativo (inclui tudo que já está vencido/vence até aquele prazo).
   const now = new Date();
-  function dueInDays(days: number): number {
+  function endOfDayInNDays(days: number): Date {
     const target = new Date(now);
     target.setDate(target.getDate() + days);
-    const targetStr = target.toLocaleDateString('sv-SE');
+    target.setHours(23, 59, 59, 999);
+    return target;
+  }
+  function dueByCutoff(cutoff: Date): number {
     return decks
       .flatMap((d) => d.cards)
-      .filter((c) => {
-        if (!c.dueDate) return false;
-        const due = new Date(c.dueDate).toLocaleDateString('sv-SE');
-        return due === targetStr;
-      }).length;
+      .filter((c) => !!c.dueDate && new Date(c.dueDate) <= cutoff).length;
   }
 
   const dueToday = decks.reduce((s, d) => s + getDueCardCount(d.cards), 0);
-  const dueTomorrow = dueInDays(1);
-  const dueIn3Days = dueInDays(3);
-  const dueIn7Days = dueInDays(7);
+  const dueTomorrow = dueByCutoff(endOfDayInNDays(1));
+  const dueIn3Days = dueByCutoff(endOfDayInNDays(3));
+  const dueIn7Days = dueByCutoff(endOfDayInNDays(7));
 
   const xpThisWeek = weeklyXP(activityLog);
   const bestStreak = Math.max(stats.bestStreakDays || 0, stats.streakDays);
@@ -195,9 +198,9 @@ export const StatsView: React.FC<StatsViewProps> = ({ stats, decks }) => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: 'Hoje', count: dueToday, color: 'border-amber-500/40 text-amber-300' },
-              { label: 'Amanhã', count: dueTomorrow, color: 'border-blue-500/40 text-[#60a5fa]' },
-              { label: 'Em 3 dias', count: dueIn3Days, color: 'border-indigo-500/40 text-indigo-300' },
-              { label: 'Em 7 dias', count: dueIn7Days, color: 'border-emerald-500/40 text-emerald-300' },
+              { label: 'Até amanhã', count: dueTomorrow, color: 'border-blue-500/40 text-[#60a5fa]' },
+              { label: 'Até 3 dias', count: dueIn3Days, color: 'border-indigo-500/40 text-indigo-300' },
+              { label: 'Até 7 dias', count: dueIn7Days, color: 'border-emerald-500/40 text-emerald-300' },
             ].map((f, i) => (
               <div
                 key={i}

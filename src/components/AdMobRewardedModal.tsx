@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Play, CheckCircle2, Sparkles, X, Volume2, VolumeX, ShieldCheck, Award, RefreshCw, Flame } from 'lucide-react';
 import { SupportedLanguage, translations } from '../lib/i18n';
 import { UserStats } from '../types';
-import { computeNextAdReward, rewardedAdsRemainingToday } from '../services/economy/creditsEngine';
+import { computeNextAdReward, rewardedAdsRemainingToday, canWatchRewardedAd } from '../services/economy/creditsEngine';
 import { ECONOMY } from '../services/economy/economyConstants';
 
 interface AdMobRewardedModalProps {
@@ -37,6 +37,17 @@ export const AdMobRewardedModal: React.FC<AdMobRewardedModalProps> = ({
   const rewardAmount = computeNextAdReward(stats);
   const remainingAfterThis = Math.max(0, rewardedAdsRemainingToday(stats) - 1);
   const streak = stats.adWatchStreakDays || 0;
+  // CORREÇÃO: antes o limite diário (ECONOMY.MAX_REWARDED_ADS_PER_DAY) só era
+  // exibido como texto informativo — nunca era aplicado de verdade. Qualquer
+  // botão que abrisse esse modal diretamente (fora do AdMobBanner, que já
+  // fazia essa checagem) deixava o usuário assistir e resgatar créditos sem
+  // limite algum. Agora o próprio modal recusa o fluxo normal quando o limite
+  // já foi atingido, não importa por onde o usuário chegou até aqui.
+  const capReached = !canWatchRewardedAd(stats);
+
+  useEffect(() => {
+    if (capReached) { setIsPlaying(false); }
+  }, [capReached]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
@@ -96,7 +107,19 @@ export const AdMobRewardedModal: React.FC<AdMobRewardedModalProps> = ({
 
         {/* Video Player Box */}
         <div className="relative aspect-video rounded-2xl bg-slate-950 border border-[#424754]/40 flex flex-col items-center justify-center overflow-hidden shadow-inner">
-          {isPlaying ? (
+          {capReached ? (
+            <div className="text-center p-6 space-y-3 z-10">
+              <div className="w-12 h-12 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center mx-auto border border-slate-700">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-white">Limite diário atingido</h4>
+                <p className="text-[11px] text-[#8c91a0] mt-1">
+                  Você já assistiu {ECONOMY.MAX_REWARDED_ADS_PER_DAY} anúncios hoje. Volte amanhã ou assine o PRO para créditos ilimitados.
+                </p>
+              </div>
+            </div>
+          ) : isPlaying ? (
             <div className="relative w-full h-full flex flex-col justify-between p-4">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-950 via-indigo-950 to-purple-950 animate-gradient-x" />
               <div className="absolute -top-10 -left-10 w-40 h-40 rounded-full bg-blue-500/20 blur-3xl animate-pulse" />
@@ -190,7 +213,14 @@ export const AdMobRewardedModal: React.FC<AdMobRewardedModalProps> = ({
         </div>
 
         {/* Action Button */}
-        {isCompleted ? (
+        {capReached ? (
+          <button
+            onClick={onClose}
+            className="w-full py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-extrabold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
+          >
+            Entendi
+          </button>
+        ) : isCompleted ? (
           <button
             onClick={handleClaimReward}
             className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-[1.01]"
