@@ -3,6 +3,21 @@ import { aiOrchestrator } from '../index';
 import { withCache, CACHE_TTL } from '../cache/aiCache';
 import { extractArrayField } from '../jsonUtils';
 
+/**
+ * Normaliza uma pergunta para comparação de duplicatas: minúsculas, sem
+ * acentuação, sem pontuação/espaços extras. Duas perguntas quase idênticas
+ * (variando só maiúscula/pontuação) caem na mesma chave.
+ */
+function normalizeForDedup(text: string): string {
+  return (text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove acentos
+    .replace(/[^\w\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export async function generateFlashcardsTask(args: {
   prompt: string;
   count?: number;
@@ -13,29 +28,38 @@ export async function generateFlashcardsTask(args: {
   const { prompt, count = 6, language = 'pt', difficulty = 'medium', selectedTopics = [] } = args;
 
   const langInstruction = language === 'pt' ? 'em Português' : `in ${language}`;
-  const topicsStr =
+
+  const difficultyGuide =
+    "'easy' = conceito fundamental/definição básica; 'medium' = aplicação prática/relação entre conceitos; " +
+    "'hard' = exceção, pegadinha comum ou caso-limite; 'expert' = nível de banca de concurso/prova avançada.";
+
+  const topicsInstruction =
     selectedTopics.length > 0
-      ? ` Foque OBRIGATORIAMENTE nos seguintes subtópicos: ${selectedTopics.join(', ')}.`
+      ? `\nSubtópicos prioritários (distribua os ${count} cards de forma EQUILIBRADA entre eles — não concentre tudo em apenas um): ${selectedTopics.join(', ')}.`
       : '';
 
-  const systemPrompt = `Você é o MemoriaFlash, um assistente especialista em criação de flashcards educativos de alta retenção baseados no método de repetição espaçada (SRS SM-2).
-Crie exatamente ${count} flashcards sobre o tema/conteúdo "${prompt}" ${langInstruction}.${topicsStr}
-Nível de dificuldade dos cartões: ${difficulty} ('easy' - conceitos fundamentais, 'medium' - aplicação prática, 'hard' - exceções e aprofundamento, 'expert' - alto nível técnico e bancas de concurso).
-Cada flashcard deve conter:
-- front: Uma PERGUNTA clara, concisa e instigante sobre o conteúdo — NUNCA repita a resposta na pergunta.
-- back: A RESPOSTA completa e diferente da pergunta, com explicação sucinta e 2-3 pontos-chave em tópicos.
-- explanation: Uma EXPLICAÇÃO DIDÁTICA do conceito com pelo menos 1 CURIOSIDADE interessante do mundo real (comece com "📘 Explicação:" e inclua "💡 Curiosidade:").
-- topic: Subtópico específico relacionado ao card.
-- difficulty: Dificuldade estimada ('${difficulty}').
-REGRA CRÍTICA: O campo "front" deve ser uma PERGUNTA e o campo "back" deve ser a RESPOSTA. Eles jamais devem ter o mesmo texto.`;
+  // ── Um único prompt coeso (system define o papel/regras fixas; user traz
+  // os parâmetros concretos do pedido). Evitar duplicar a mesma instrução
+  // nos dois lugares reduz o risco do modelo "misturar" versões levemente
+  // diferentes da mesma regra e economiza tokens de contexto.
+  const systemPrompt = `Você é o MemoriaFlash, especialista em criar flashcards educativos de alta retenção para o método de repetição espaçada (SRS SM-2).
 
-  // O userPrompt agora inclui os tópicos selecionados explicitamente
-  const userPromptFull =
-    selectedTopics.length > 0
-      ? `Tema: ${prompt}\nSubtópicos prioritários: ${selectedTopics.join(', ')}\nGere ${count} flashcards com perguntas e respostas distintas entre si.\nINCLUA em cada card o campo "explanation" com uma explicação didática e uma curiosidade interessante.`
-      : `Tema: ${prompt}\nGere ${count} flashcards com perguntas e respostas distintas entre si.\nINCLUA em cada card o campo "explanation" com uma explicação didática e uma curiosidade interessante.`;
+REGRAS OBRIGATÓRIAS PARA CADA FLASHCARD:
+1. "front" é sempre uma PERGUNTA clara e direta. "back" é sempre a RESPOSTA correspondente. Nunca inverta os dois, e nunca deixe front e back com o mesmo texto ou paráfrases óbvias um do outro.
+   ❌ Errado: front="Mitocôndria" / back="Mitocôndria é a organela responsável pela respiração celular."
+   ✅ Certo: front="Qual organela é responsável pela respiração celular e produção de ATP?" / back="A mitocôndria."
+2. Nenhum card pode repetir a pergunta de outro card do mesmo lote, nem reformular a mesma pergunta com palavras diferentes ("card espelho"). Cada card deve testar um FATO ou RELAÇÃO distinta do conteúdo.
+3. "difficulty" reflete a dificuldade REAL daquele card específico, não um valor fixo repetido em todos: ${difficultyGuide}
+4. "explanation" é uma explicação didática do "back", começando com "📘 Explicação:" e incluindo uma curiosidade real e verificável do mundo real com "💡 Curiosidade:" — nunca invente fatos, datas ou números; se não tiver uma curiosidade genuína, foque em aprofundar a explicação do conceito em vez de inventar uma.
+5. "topic" é o subtópico específico do conteúdo abordado por aquele card (não repita o nome da matéria inteira).
 
-  const schemaHint = `[{ "front": string, "back": string, "explanation": string, "topic": string, "difficulty": "easy"|"medium"|"hard"|"expert" }, ...] — um array com exatamente ${count} objetos (\"cards\").`;
+Responda sempre ${langInstruction}.`;
+
+  const userPrompt = `Assunto: "${prompt}"${topicsInstruction}
+Nível-alvo de dificuldade do conjunto: ${difficulty} (varie individualmente ao redor desse nível conforme a regra 3, mas mantenha a maioria dos cards nesse patamar).
+Gere exatamente ${count} flashcards distintos entre si, cobrindo os conceitos, definições, fórmulas e relações mais importantes do assunto acima.`;
+
+  const schemaHint = `[{ "front": string, "back": string, "explanation": string, "topic": string, "difficulty": "easy"|"medium"|"hard"|"expert" }, ...] — um array com exatamente ${count} objetos ("cards"), cada um com todos os 5 campos preenchidos.`;
 
   const geminiSchema = {
     type: Type.ARRAY,
@@ -48,7 +72,7 @@ REGRA CRÍTICA: O campo "front" deve ser uma PERGUNTA e o campo "back" deve ser 
         topic: { type: Type.STRING },
         difficulty: { type: Type.STRING },
       },
-      required: ['front', 'back', 'topic', 'explanation'],
+      required: ['front', 'back', 'topic', 'explanation', 'difficulty'],
     },
   };
 
@@ -59,14 +83,34 @@ REGRA CRÍTICA: O campo "front" deve ser uma PERGUNTA e o campo "back" deve ser 
     async () => {
       const { data, providerUsed } = await aiOrchestrator.generateJSON({
         systemPrompt,
-        userPrompt: userPromptFull,
+        userPrompt,
         schemaHint,
         geminiSchema,
         // Gerações maiores (25/50/100 cards) precisam de mais tokens de saída
         // para não truncar o JSON — senão o parser retorna 0 cards.
         maxOutputTokens: Math.max(8192, count * 350),
       });
-      const cards = extractArrayField(data, ['cards', 'flashcards']);
+      const rawCards = extractArrayField(data, ['cards', 'flashcards']) as Array<Record<string, unknown>>;
+
+      // Rede de segurança determinística: a instrução no prompt (regra 2)
+      // reduz duplicatas, mas modelos gratuitos/menores nem sempre obedecem
+      // à risca em lotes grandes (25–100 cards). Removemos aqui qualquer
+      // card cuja pergunta normalizada já apareceu antes no mesmo lote,
+      // mantendo a primeira ocorrência.
+      const seen = new Set<string>();
+      const cards = rawCards.filter((card) => {
+        const front = typeof card?.front === 'string' ? card.front : '';
+        const key = normalizeForDedup(front);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      const removedCount = rawCards.length - cards.length;
+      if (removedCount > 0) {
+        console.warn(`[generateFlashcards] ${removedCount} card(s) duplicado(s) removido(s) do lote (provider: ${providerUsed}).`);
+      }
+
       return { cards, providerUsed };
     }
   );

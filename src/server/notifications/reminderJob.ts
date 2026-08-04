@@ -68,7 +68,23 @@ export async function runDailyReminderJob(): Promise<ReminderJobResult> {
 
       if (sendResult.successCount > 0) result.notificationsSent++;
 
-      await prefDoc.ref.set({ lastNotifiedDateKey: today, lastCheckedAt: Date.now() }, { merge: true });
+      // CORREÇÃO: antes marcávamos `lastNotifiedDateKey` sempre que
+      // `sendPushToUser` retornava sem lançar exceção — mas isso inclui o
+      // caso em que TODOS os tokens existiam e falharam na entrega (ex:
+      // instabilidade momentânea do FCM), não só o caso de "usuário sem
+      // nenhum token registrado". No primeiro caso, o job roda de hora em
+      // hora e poderia ter sucesso na tentativa seguinte — mas ao marcar o
+      // dia como "concluído" mesmo com falha total, o usuário ficava sem
+      // NENHUM lembrete naquele dia inteiro. Só marcamos como concluído
+      // quando: (a) o envio teve sucesso em pelo menos 1 dispositivo, ou
+      // (b) o usuário genuinamente não tem nenhum token — nesse caso não há
+      // nada a reenviar, então checar de novo a cada hora seria inútil.
+      const genuineFailure = sendResult.successCount === 0 && sendResult.failureCount > 0;
+      if (!genuineFailure) {
+        await prefDoc.ref.set({ lastNotifiedDateKey: today, lastCheckedAt: Date.now() }, { merge: true });
+      } else {
+        await prefDoc.ref.set({ lastCheckedAt: Date.now() }, { merge: true });
+      }
     } catch (err) {
       result.errors++;
       console.error(`[reminderJob] Falha ao processar usuário ${uid}:`, err);

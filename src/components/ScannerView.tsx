@@ -9,14 +9,12 @@ import {
   AlertCircle,
   FileText,
   X,
-  Plus,
   Play,
   RotateCcw,
   BookOpen,
   ChevronDown,
   ChevronUp,
   Lock,
-  ZoomIn,
   FlipHorizontal,
   CircleDot,
 } from 'lucide-react';
@@ -342,6 +340,10 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
     setHasGetUserMedia(!!(navigator.mediaDevices?.getUserMedia));
   }, []);
 
+  // Créditos insuficientes para gerar (usado tanto para desabilitar o botão
+  // quanto para trocar o texto — calculado uma única vez, não duas)
+  const noCredits = !!stats && !stats.isPro && (stats.aiCredits || 0) < ECONOMY.COST_GENERATE_DECK;
+
   // ── Add items ──────────────────────────────────────────────────────────────
 
   const addItem = useCallback(async (file: File) => {
@@ -602,99 +604,58 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
               />
             </div>
 
-            {/* Câmera button */}
+            {/* Câmera — único botão de captura na tela (antes havia 3: este,
+                "+ Adicionar foto" e o tile "+ Mais" da grade — redundante e
+                confuso). Fica sempre visível logo acima da lista, servindo
+                tanto para a primeira foto quanto para adicionar mais depois. */}
             <button
               type="button"
               onClick={openCamera}
               className="w-full bg-gradient-to-r from-emerald-600/25 to-teal-600/25 text-emerald-300 hover:from-emerald-600/40 hover:to-teal-600/40 border border-emerald-500/30 px-4 py-3.5 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 active:scale-95"
             >
               <Camera className="w-5 h-5" />
-              {hasGetUserMedia ? 'Abrir Câmera — Fotografar Página' : 'Tirar Foto com a Câmera'}
+              {items.length > 0
+                ? 'Fotografar Mais uma Página'
+                : hasGetUserMedia ? 'Abrir Câmera — Fotografar Página' : 'Tirar Foto com a Câmera'}
             </button>
 
-            {/* Items list */}
+            {/* Lista unificada de arquivos — antes cada foto aparecia DUAS
+                vezes na tela (uma na lista "Arquivos selecionados" e de novo
+                na grade "Pré-visualização"). Agora é uma única grade: fotos
+                mostram a miniatura real da imagem, documentos mostram um
+                ícone — tudo num só lugar, sem repetição. */}
             {items.length > 0 && (
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Arquivos selecionados ({items.length})
-                  </p>
-                  <button
-                    type="button"
-                    onClick={openCamera}
-                    className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Adicionar foto
-                  </button>
-                </div>
-
-                <div className="grid gap-2 sm:grid-cols-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Arquivos selecionados ({items.length})
+                </p>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {items.map(item => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-3 bg-slate-950/60 border border-slate-800 rounded-xl p-3 group hover:border-purple-500/30 transition"
-                    >
+                    <div key={item.id} className="relative aspect-square group">
                       {item.type === 'image' && item.previewUrl ? (
                         <img
                           src={item.previewUrl}
                           alt={item.name}
-                          className="w-12 h-12 object-cover rounded-lg shrink-0 border border-slate-700"
+                          className="w-full h-full object-cover rounded-xl border border-slate-700"
                         />
                       ) : (
-                        <div className="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-lg flex items-center justify-center shrink-0">
-                          <FileText className="w-6 h-6" />
+                        <div className="w-full h-full bg-blue-500/10 border border-blue-500/20 rounded-xl flex flex-col items-center justify-center gap-1 p-2">
+                          <FileText className="w-6 h-6 text-blue-400 shrink-0" />
+                          <span className="text-[9px] text-blue-300 text-center leading-tight line-clamp-2 break-all">
+                            {item.name}
+                          </span>
                         </div>
                       )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-white font-medium truncate">{item.name}</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          {item.type === 'image' ? '📷 Imagem / Foto' : '📄 Documento'}
-                        </p>
-                      </div>
                       <button
                         type="button"
                         onClick={() => removeItem(item.id)}
-                        className="text-slate-600 hover:text-rose-400 transition opacity-0 group-hover:opacity-100 shrink-0"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Image previews grid */}
-            {items.some(i => i.type === 'image') && (
-              <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Pré-visualização das fotos
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  {items.filter(i => i.type === 'image').map(item => (
-                    <div key={item.id} className="relative aspect-square">
-                      <img
-                        src={item.previewUrl}
-                        alt={item.name}
-                        className="w-full h-full object-cover rounded-xl border border-slate-700"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.id)}
-                        className="absolute top-1 right-1 w-6 h-6 bg-black/70 text-white rounded-full flex items-center justify-center hover:bg-rose-600/80 transition"
+                        className="absolute top-1 right-1 w-6 h-6 bg-black/70 text-white rounded-full flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-rose-600/80 transition"
+                        title="Remover"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ))}
-                  <button
-                    type="button"
-                    onClick={openCamera}
-                    className="aspect-square border-2 border-dashed border-slate-700 hover:border-emerald-500 rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-emerald-400 transition"
-                  >
-                    <Plus className="w-5 h-5" />
-                    <span className="text-[10px]">Mais</span>
-                  </button>
                 </div>
               </div>
             )}
@@ -743,10 +704,10 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
                 <button
                   type="button"
                   onClick={processItems}
-                  disabled={!!stats && !stats.isPro && (stats.aiCredits || 0) < ECONOMY.COST_GENERATE_DECK}
+                  disabled={noCredits}
                   className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-bold py-4 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  {(!!stats && !stats.isPro && (stats.aiCredits || 0) < ECONOMY.COST_GENERATE_DECK) ? (
+                  {noCredits ? (
                     <><Lock className="w-5 h-5" /> Sem Créditos — Assista um Anúncio</>
                   ) : (
                     <><Play className="w-5 h-5" /> Gerar {cardCount} Flashcards com IA</>
