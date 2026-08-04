@@ -52,7 +52,7 @@ describe('i18n — cobertura de idiomas', () => {
       });
 
       it('chaves de AdMob com placeholders preservam os placeholders', () => {
-        const t = translations[lang as SupportedLanguage] as Record<string, string>;
+        const t = translations[lang as SupportedLanguage] as unknown as Record<string, string>;
         for (const [key, placeholders] of Object.entries(PLACEHOLDER_KEYS)) {
           const val = t[key];
           for (const ph of placeholders) {
@@ -62,7 +62,7 @@ describe('i18n — cobertura de idiomas', () => {
       });
 
       it('nenhuma chave obrigatória é uma string vazia ou undefined', () => {
-        const t = translations[lang as SupportedLanguage] as Record<string, string>;
+        const t = translations[lang as SupportedLanguage] as unknown as Record<string, string>;
         for (const key of REQUIRED_KEYS) {
           const val = t[key];
           expect(typeof val).toBe('string');
@@ -71,6 +71,61 @@ describe('i18n — cobertura de idiomas', () => {
       });
     });
   }
+});
+
+describe('i18n — bloco "help" (aba Ajuda) presente e completo em todos os idiomas', () => {
+  const langs = SUPPORTED_LANGUAGES.map((l) => l.code);
+  const SECTION_IDS = ['study', 'cards', 'scanner', 'stats', 'ai', 'credits'] as const;
+  const FEEDBACK_KEYS = [
+    'heading', 'intro', 'typeBug', 'typeSuggestion', 'typePraise', 'typeOther',
+    'placeholder', 'contactPlaceholder', 'send', 'sentTitle', 'sentBody',
+    'sendAnother', 'errorEmpty', 'errorShort', 'errorEmail', 'errorGeneric',
+  ] as const;
+
+  for (const lang of langs) {
+    describe(`idioma "${lang}"`, () => {
+      const t = translations[lang as SupportedLanguage] as any;
+
+      it('possui title e subtitle', () => {
+        expect(t.help?.title?.trim()).toBeTruthy();
+        expect(t.help?.subtitle?.trim()).toBeTruthy();
+      });
+
+      it.each(SECTION_IDS)('seção "%s" tem title, description e ao menos 2 items', (sectionId) => {
+        const section = t.help?.sections?.[sectionId];
+        expect(section, `Faltando seção "${sectionId}" no idioma "${lang}"`).toBeTruthy();
+        expect(section.title?.trim()).toBeTruthy();
+        expect(section.description?.trim()).toBeTruthy();
+        expect(Array.isArray(section.items)).toBe(true);
+        expect(section.items.length).toBeGreaterThanOrEqual(2);
+        for (const item of section.items) {
+          expect(typeof item).toBe('string');
+          expect(item.trim().length).toBeGreaterThan(0);
+        }
+      });
+
+      it('bloco de feedback tem todas as chaves obrigatórias e não-vazias', () => {
+        for (const key of FEEDBACK_KEYS) {
+          const val = t.help?.feedback?.[key];
+          expect(val, `Faltando "help.feedback.${key}" no idioma "${lang}"`).toBeTruthy();
+          expect(typeof val).toBe('string');
+        }
+      });
+    });
+  }
+
+  it('todos os idiomas têm o mesmo número de seções e de items por seção que o pt (paridade estrutural)', () => {
+    const ptSections = (translations.pt as any).help.sections;
+    for (const lang of langs) {
+      if (lang === 'pt') continue;
+      const sections = (translations[lang as SupportedLanguage] as any).help.sections;
+      for (const id of SECTION_IDS) {
+        expect(sections[id].items.length, `"${lang}".help.sections.${id} com número de items diferente do pt`).toBe(
+          ptSections[id].items.length
+        );
+      }
+    }
+  });
 });
 
 describe('detectBrowserLanguage', () => {

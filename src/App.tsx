@@ -3,7 +3,8 @@ import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { OnboardingModal } from './components/OnboardingModal';
 import { DashboardView } from './components/DashboardView';
-import { StudySessionView } from './components/StudySessionView';
+import { StudySessionView, SessionSummary } from './components/StudySessionView';
+import { countMasteredCards } from './services/srsEngine';
 import { AdMobBanner } from './components/AdMobBanner';
 
 // ----------------------------------------------------------------------------
@@ -254,17 +255,33 @@ export function App() {
     setActiveStudyDeck(deck);
   };
 
-  const handleFinishStudySession = (updatedDeck: Deck, cardsReviewedCount: number) => {
+  const handleFinishStudySession = (
+    updatedDeck: Deck,
+    cardsReviewedCount: number,
+    summary: SessionSummary
+  ) => {
     const updatedDecks = decks.map((d) => (d.id === updatedDeck.id ? updatedDeck : d));
     setDecks(updatedDecks);
     saveDeckToFirestore(updatedDeck);
 
-    // Update user stats (streak e meta diária calculados corretamente por dia — ver src/services/studyStreak.ts)
-    const streakUpdatedStats = applyStudySessionCompleted(stats, cardsReviewedCount);
+    const xpEarned = cardsReviewedCount * 25;
+
+    // Update user stats (streak, meta diária, activityLog, retenção e horas
+    // estudadas — tudo calculado a partir de dados reais da sessão; ver
+    // src/services/studyStreak.ts).
+    const streakUpdatedStats = applyStudySessionCompleted(stats, cardsReviewedCount, {
+      hardCount: summary.hardCount,
+      correctCount: summary.correctCount,
+      xpEarned,
+      minutesStudied: summary.minutesStudied,
+    });
     const newStats: UserStats = {
       ...streakUpdatedStats,
-      totalCardsMastered: stats.totalCardsMastered + Math.floor(cardsReviewedCount / 2),
-      xp: stats.xp + cardsReviewedCount * 25,
+      // "Cards Dominados" agora reflete cards que de fato atingiram um
+      // intervalo maduro no SM-2 (reps >= 3), em vez de um contador que só
+      // crescia com base na quantidade de cards revisados na sessão.
+      totalCardsMastered: countMasteredCards(updatedDecks),
+      xp: stats.xp + xpEarned,
     };
     setStats(newStats);
     saveStatsToFirestore(newStats);

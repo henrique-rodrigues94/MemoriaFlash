@@ -1,4 +1,4 @@
-import { Flashcard, RatingGrade } from '../types';
+import { Flashcard, RatingGrade, Deck } from '../types';
 
 export interface SRSUpdateResult {
   reps: number;
@@ -61,6 +61,24 @@ export function getDueCardCount(cards: Flashcard[]): number {
     if (!card.dueDate) return true;
     return new Date(card.dueDate) <= now;
   }).length;
+}
+
+/**
+ * Considera um card "dominado" quando já sobreviveu a repetições suficientes
+ * no SM-2 (reps >= 3, aprox. 15+ dias de intervalo acumulado) — sinal de
+ * retenção de longo prazo, e não apenas "foi revisado uma vez".
+ *
+ * BUG CORRIGIDO: antes, `totalCardsMastered` em App.tsx era incrementado com
+ * `Math.floor(cardsReviewedCount / 2)` a cada sessão, sem nenhuma relação com
+ * o estado real dos cards (um card avaliado como "hard" repetidamente também
+ * contava como "dominado"). Agora o contador é recalculado a partir do
+ * histórico SM-2 de cada card em todos os decks.
+ */
+export function countMasteredCards(decks: Deck[]): number {
+  return decks.reduce(
+    (total, deck) => total + deck.cards.filter((c) => (c.reps || 0) >= 3).length,
+    0
+  );
 }
 
 export function computeDeckMastery(cards: Flashcard[]): number {

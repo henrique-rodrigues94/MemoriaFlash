@@ -5,6 +5,7 @@
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
+import admin from 'firebase-admin';
 
 import { aiOrchestrator } from './src/server/ai';
 import { generateFlashcardsTask } from './src/server/ai/tasks/generateFlashcards';
@@ -19,6 +20,7 @@ import { notificationsRouter } from './src/server/routes/notifications';
 import { getCacheStats } from './src/server/ai/cache/aiCache';
 import { startCronJobs } from './src/server/cron';
 import { injectReferralMeta, readIndexHtmlTemplate } from './src/server/ogPreview';
+import { getAdminFirestore } from './src/server/firebaseAdmin';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -30,6 +32,11 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/api/gemini', simpleRateLimit({ windowMs: 60_000, max: 30 }));
 app.use('/api/referral', simpleRateLimit({ windowMs: 60_000, max: 20 }));
 app.use('/api/notifications', simpleRateLimit({ windowMs: 60_000, max: 10 }));
+// BUG CORRIGIDO: /api/log não tinha nenhum limite de requisições — como é o
+// mesmo endpoint usado pelo formulário de feedback da aba Ajuda, isso abria
+// brecha para spam (um script podia mandar milhares de "feedbacks" por
+// minuto). Aplica o mesmo padrão de limite básico já usado nas outras rotas.
+app.use('/api/log', simpleRateLimit({ windowMs: 60_000, max: 20 }));
 app.use('/api/referral', referralRouter);
 app.use('/api/notifications', notificationsRouter);
 
@@ -38,25 +45,61 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Endpoint: captura de erros do frontend — apenas LOG no terminal, sem resposta
-// sensível ao cliente. Usado pelo errorLogger.ts (sendBeacon/fetch keepalive).
-app.post('/api/log', (req, res) => {
+// Endpoint: captura de erros do frontend E feedback dos usuários (aba Ajuda).
+// ----------------------------------------------------------------------------
+// BUGS CORRIGIDOS nesta rota:
+// 1) O feedback enviado pelos usuários (HelpView.tsx) só era impresso com
+//    `console.error` — nunca era salvo em lugar nenhum. Na prática, qualquer
+//    feedback enviado se perdia para sempre assim que o terminal rolava ou o
+//    servidor reiniciava, apesar do texto na UI prometer que "chega
+//    diretamente aos desenvolvedores". Agora, quando o Firebase Admin SDK
+//    está configurado, o feedback é persistido na coleção `feedback` do
+//    Firestore (mesmo padrão de persistência já usado em referral.ts). Sem
+//    credenciais configuradas, cai no comportamento antigo (apenas log) para
+//    não derrubar o servidor.
+// 2) Não havia NENHUMA validação de tamanho/tipo — um cliente malicioso podia
+//    mandar um `message` de vários MB (dentro do limite de 10mb do body
+//    parser) ou um `type`/`feedbackType` arbitrário. Agora o payload é
+//    validado e truncado antes de ser processado ou persistido.
+app.post('/api/log', async (req, res) => {
   try {
     const data = req.body || {};
-    const ts = data.ts || new Date().toISOString();
-    const type = data.type || 'frontend';
-    if (type === 'frontend-batch') {
+    const ts = typeof data.ts === 'string' ? data.ts : new Date().toISOString();
+    const type = typeof data.type === 'string' ? data.type : 'frontend';
+    const url = typeof data.url === 'string' ? data.url.slice(0, 500) : undefined;
+
+    if (type === 'feedback') {
+      const message = typeof data.message === 'string' ? data.message.trim().slice(0, 4000) : '';
+      if (!message) {
+        return res.status(400).json({ ok: false, error: 'Mensagem de feedback vazia.' });
+      }
+
+      const db = getAdminFirestore();
+      if (db) {
+        await db.collection('feedback').add({
+          message,
+          url: url || null,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          resolved: false,
+        });
+      } else {
+        // Sem Admin SDK configurado: mantém o comportamento antigo (log local)
+        // como fallback, para não perder o feedback silenciosamente sem avisar.
+        console.warn('[api/log] Firebase Admin não configurado — feedback apenas logado, NÃO persistido:');
+        console.error(`[frontend:feedback] ${ts}`, message, url ? `@ ${url}` : '');
+      }
+    } else if (type === 'frontend-batch') {
       const errors = Array.isArray(data.errors) ? data.errors : [];
       for (const e of errors.slice(0, 50)) {
         console.error(`[frontend:${e?.type || 'error'}] ${ts}`, e?.message || '(sem mensagem)', e?.url ? `@ ${e.url}` : '');
       }
     } else {
-      console.error(`[frontend:${type}] ${ts}`, data.message || '(sem mensagem)', data.url ? `@ ${data.url}` : '');
+      console.error(`[frontend:${type}] ${ts}`, data.message || '(sem mensagem)', url ? `@ ${url}` : '');
     }
     res.json({ ok: true });
   } catch (err) {
     console.error('[api/log] erro ao processar log do frontend:', err);
-    res.json({ ok: false });
+    res.status(500).json({ ok: false, error: 'Falha ao processar o log/feedback.' });
   }
 });
 

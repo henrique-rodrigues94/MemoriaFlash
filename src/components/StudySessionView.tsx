@@ -62,10 +62,20 @@ function responsiveFontSize(text: string, kind: 'question' | 'answer' = 'questio
   return `clamp(${minPx}px, min(${basePx}px, ${sizeCqh}cqh), ${maxPx}px)`;
 }
 
+/** Resumo de desempenho de uma sessão de estudo concluída. */
+export interface SessionSummary {
+  /** Quantos cards foram avaliados como "hard" (errados/difíceis) — base da taxa de retenção. */
+  hardCount: number;
+  /** Quantos cards foram avaliados como "good" ou "easy" (acertos). */
+  correctCount: number;
+  /** Duração aproximada da sessão em minutos (do primeiro card avaliado até o fim). */
+  minutesStudied: number;
+}
+
 interface StudySessionViewProps {
   deck: Deck;
   currentLanguage?: SupportedLanguage;
-  onFinishSession: (updatedDeck: Deck, cardsReviewedCount: number) => void;
+  onFinishSession: (updatedDeck: Deck, cardsReviewedCount: number, summary: SessionSummary) => void;
   // Salva o progresso automaticamente a cada card avaliado (sem fechar a sessão)
   onSaveProgress?: (updatedDeck: Deck) => void;
   onBack: () => void;
@@ -104,6 +114,13 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   const [isFlipped, setIsFlipped] = useState(false);
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
+  // Contadores de acerto/erro da sessão — base real da "Retenção Média" exibida em Estatísticas
+  // (antes esse número nunca era calculado a partir do desempenho de fato).
+  const [hardCount, setHardCount] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
+  // Marca o início da sessão para derivar minutos estudados de forma real
+  // (antes `timeStudiedHours` nunca era incrementado em lugar nenhum do app).
+  const [sessionStartedAt] = useState(() => Date.now());
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   // Inverte pergunta/resposta ao revisar (útil para consolidar a resposta como estímulo)
   const [invertCards, setInvertCards] = useState(false);
@@ -140,6 +157,11 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
     setCards(updatedList);
     const newReviewedCount = reviewedCount + 1;
     setReviewedCount(newReviewedCount);
+    if (rating === 'hard') {
+      setHardCount((prev) => prev + 1);
+    } else {
+      setCorrectCount((prev) => prev + 1);
+    }
 
     setIsFlipped(false);
 
@@ -166,7 +188,14 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
       : mergedCards;
 
     const updatedDeck: Deck = { ...deck, cards: finalCards };
-    onFinishSession(updatedDeck, reviewedCount);
+
+    // Minutos estudados = tempo real decorrido na sessão, arredondado para o minuto
+    // mais próximo (mínimo de 1 min se houve pelo menos 1 card avaliado, para que
+    // sessões curtas ainda apareçam no histórico de atividade).
+    const elapsedMs = Date.now() - sessionStartedAt;
+    const minutesStudied = reviewedCount > 0 ? Math.max(1, Math.round(elapsedMs / 60000)) : 0;
+
+    onFinishSession(updatedDeck, reviewedCount, { hardCount, correctCount, minutesStudied });
   };
 
   const handleBackRequest = () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { calculateSM2, getDueCardCount, computeDeckMastery } from './srsEngine';
-import { Flashcard } from '../types';
+import { calculateSM2, getDueCardCount, computeDeckMastery, countMasteredCards } from './srsEngine';
+import { Flashcard, Deck } from '../types';
 
 function baseCard(overrides: Partial<Flashcard> = {}): Flashcard {
   return {
@@ -104,5 +104,48 @@ describe('computeDeckMastery', () => {
   it('nunca ultrapassa 100% mesmo com reps acima do esperado', () => {
     const cards = [baseCard({ reps: 20 })];
     expect(computeDeckMastery(cards)).toBeLessThanOrEqual(100);
+  });
+});
+
+function baseDeck(cards: Flashcard[], overrides: Partial<Deck> = {}): Deck {
+  return {
+    id: 'd1',
+    title: 'Deck Teste',
+    category: 'Geral',
+    description: '',
+    cards,
+    color: '#000',
+    accentBorder: '#000',
+    ...overrides,
+  };
+}
+
+describe('countMasteredCards — corrige o bug de "Cards Dominados" desconectado do desempenho real', () => {
+  it('não conta cards com poucas repetições (reps < 3)', () => {
+    const decks = [baseDeck([baseCard({ reps: 0 }), baseCard({ id: 'c2', reps: 2 })])];
+    expect(countMasteredCards(decks)).toBe(0);
+  });
+
+  it('conta cards que atingiram reps >= 3', () => {
+    const decks = [
+      baseDeck([
+        baseCard({ id: 'c1', reps: 3 }),
+        baseCard({ id: 'c2', reps: 5 }),
+        baseCard({ id: 'c3', reps: 1 }),
+      ]),
+    ];
+    expect(countMasteredCards(decks)).toBe(2);
+  });
+
+  it('soma cards dominados em múltiplos decks', () => {
+    const decks = [
+      baseDeck([baseCard({ id: 'c1', reps: 3 })], { id: 'd1' }),
+      baseDeck([baseCard({ id: 'c2', reps: 4 }), baseCard({ id: 'c3', reps: 0 })], { id: 'd2' }),
+    ];
+    expect(countMasteredCards(decks)).toBe(2);
+  });
+
+  it('lista de decks vazia retorna 0', () => {
+    expect(countMasteredCards([])).toBe(0);
   });
 });

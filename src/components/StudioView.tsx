@@ -1,12 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Sparkles, PlusCircle, CheckCircle2, Loader2, Plus, X, Trash2, BookOpen, Save, HelpCircle, Play, Lock, Lightbulb } from 'lucide-react';
+// 📁 flashmind-ai/src/components/StudioView.tsx
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Sparkles, PlusCircle, CheckCircle2, Loader2, Plus, X, Trash2,
+  BookOpen, Save, HelpCircle, Play, Lock, Lightbulb, ChevronDown,
+  ChevronUp, Wand2, Tag,
+} from 'lucide-react';
 import { Deck, UserStats, Flashcard } from '../types';
 import { SupportedLanguage } from '../lib/i18n';
 import { ManualCardForm } from './ManualCardForm';
 import { fetchAITopicSuggestions, generateAICards } from '../lib/aiGenerator';
 import { findClosestMatch } from '../lib/spellCheck';
-import { hasEnoughCredits, applySpendCredits } from '../services/economy/creditsEngine';
+import { hasEnoughCredits } from '../services/economy/creditsEngine';
 import { ECONOMY } from '../services/economy/economyConstants';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface StudioViewProps {
   decks: Deck[];
@@ -16,11 +23,177 @@ interface StudioViewProps {
   onDeductCredit?: (amount?: number) => void;
   onOpenAdMob?: () => void;
   onOpenSubscription?: () => void;
-  /** Deck para pré-preencher os campos (ex: vindo do Gerenciador de Deck). */
   initialDeck?: Deck | null;
-  /** Chamado após consumir o initialDeck (para limpar o estado no App). */
   onConsumedInitialDeck?: () => void;
 }
+
+// ─── Spell-check suggestion pill ─────────────────────────────────────────────
+
+function SpellSuggestion({ suggestion, onAccept }: { suggestion: string; onAccept: () => void }) {
+  return (
+    <div className="mt-2 px-3.5 py-2.5 rounded-xl bg-[#122131] border border-blue-500/30 flex items-center gap-2 text-xs animate-fade-in">
+      <Sparkles className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+      <span className="text-[#c2c6d6]">Você quis dizer</span>
+      <button
+        type="button"
+        onClick={onAccept}
+        className="font-extrabold text-[#60a5fa] hover:text-white underline decoration-dotted underline-offset-2 cursor-pointer"
+      >
+        {suggestion.toUpperCase()}
+      </button>
+      <span className="text-[#8c91a0]">?</span>
+    </div>
+  );
+}
+
+// ─── Generated card preview ───────────────────────────────────────────────────
+
+function AICardPreview({ card, index, onRemove }: { card: Flashcard; index: number; onRemove: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="bg-[#0b1a2a]/95 border border-[#adc6ff]/20 rounded-2xl overflow-hidden shadow-xl">
+      <button
+        type="button"
+        onClick={() => setExpanded(e => !e)}
+        className="w-full text-left p-4 flex items-start gap-3 hover:bg-white/5 transition"
+      >
+        <span className="text-[11px] font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 rounded-lg px-2 py-1 shrink-0 mt-0.5">
+          #{index + 1}
+        </span>
+        <div className="flex-1 min-w-0">
+          {card.topic && (
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1 truncate">{card.topic}</p>
+          )}
+          <p className="text-sm text-white font-semibold leading-snug">
+            {card.front}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0 mt-0.5">
+          {expanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); onRemove(); }}
+            className="text-slate-600 hover:text-red-400 p-0.5 transition-colors cursor-pointer"
+            title="Remover card"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3 border-t border-[#424754]/40 pt-3">
+          <div className="space-y-1">
+            <span className="text-[11px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+              <HelpCircle className="w-3.5 h-3.5" /> Pergunta:
+            </span>
+            <p className="text-sm text-white">{card.front}</p>
+          </div>
+          <div className="space-y-1">
+            <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Resposta:
+            </span>
+            <p className="text-sm text-[#adc6ff] whitespace-pre-line">{card.back}</p>
+          </div>
+          {card.explanation && (
+            <div className="space-y-1">
+              <span className="text-[11px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Lightbulb className="w-3.5 h-3.5" /> Explicação:
+              </span>
+              <p className="text-sm text-[#fbbf24]/90 whitespace-pre-line">{card.explanation}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Manual card preview ──────────────────────────────────────────────────────
+
+function ManualCardPreview({ card, onRemove }: { card: Flashcard; onRemove: () => void }) {
+  return (
+    <div className="bg-[#0b1a2a]/95 border border-[#adc6ff]/20 rounded-2xl p-5 text-left space-y-3 shadow-xl">
+      <div className="flex items-center justify-between border-b border-[#424754]/40 pb-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30">
+            {card.subject}
+          </span>
+          <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30">
+            {card.topic}
+          </span>
+        </div>
+        <button
+          onClick={onRemove}
+          className="text-[#8c91a0] hover:text-red-400 p-1.5 transition-colors cursor-pointer"
+          title="Remover visualização"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="space-y-1">
+        <span className="text-[11px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+          <HelpCircle className="w-3.5 h-3.5" /> Pergunta:
+        </span>
+        <p className="text-sm text-white font-semibold">{card.front}</p>
+      </div>
+      <div className="space-y-1">
+        <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5" /> Resposta:
+        </span>
+        <p className="text-sm text-[#adc6ff]">{card.back}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Credits banner ───────────────────────────────────────────────────────────
+
+function CreditsBanner({
+  stats,
+  onOpenAdMob,
+}: {
+  stats: UserStats;
+  onOpenAdMob?: () => void;
+}) {
+  if (stats.isPro) return null;
+  const credits = stats.aiCredits || 0;
+  const hasCredits = credits > 0;
+  return (
+    <div className={`rounded-xl p-3.5 flex items-center justify-between gap-3 border ${
+      hasCredits ? 'bg-blue-500/10 border-blue-500/30' : 'bg-amber-500/10 border-amber-500/30'
+    }`}>
+      <div className="flex items-center gap-2">
+        {hasCredits
+          ? <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+          : <Lock className="w-4 h-4 text-amber-400 shrink-0" />}
+        <div>
+          <p className={`text-xs font-bold ${hasCredits ? 'text-blue-300' : 'text-amber-300'}`}>
+            {hasCredits
+              ? `${credits} crédito${credits !== 1 ? 's' : ''} disponível`
+              : 'Sem créditos — assista um vídeo para ganhar'}
+          </p>
+          <p className="text-[11px] text-slate-400">
+            {hasCredits
+              ? `Cada geração custa ${ECONOMY.COST_GENERATE_DECK} crédito`
+              : 'Créditos são necessários para usar a IA'}
+          </p>
+        </div>
+      </div>
+      {!hasCredits && onOpenAdMob && (
+        <button
+          type="button"
+          onClick={onOpenAdMob}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold whitespace-nowrap hover:bg-amber-500/30 transition"
+        >
+          <Play className="w-3.5 h-3.5 fill-current" /> Ganhar créditos
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export const StudioView: React.FC<StudioViewProps> = ({
   decks,
@@ -28,74 +201,62 @@ export const StudioView: React.FC<StudioViewProps> = ({
   onSaveNewDeck,
   onDeductCredit,
   onOpenAdMob,
-  onOpenSubscription,
   initialDeck,
   onConsumedInitialDeck,
 }) => {
   const [activeMode, setActiveMode] = useState<'ia' | 'manual'>('ia');
 
-  // Estados Form IA
+  // ── Gerador IA — form state ───────────────────────────────────────────────
   const [subject, setSubject] = useState('');
   const [deckName, setDeckName] = useState('');
+  // true quando o usuário editou o nome manualmente (não sincroniza com matéria)
+  const [deckNameLocked, setDeckNameLocked] = useState(false);
   const [topicInput, setTopicInput] = useState('');
   const [topics, setTopics] = useState<string[]>([]);
   const [suggestedTopics, setSuggestedTopics] = useState<string[]>([]);
-  const [cardCount, setCardCount] = useState<number>(10);
+  const [cardCount, setCardCount] = useState<number>(25);
   const [isLoading, setIsLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const topicInputRef = useRef<HTMLInputElement>(null);
 
-  // Cards gerados pela IA
+  // ── Cards gerados / criados ───────────────────────────────────────────────
   const [generatedAICards, setGeneratedAICards] = useState<Flashcard[]>([]);
-
-  // Cards criados no modo Manual
   const [createdManualCards, setCreatedManualCards] = useState<Flashcard[]>([]);
 
-  // Listas para Autocomplete
-  const existingDeckTitles = Array.from(new Set(decks.map((d) => d.title)));
-  // Matérias existentes: categorias, títulos e os "subject" dos cards (campo
-  // real de matéria). Isso garante que "geografia" (subject dos cards) apareça
-  // como candidato mesmo se a categoria do deck for outra.
+  // ── Autocomplete lists ────────────────────────────────────────────────────
+  const existingDeckTitles = Array.from(new Set(decks.map(d => d.title)));
   const existingSubjects = Array.from(
     new Set(
-      decks.flatMap((d) => [
+      decks.flatMap(d => [
         d.category || d.title,
-        ...d.cards.map((c) => c.subject).filter((s): s is string => !!s),
+        ...d.cards.map(c => c.subject).filter((s): s is string => !!s),
       ])
     )
   );
 
-  // Auto-sync do nome do baralho: quando o usuário digita a matéria, o campo
-  // "Nome do Baralho" é preenchido automaticamente com ela — mas se o usuário
-  // já editou o nome manualmente (deckNamePersonalizado=true), não sobrescreve.
-  const [deckNamePersonalized, setDeckNamePersonalized] = useState(false);
-
-  // Correção ortográfica — "Você quis dizer?" quando o usuário digita errado
-  // (ex: "geogafia" → sugere "geografia"). Baseado nas matérias/decks existentes.
+  // ── Spell-check suggestions ───────────────────────────────────────────────
   const [subjectSuggestion, setSubjectSuggestion] = useState<string | null>(null);
   const [deckNameSuggestion, setDeckNameSuggestion] = useState<string | null>(null);
 
-  // Pré-preenche os campos com o deck vindo do Gerenciador de Deck (botão
-  // "+ Adicionar Cartão"). Só executa quando o initialDeck chega/passa a existir.
+  // ── Pré-preenche campos quando vem do Gerenciador de Deck ─────────────────
   useEffect(() => {
-    if (initialDeck) {
-      // Matéria = a MATÉRIA dos cards (subject), não o tópico/categoria.
-      const firstCardSubject = initialDeck.cards.find((c) => c.subject)?.subject || '';
-      const fallbackSubject = firstCardSubject || initialDeck.category || initialDeck.title || '';
-      setSubject(fallbackSubject.toUpperCase());
-      setDeckName((initialDeck.title || '').toUpperCase());
-      setDeckNamePersonalized(true); // o nome veio preenchido, não sobrescrever
-      if (onConsumedInitialDeck) onConsumedInitialDeck();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialDeck?.id]);
+    if (!initialDeck) return;
+    const firstCardSubject = initialDeck.cards.find(c => c.subject)?.subject || '';
+    const fallback = firstCardSubject || initialDeck.category || initialDeck.title || '';
+    setSubject(fallback.toUpperCase());
+    setDeckName(initialDeck.title.toUpperCase());
+    setDeckNameLocked(true);
+    onConsumedInitialDeck?.();
+  }, [initialDeck?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Ao digitar a matéria, sincroniza o nome do baralho (se não foi personalizado)
-  // Nome do baralho e matéria são sempre armazenados em LETRAS MAIÚSCULAS.
+  // ── Handlers: subject & deckName ──────────────────────────────────────────
   const handleSubjectChange = (value: string) => {
     const upper = value.toUpperCase();
     setSubject(upper);
     setSubjectSuggestion(findClosestMatch(upper, existingSubjects));
-    if (!deckNamePersonalized) {
+    // Sincroniza nome do baralho enquanto o usuário não tiver editado manualmente
+    if (!deckNameLocked) {
       setDeckName(upper.trim());
       setDeckNameSuggestion(findClosestMatch(upper, existingDeckTitles));
     }
@@ -104,52 +265,56 @@ export const StudioView: React.FC<StudioViewProps> = ({
   const handleDeckNameChange = (value: string) => {
     const upper = value.toUpperCase();
     setDeckName(upper);
-    setDeckNamePersonalized(true);
+    setDeckNameLocked(true); // usuário editou — não sobrescreve mais
     setDeckNameSuggestion(findClosestMatch(upper, existingDeckTitles));
   };
 
+  // Limpa o nome do baralho → volta a sincronizar com a matéria
+  const handleClearDeckName = () => {
+    setDeckName('');
+    setDeckNameLocked(false);
+    setDeckNameSuggestion(null);
+  };
+
+  // ── Sugestões de tópicos (debounce 600ms) ─────────────────────────────────
   useEffect(() => {
     if (subject.trim().length < 2) {
       setSuggestedTopics([]);
       return;
     }
-    // Debounce 600ms — chama o backend para sugestões reais de IA
     const timer = setTimeout(async () => {
-      const suggestions = await fetchAITopicSuggestions(subject);
-      setSuggestedTopics(suggestions.filter((t) => !topics.includes(t)));
+      try {
+        const suggestions = await fetchAITopicSuggestions(subject);
+        setSuggestedTopics(suggestions.filter(t => !topics.includes(t)));
+      } catch {
+        // silencioso — sugestões são opcionais
+      }
     }, 600);
     return () => clearTimeout(timer);
   }, [subject, topics]);
 
-  const handleAddTopic = (topicToAdd?: string) => {
-    const target = topicToAdd || topicInput.trim();
+  // ── Tópicos ───────────────────────────────────────────────────────────────
+  const handleAddTopic = useCallback((topicToAdd?: string) => {
+    const target = (topicToAdd || topicInput).trim();
     if (target && !topics.includes(target)) {
-      setTopics([...topics, target]);
+      setTopics(prev => [...prev, target]);
       setTopicInput('');
+      topicInputRef.current?.focus();
     }
-  };
+  }, [topicInput, topics]);
 
-  const handleRemoveTopic = (index: number) => {
-    setTopics(topics.filter((_, i) => i !== index));
-  };
+  const handleRemoveTopic = (index: number) =>
+    setTopics(prev => prev.filter((_, i) => i !== index));
 
-  // --- ADICIONA CARD MANUAL E VINCULA AO BARALHO ---
+  // ── Card manual → persiste no baralho ────────────────────────────────────
   const handleAddManualCard = (newCard: Flashcard, targetDeckName: string) => {
-    // Procura se já existe um baralho com esse nome (evita duplicidade de baralhos)
-    const existingDeck = decks.find(
-      (d) => d.title.trim().toLowerCase() === targetDeckName.trim().toLowerCase()
+    const existing = decks.find(
+      d => d.title.trim().toLowerCase() === targetDeckName.trim().toLowerCase()
     );
-
-    if (existingDeck) {
-      // Adiciona o card ao baralho existente
-      const updatedDeck: Deck = {
-        ...existingDeck,
-        cards: [newCard, ...existingDeck.cards],
-      };
-      onSaveNewDeck(updatedDeck);
+    if (existing) {
+      onSaveNewDeck({ ...existing, cards: [newCard, ...existing.cards] });
     } else {
-      // Cria um novo baralho
-      const newDeck: Deck = {
+      onSaveNewDeck({
         id: `deck-${Date.now()}`,
         title: targetDeckName.trim(),
         category: newCard.subject || 'Geral',
@@ -158,127 +323,113 @@ export const StudioView: React.FC<StudioViewProps> = ({
         accentBorder: 'border-l-primary',
         cards: [newCard],
         createdAt: new Date().toISOString(),
-      };
-      onSaveNewDeck(newDeck);
+      });
     }
-
-    // Adiciona na lista visual de pré-visualização abaixo
-    setCreatedManualCards((prev) => [newCard, ...prev]);
-
-    setSuccessMsg(`🎉 Card adicionado ao baralho "${targetDeckName}"!`);
-    setTimeout(() => setSuccessMsg(null), 3500);
+    setCreatedManualCards(prev => [newCard, ...prev]);
+    showSuccess(`🎉 Card adicionado ao baralho "${targetDeckName}"!`);
   };
 
-  // --- GERAÇÃO VIA IA ---
+  // ── Geração IA ────────────────────────────────────────────────────────────
   const handleGenerateCards = async () => {
     if (!subject.trim()) {
-      alert('Por favor, digite a Matéria / Assunto.');
+      setErrorMsg('Por favor, digite a Matéria / Assunto.');
       return;
     }
-
-    // Gate de créditos: 1 crédito por geração
     const cost = ECONOMY.COST_GENERATE_DECK;
     if (!hasEnoughCredits(stats, cost)) {
-      // Abre modal de anúncio recompensado para ganhar créditos
-      if (onOpenAdMob) onOpenAdMob();
+      onOpenAdMob?.();
       return;
     }
-
     setIsLoading(true);
+    setErrorMsg(null);
     setSuccessMsg(null);
-
     try {
       const cards = await generateAICards(subject.trim(), topics, cardCount);
-      // Desconta crédito após geração bem-sucedida
-      if (onDeductCredit) onDeductCredit(cost);
+      onDeductCredit?.(cost);
       setGeneratedAICards(cards);
-    } catch (error: any) {
-      console.error(error);
-      alert(error?.message || 'Ocorreu um erro ao gerar os cards com IA.');
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Ocorreu um erro ao gerar os cards com IA.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // --- SALVAMENTO FINAL DOS CARDS GERADOS POR IA ---
+  // ── Salvar cards gerados pela IA ──────────────────────────────────────────
   const handleSaveAllAICards = () => {
-    if (generatedAICards.length === 0) return;
-
-    // Nome do baralho: prioriza o campo manual, senão usa a matéria
-    const mainSubject = (deckName.trim() || generatedAICards[0].subject || subject.trim() || 'Geral');
-    const existingDeck = decks.find(
-      (d) => d.title.toLowerCase() === mainSubject.toLowerCase()
-    );
-
-    if (existingDeck) {
-      const updatedDeck: Deck = {
-        ...existingDeck,
-        cards: [...generatedAICards, ...existingDeck.cards],
-      };
-      onSaveNewDeck(updatedDeck);
+    if (!generatedAICards.length) return;
+    // Nome do baralho: campo manual → matéria → fallback 'Geral'
+    const title = (deckName.trim() || subject.trim() || generatedAICards[0].subject || 'Geral');
+    const existing = decks.find(d => d.title.toLowerCase() === title.toLowerCase());
+    if (existing) {
+      onSaveNewDeck({ ...existing, cards: [...generatedAICards, ...existing.cards] });
     } else {
-      const newDeck: Deck = {
+      onSaveNewDeck({
         id: `deck-${Date.now()}`,
-        title: mainSubject,
+        title,
         category: generatedAICards[0].topic || 'Geral',
         description: '',
         color: '#60a5fa',
         accentBorder: 'border-l-primary',
         cards: generatedAICards,
         createdAt: new Date().toISOString(),
-      };
-      onSaveNewDeck(newDeck);
+      });
     }
-
-    setSuccessMsg(`🎉 ${generatedAICards.length} Flashcards salvos no baralho "${mainSubject}"!`);
+    showSuccess(`🎉 ${generatedAICards.length} flashcards salvos em "${title}"!`);
+    // Reset form
     setGeneratedAICards([]);
     setTopics([]);
     setSubject('');
     setDeckName('');
+    setDeckNameLocked(false);
   };
 
-  const handleRemoveAICard = (cardId: string) => {
-    setGeneratedAICards((prev) => prev.filter((c) => c.id !== cardId));
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const showSuccess = (msg: string) => {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(null), 4000);
   };
 
-  const handleRemoveManualCard = (cardId: string) => {
-    setCreatedManualCards((prev) => prev.filter((c) => c.id !== cardId));
-  };
+  const noCredits = !stats.isPro && (stats.aiCredits || 0) < ECONOMY.COST_GENERATE_DECK;
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-3xl mx-auto pb-24 animate-fade-in space-y-6">
-      {/* Seletor IA / Manual */}
+
+      {/* Tab switcher */}
       <div className="flex justify-center">
         <div className="bg-[#0b1a2a] p-1.5 rounded-2xl border border-[#424754]/40 flex items-center gap-2 shadow-lg">
-          <button
-            onClick={() => setActiveMode('ia')}
-            className={`px-6 py-2.5 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer ${
-              activeMode === 'ia'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                : 'text-[#8c91a0] hover:text-white'
-            }`}
-          >
-            <Sparkles className="w-4 h-4" /> Gerador IA
-          </button>
-          <button
-            onClick={() => setActiveMode('manual')}
-            className={`px-6 py-2.5 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer ${
-              activeMode === 'manual'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                : 'text-[#8c91a0] hover:text-white'
-            }`}
-          >
-            <PlusCircle className="w-4 h-4" /> Manual
-          </button>
+          {(['ia', 'manual'] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => setActiveMode(mode)}
+              className={`px-6 py-2.5 rounded-xl font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+                activeMode === mode
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-[#8c91a0] hover:text-white'
+              }`}
+            >
+              {mode === 'ia'
+                ? <><Sparkles className="w-4 h-4" /> Gerador IA</>
+                : <><PlusCircle className="w-4 h-4" /> Manual</>}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Formulário Central */}
+      {/* Form card */}
       <div className="bg-[#0b1a2a]/90 backdrop-blur-xl border border-[#adc6ff]/20 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+
+        {/* Feedback banners */}
         {successMsg && (
           <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5 animate-fade-in">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-            <span>{successMsg}</span>
+            {successMsg}
+          </div>
+        )}
+        {errorMsg && (
+          <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5 animate-fade-in">
+            <X className="w-4 h-4 text-rose-400 flex-shrink-0" />
+            {errorMsg}
           </div>
         )}
 
@@ -290,84 +441,92 @@ export const StudioView: React.FC<StudioViewProps> = ({
           />
         ) : (
           <div className="space-y-5 text-left">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5">
-                � NOME DO BARALHO:
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  list="deck-name-suggestions"
-                  placeholder="Ex: DIREITO PENAL, BIOLOGIA..."
-                  value={deckName}
-                  onChange={(e) => handleDeckNameChange(e.target.value)}
-                  className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm uppercase"
-                />
-                {deckNameSuggestion && deckNameSuggestion.toUpperCase() !== deckName.trim().toUpperCase() && (
-                  <div className="mt-2 px-3.5 py-2.5 rounded-xl bg-[#122131] border border-blue-500/30 flex items-center gap-2 text-xs animate-fade-in">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-                    <span className="text-[#c2c6d6]">Você quis dizer</span>
-                    <button
-                      type="button"
-                      onClick={() => handleDeckNameChange(deckNameSuggestion)}
-                      className="font-extrabold text-[#60a5fa] hover:text-white underline decoration-dotted underline-offset-2 cursor-pointer"
-                    >
-                      {deckNameSuggestion.toUpperCase()}
-                    </button>
-                    <span className="text-[#8c91a0]">?</span>
-                  </div>
-                )}
-                <datalist id="deck-name-suggestions">
-                  {existingDeckTitles.map((s) => (
-                    <option key={s} value={s} />
-                  ))}
-                </datalist>
-              </div>
-            </div>
 
+            {/* ── Matéria (obrigatório) ── */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5">
-                �💻 MATÉRIA / ASSUNTO:
+                📚 Matéria / Assunto <span className="text-rose-400">*</span>
               </label>
               <div className="relative">
                 <input
                   type="text"
                   list="subject-suggestions"
-                  placeholder="Ex: DIREITO PENAL, BIOLOGIA, MATEMÁTICA..."
+                  placeholder="Ex: DIREITO PENAL, BIOLOGIA, MATEMÁTICA…"
                   value={subject}
-                  onChange={(e) => handleSubjectChange(e.target.value)}
-                  className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm"
-                />                {subjectSuggestion && subjectSuggestion.toUpperCase() !== subject.trim().toUpperCase() && (
-                  <div className="mt-2 px-3.5 py-2.5 rounded-xl bg-[#122131] border border-blue-500/30 flex items-center gap-2 text-xs animate-fade-in">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-                    <span className="text-[#c2c6d6]">Você quis dizer</span>
-                    <button
-                      type="button"
-                      onClick={() => handleSubjectChange(subjectSuggestion)}
-                      className="font-extrabold text-[#60a5fa] hover:text-white underline decoration-dotted underline-offset-2 cursor-pointer"
-                    >
-                      {subjectSuggestion.toUpperCase()}
-                    </button>
-                    <span className="text-[#8c91a0]">?</span>
-                  </div>
-                )}                {/* Autocomplete: sugere matérias de decks já existentes */}
-                <datalist id="subject-suggestions">
-                  {existingSubjects.map((s) => (
-                    <option key={s} value={s} />
-                  ))}
-                </datalist>
+                  onChange={e => handleSubjectChange(e.target.value)}
+                  className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm uppercase"
+                />
                 {subject.trim().length >= 2 && (
-                  <div className="absolute inset-y-0 right-3 flex items-center text-[#60a5fa]">
+                  <div className="absolute inset-y-0 right-3 flex items-center text-[#60a5fa] pointer-events-none">
                     <Sparkles className="w-4 h-4" />
                   </div>
                 )}
+                <datalist id="subject-suggestions">
+                  {existingSubjects.map(s => <option key={s} value={s} />)}
+                </datalist>
               </div>
+              {subjectSuggestion && subjectSuggestion.toUpperCase() !== subject.trim().toUpperCase() && (
+                <SpellSuggestion
+                  suggestion={subjectSuggestion}
+                  onAccept={() => handleSubjectChange(subjectSuggestion)}
+                />
+              )}
             </div>
 
+            {/* ── Nome do Baralho (opcional) ── */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#adc6ff]">
+                  🗂️ Nome do Baralho{' '}
+                  <span className="text-[#8c91a0] font-normal normal-case tracking-normal">
+                    (opcional — usa a Matéria se vazio)
+                  </span>
+                </label>
+                {deckName && (
+                  <button
+                    type="button"
+                    onClick={handleClearDeckName}
+                    className="text-[10px] text-[#8c91a0] hover:text-rose-400 flex items-center gap-1 transition"
+                  >
+                    <X className="w-3 h-3" /> Limpar
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  list="deck-name-suggestions"
+                  placeholder={subject.trim() ? subject.trim() : 'Ex: DIREITO PENAL — PARTE GERAL…'}
+                  value={deckName}
+                  onChange={e => handleDeckNameChange(e.target.value)}
+                  className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0]/60 focus:outline-none focus:border-[#60a5fa] text-sm uppercase"
+                />
+                <datalist id="deck-name-suggestions">
+                  {existingDeckTitles.map(s => <option key={s} value={s} />)}
+                </datalist>
+              </div>
+              {deckNameSuggestion && deckNameSuggestion.toUpperCase() !== deckName.trim().toUpperCase() && (
+                <SpellSuggestion
+                  suggestion={deckNameSuggestion}
+                  onAccept={() => handleDeckNameChange(deckNameSuggestion)}
+                />
+              )}
+              {/* Preview do nome que será usado */}
+              {subject.trim() && (
+                <p className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1">
+                  <BookOpen className="w-3 h-3" />
+                  Baralho: <span className="text-slate-300 font-semibold ml-1">
+                    {(deckName.trim() || subject.trim()).toUpperCase()}
+                  </span>
+                </p>
+              )}
+            </div>
+
+            {/* ── Sugestões de tópicos da IA ── */}
             {suggestedTopics.length > 0 && (
               <div className="p-3.5 bg-[#051424]/80 rounded-2xl border border-blue-500/20 animate-fade-in">
                 <span className="block text-[11px] font-bold text-[#60a5fa] mb-2 uppercase tracking-wide flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-blue-400" /> Sugestões de Tópicos da IA:
+                  <Wand2 className="w-3.5 h-3.5" /> Sugestões de Tópicos da IA:
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {suggestedTopics.map((sug, idx) => (
@@ -384,35 +543,34 @@ export const StudioView: React.FC<StudioViewProps> = ({
               </div>
             )}
 
+            {/* ── Tópicos adicionados ── */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5">
-                🏷️ TÓPICOS DE ESTUDO RELACIONADOS
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5" /> Tópicos de estudo
+                <span className="text-[#8c91a0] font-normal normal-case tracking-normal">(opcional)</span>
               </label>
               <div className="flex gap-2">
                 <input
+                  ref={topicInputRef}
                   type="text"
-                  placeholder="Ex: Parte Geral, Mitocôndrias..."
+                  placeholder="Ex: Parte Geral, Mitocôndrias…"
                   value={topicInput}
-                  onChange={(e) => setTopicInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTopic())}
+                  onChange={e => setTopicInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddTopic())}
                   className="flex-1 bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm"
                 />
                 <button
                   type="button"
                   onClick={() => handleAddTopic()}
-                  className="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-[#424754]/50 cursor-pointer"
+                  className="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-[#424754]/50 cursor-pointer transition"
                 >
                   + Adicionar
                 </button>
               </div>
-
               {topics.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-3">
                   {topics.map((t, idx) => (
-                    <span
-                      key={idx}
-                      className="px-3 py-1.5 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-500/30 text-xs flex items-center gap-1.5"
-                    >
+                    <span key={idx} className="px-3 py-1.5 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-500/30 text-xs flex items-center gap-1.5">
                       {t}
                       <button onClick={() => handleRemoveTopic(idx)} className="hover:text-white cursor-pointer">
                         <X className="w-3.5 h-3.5" />
@@ -423,208 +581,115 @@ export const StudioView: React.FC<StudioViewProps> = ({
               )}
             </div>
 
+            {/* ── Quantidade ── */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5">
-                QUANTIDADE DE CARDS
+                Quantidade de Cards
               </label>
-              <select
-                value={cardCount}
-                onChange={(e) => setCardCount(Number(e.target.value))}
-                className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#60a5fa] text-sm cursor-pointer"
-              >
-                <option value={25}>25 Flashcards</option>
-                <option value={50}>50 Flashcards</option>
-                <option value={100}>100 Flashcards</option>
-              </select>
+              <div className="grid grid-cols-3 gap-2">
+                {([25, 50, 100] as const).map(n => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setCardCount(n)}
+                    className={`py-3 rounded-xl text-sm font-semibold border transition ${
+                      cardCount === n
+                        ? 'bg-blue-600/30 border-blue-500 text-blue-200'
+                        : 'bg-[#051424] border-[#424754]/50 text-[#8c91a0] hover:border-slate-500 hover:text-white'
+                    }`}
+                  >
+                    {n}
+                    <span className="block text-[10px] opacity-70 mt-0.5">
+                      {n === 25 ? 'Rápido' : n === 50 ? 'Completo' : 'Intensivo'}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Banner de créditos */}
-            {!stats.isPro && (
-              <div className={`rounded-xl p-3.5 flex items-center justify-between gap-3 mt-2 border ${
-                (stats.aiCredits || 0) > 0
-                  ? 'bg-blue-500/10 border-blue-500/30'
-                  : 'bg-amber-500/10 border-amber-500/30'
-              }`}>
-                <div className="flex items-center gap-2">
-                  {(stats.aiCredits || 0) > 0 ? (
-                    <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
-                  ) : (
-                    <Lock className="w-4 h-4 text-amber-400 shrink-0" />
-                  )}
-                  <div>
-                    <p className={`text-xs font-bold ${(stats.aiCredits || 0) > 0 ? 'text-blue-300' : 'text-amber-300'}`}>
-                      {(stats.aiCredits || 0) > 0
-                        ? `${stats.aiCredits} crédito${(stats.aiCredits || 0) !== 1 ? 's' : ''} disponível`
-                        : 'Sem créditos — assista um vídeo para ganhar'}
-                    </p>
-                    <p className="text-[11px] text-slate-400">
-                      {(stats.aiCredits || 0) > 0
-                        ? `Cada geração custa ${ECONOMY.COST_GENERATE_DECK} crédito`
-                        : 'Créditos são necessários para usar a IA'}
-                    </p>
-                  </div>
-                </div>
-                {(stats.aiCredits || 0) === 0 && onOpenAdMob && (
-                  <button
-                    type="button"
-                    onClick={onOpenAdMob}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold whitespace-nowrap hover:bg-amber-500/30 transition"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-current" /> Ganhar créditos
-                  </button>
-                )}
-              </div>
-            )}
+            {/* ── Créditos ── */}
+            <CreditsBanner stats={stats} onOpenAdMob={onOpenAdMob} />
 
+            {/* ── Gerar ── */}
             <button
               type="button"
               onClick={handleGenerateCards}
-              disabled={isLoading || (!stats.isPro && (stats.aiCredits || 0) < ECONOMY.COST_GENERATE_DECK)}
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-sm shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all mt-4 disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={isLoading || noCredits}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-sm shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all mt-4 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98]"
             >
               {isLoading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" /> Criando Flashcards com IA...
-                </>
-              ) : (!stats.isPro && (stats.aiCredits || 0) < ECONOMY.COST_GENERATE_DECK) ? (
-                <>
-                  <Lock className="w-5 h-5" /> Sem Créditos — Assista um Anúncio
-                </>
+                <><Loader2 className="w-5 h-5 animate-spin" /> Criando Flashcards com IA…</>
+              ) : noCredits ? (
+                <><Lock className="w-5 h-5" /> Sem Créditos — Assista um Anúncio</>
               ) : (
-                <>
-                  <Sparkles className="w-5 h-5" /> Gerar Flashcards com IA
-                </>
+                <><Sparkles className="w-5 h-5" /> Gerar {cardCount} Flashcards com IA</>
               )}
             </button>
           </div>
         )}
       </div>
 
-      {/* CARDS CRIADOS MANUALMENTE (EXIBIDOS ABAIXO DO BOTÃO) */}
+      {/* ── Cards criados manualmente ── */}
       {activeMode === 'manual' && createdManualCards.length > 0 && (
-        <div className="space-y-6 pt-4 animate-fade-in">
+        <div className="space-y-4 pt-2 animate-fade-in">
           <div className="flex items-center justify-between px-2">
             <h3 className="text-base font-extrabold uppercase tracking-wider text-[#adc6ff] flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-blue-400" />
               Cards Criados ({createdManualCards.length})
             </h3>
+            <button
+              type="button"
+              onClick={() => setCreatedManualCards([])}
+              className="text-xs text-[#8c91a0] hover:text-rose-400 transition"
+            >
+              Limpar lista
+            </button>
           </div>
-
-          <div className="space-y-4">
-            {createdManualCards.map((card) => (
-              <div
+          <div className="space-y-3">
+            {createdManualCards.map(card => (
+              <ManualCardPreview
                 key={card.id}
-                className="bg-[#0b1a2a]/95 border border-[#adc6ff]/20 rounded-2xl p-6 text-left space-y-4 shadow-xl relative"
-              >
-                <div className="flex items-center justify-between border-b border-[#424754]/40 pb-3">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                      💻 Matéria: {card.subject}
-                    </span>
-                    <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      🏷️ Tópico: {card.topic}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleRemoveManualCard(card.id)}
-                    className="text-[#8c91a0] hover:text-red-400 p-1.5 transition-colors cursor-pointer"
-                    title="Remover visualização"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* Pergunta */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <HelpCircle className="w-3.5 h-3.5" /> Pergunta:
-                  </span>
-                  <p className="text-sm text-white font-semibold">{card.front}</p>
-                </div>
-
-                {/* Resposta */}
-                <div className="space-y-1">
-                  <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Resposta:
-                  </span>
-                  <p className="text-sm text-[#adc6ff]">{card.back}</p>
-                </div>
-              </div>
+                card={card}
+                onRemove={() => setCreatedManualCards(prev => prev.filter(c => c.id !== card.id))}
+              />
             ))}
           </div>
         </div>
       )}
 
-      {/* CARDS GERADOS PELA IA */}
+      {/* ── Cards gerados pela IA ── */}
       {activeMode === 'ia' && generatedAICards.length > 0 && (
-        <div className="space-y-6 pt-4 animate-fade-in">
+        <div className="space-y-4 pt-2 animate-fade-in">
           <div className="flex items-center justify-between px-2">
             <h3 className="text-base font-extrabold uppercase tracking-wider text-[#adc6ff] flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-orange-400" />
-              Cards Gerados pela IA ({generatedAICards.length})
+              Cards Gerados ({generatedAICards.length})
             </h3>
-          </div>
-
-          <div className="space-y-4">
-            {generatedAICards.map((card) => (
-              <div
-                key={card.id}
-                className="bg-[#0b1a2a]/95 border border-[#adc6ff]/20 rounded-2xl p-6 text-left space-y-4 shadow-xl relative"
-              >
-                <div className="flex items-center justify-between border-b border-[#424754]/40 pb-3">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                      💻 Matéria: {card.subject}
-                    </span>
-                    <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      🏷️ Tópico: {card.topic}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleRemoveAICard(card.id)}
-                    className="text-[#8c91a0] hover:text-red-400 p-1.5 transition-colors cursor-pointer"
-                    title="Remover card"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="space-y-1">
-                  <span className="text-[11px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <HelpCircle className="w-3.5 h-3.5" /> Pergunta:
-                  </span>
-                  <p className="text-sm text-white font-semibold">{card.front}</p>
-                </div>
-
-                <div className="space-y-1">
-                  <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Resposta:
-                  </span>
-                  <p className="text-sm text-[#adc6ff] whitespace-pre-line">{card.back}</p>
-                </div>
-
-                {/* Explicação & Curiosidade */}
-                {card.explanation && (
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Lightbulb className="w-3.5 h-3.5" /> Explicação & Curiosidade:
-                    </span>
-                    <p className="text-sm text-[#fbbf24]/90 whitespace-pre-line">{card.explanation}</p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="pt-2">
             <button
               type="button"
-              onClick={handleSaveAllAICards}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold text-base shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2.5 cursor-pointer transition-all hover:scale-[1.01]"
+              onClick={() => setGeneratedAICards([])}
+              className="text-xs text-[#8c91a0] hover:text-rose-400 transition"
             >
-              <Save className="w-5 h-5" /> Salvar Cards ({generatedAICards.length})
+              Descartar todos
             </button>
           </div>
+          <div className="space-y-3">
+            {generatedAICards.map((card, index) => (
+              <AICardPreview
+                key={card.id}
+                card={card}
+                index={index}
+                onRemove={() => setGeneratedAICards(prev => prev.filter(c => c.id !== card.id))}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={handleSaveAllAICards}
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold text-base shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2.5 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99]"
+          >
+            <Save className="w-5 h-5" /> Salvar {generatedAICards.length} Cards no Baralho
+          </button>
         </div>
       )}
     </div>
