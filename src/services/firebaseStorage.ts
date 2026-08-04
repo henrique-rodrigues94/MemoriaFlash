@@ -32,13 +32,16 @@ export async function syncDecksFromFirestore(
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        if (!snapshot.empty) {
-          const list: Deck[] = [];
-          snapshot.forEach((docSnap) => {
-            list.push({ id: docSnap.id, ...docSnap.data() } as Deck);
-          });
-          onUpdate(list);
-        }
+        // CORREÇÃO: antes só chamava onUpdate quando a coleção NÃO estava
+        // vazia — então apagar o último deck em outro dispositivo nunca
+        // propagava para os demais (o listener simplesmente ficava calado, e
+        // a tela continuava mostrando o deck já excluído). Uma lista vazia é
+        // um estado válido e precisa ser propagado igual a qualquer outro.
+        const list: Deck[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() } as Deck);
+        });
+        onUpdate(list);
       },
       (error) => {
         console.warn('Firestore snapshot error (decks):', error);

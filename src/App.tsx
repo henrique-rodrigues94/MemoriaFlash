@@ -3,8 +3,7 @@ import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { OnboardingModal } from './components/OnboardingModal';
 import { DashboardView } from './components/DashboardView';
-import { StudySessionView, SessionSummary } from './components/StudySessionView';
-import { countMasteredCards } from './services/srsEngine';
+import { StudySessionView } from './components/StudySessionView';
 import { AdMobBanner } from './components/AdMobBanner';
 
 // ----------------------------------------------------------------------------
@@ -72,6 +71,7 @@ import { detectBrowserLanguage, SupportedLanguage, translations } from './lib/i1
 import { auth, onAuthStateChanged, ensureAuthenticated } from './lib/firebase';
 import {
   applyRewardedAdWatched,
+  canWatchRewardedAd,
   applyDailyFreeGrantIfNeeded,
   applySpendCredits,
   canShowInterstitial,
@@ -183,11 +183,28 @@ export function App() {
   useEffect(() => {
     let unsubDecks: (() => void) | undefined;
     let unsubStats: (() => void) | undefined;
+    let receivedFirstDecksSnapshot = false;
 
     syncDecksFromFirestore((remoteDecks) => {
-      if (remoteDecks && remoteDecks.length > 0) {
-        setDecks(remoteDecks);
+      // Migração única: no PRIMEIRO snapshot, se a nuvem vier vazia mas já
+      // existem decks salvos localmente (ex: criados antes de fazer login),
+      // não apagamos a tela — enviamos esses decks locais para o Firestore.
+      // Sem essa checagem, corrigir a sincronização de exclusões (abaixo)
+      // faria login apagar decks locais ainda não sincronizados.
+      if (!receivedFirstDecksSnapshot) {
+        receivedFirstDecksSnapshot = true;
+        if (remoteDecks.length === 0) {
+          const localDecks = getStoredDecks();
+          if (localDecks.length > 0) {
+            localDecks.forEach((d) => saveDeckToFirestore(d));
+            return; // mantém os decks locais na tela; o snapshot seguinte os ecoa de volta
+          }
+        }
       }
+      // A partir daqui, a nuvem é a fonte da verdade — inclusive quando
+      // fica vazia de propósito (ex: usuário apagou o último deck em outro
+      // dispositivo). Ver correção detalhada em firebaseStorage.ts.
+      setDecks(remoteDecks);
     }).then((unsub) => {
       unsubDecks = unsub;
     });
@@ -214,6 +231,9 @@ export function App() {
   };
 
   const handleRewardEarned = (creditsEarned?: number) => {
+    // Defesa em profundidade: mesmo que a UI do modal falhe em bloquear,
+    // a recompensa nunca é aplicada além do limite diário real.
+    if (!canWatchRewardedAd(stats)) return;
     const { updated, creditsEarned: earned } = applyRewardedAdWatched(stats);
     setStats(updated);
     saveStoredStats(updated);
@@ -255,33 +275,17 @@ export function App() {
     setActiveStudyDeck(deck);
   };
 
-  const handleFinishStudySession = (
-    updatedDeck: Deck,
-    cardsReviewedCount: number,
-    summary: SessionSummary
-  ) => {
+  const handleFinishStudySession = (updatedDeck: Deck, cardsReviewedCount: number) => {
     const updatedDecks = decks.map((d) => (d.id === updatedDeck.id ? updatedDeck : d));
     setDecks(updatedDecks);
     saveDeckToFirestore(updatedDeck);
 
-    const xpEarned = cardsReviewedCount * 25;
-
-    // Update user stats (streak, meta diária, activityLog, retenção e horas
-    // estudadas — tudo calculado a partir de dados reais da sessão; ver
-    // src/services/studyStreak.ts).
-    const streakUpdatedStats = applyStudySessionCompleted(stats, cardsReviewedCount, {
-      hardCount: summary.hardCount,
-      correctCount: summary.correctCount,
-      xpEarned,
-      minutesStudied: summary.minutesStudied,
-    });
+    // Update user stats (streak e meta diária calculados corretamente por dia — ver src/services/studyStreak.ts)
+    const streakUpdatedStats = applyStudySessionCompleted(stats, cardsReviewedCount);
     const newStats: UserStats = {
       ...streakUpdatedStats,
-      // "Cards Dominados" agora reflete cards que de fato atingiram um
-      // intervalo maduro no SM-2 (reps >= 3), em vez de um contador que só
-      // crescia com base na quantidade de cards revisados na sessão.
-      totalCardsMastered: countMasteredCards(updatedDecks),
-      xp: stats.xp + xpEarned,
+      totalCardsMastered: stats.totalCardsMastered + Math.floor(cardsReviewedCount / 2),
+      xp: stats.xp + cardsReviewedCount * 25,
     };
     setStats(newStats);
     saveStatsToFirestore(newStats);
