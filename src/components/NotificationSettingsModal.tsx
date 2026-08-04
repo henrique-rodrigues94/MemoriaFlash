@@ -54,6 +54,28 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
     }
   };
 
+  // CORREÇÃO: antes, o botão "Aplicar novo horário" chamava handleToggleDaily
+  // — mas como os lembretes JÁ ESTAVAM ativos nesse ponto (é a única situação
+  // em que esse botão aparece), isso caía no branch de DESATIVAR em vez de
+  // apenas atualizar o horário. Resultado: clicar para trocar o horário
+  // desligava os lembretes por completo. Agora há uma função dedicada que
+  // sempre reaplica com o novo horário, sem depender do estado atual.
+  const handleApplyNewHour = async () => {
+    if (!prefs) return;
+    setLoading(true);
+    setStatusMessage(null);
+    try {
+      const result = await enableDailyReminders(selectedHour);
+      setStatusMessage(result.message);
+      if (result.success) {
+        const updated = await getNotificationPrefs();
+        setPrefs(updated);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleToggleStreak = async () => {
     if (!prefs) return;
     const next = !prefs.streakReminderEnabled;
@@ -139,8 +161,9 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                 </div>
                 {selectedHour !== prefs.reminderHourLocal && prefs.dailyReminderEnabled && (
                   <button
-                    onClick={handleToggleDaily}
-                    className="mt-2 text-[10px] text-blue-400 hover:text-blue-300 underline cursor-pointer"
+                    onClick={handleApplyNewHour}
+                    disabled={loading}
+                    className="mt-2 text-[10px] text-blue-400 hover:text-blue-300 underline cursor-pointer disabled:opacity-50"
                   >
                     Aplicar novo horário ({selectedHour}h)
                   </button>

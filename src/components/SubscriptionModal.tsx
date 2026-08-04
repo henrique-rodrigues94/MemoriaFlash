@@ -229,9 +229,6 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                       <li className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-blue-500" /> Scanner Ilimitado (PDF, foto, DOCX)
                       </li>
-                      <li className="flex items-center gap-2">
-                        <Check className="w-3.5 h-3.5 text-blue-500" /> Quiz Diagnóstico Ilimitado
-                      </li>
                     </ul>
                   </div>
 

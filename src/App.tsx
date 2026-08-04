@@ -3,8 +3,7 @@ import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { OnboardingModal } from './components/OnboardingModal';
 import { DashboardView } from './components/DashboardView';
-import { StudySessionView, SessionSummary } from './components/StudySessionView';
-import { countMasteredCards } from './services/srsEngine';
+import { StudySessionView } from './components/StudySessionView';
 import { AdMobBanner } from './components/AdMobBanner';
 
 // ----------------------------------------------------------------------------
@@ -72,6 +71,7 @@ import { detectBrowserLanguage, SupportedLanguage, translations } from './lib/i1
 import { auth, onAuthStateChanged, ensureAuthenticated } from './lib/firebase';
 import {
   applyRewardedAdWatched,
+  canWatchRewardedAd,
   applyDailyFreeGrantIfNeeded,
   applySpendCredits,
   canShowInterstitial,
@@ -214,6 +214,9 @@ export function App() {
   };
 
   const handleRewardEarned = (creditsEarned?: number) => {
+    // Defesa em profundidade: mesmo que a UI do modal falhe em bloquear,
+    // a recompensa nunca é aplicada além do limite diário real.
+    if (!canWatchRewardedAd(stats)) return;
     const { updated, creditsEarned: earned } = applyRewardedAdWatched(stats);
     setStats(updated);
     saveStoredStats(updated);
@@ -255,33 +258,17 @@ export function App() {
     setActiveStudyDeck(deck);
   };
 
-  const handleFinishStudySession = (
-    updatedDeck: Deck,
-    cardsReviewedCount: number,
-    summary: SessionSummary
-  ) => {
+  const handleFinishStudySession = (updatedDeck: Deck, cardsReviewedCount: number) => {
     const updatedDecks = decks.map((d) => (d.id === updatedDeck.id ? updatedDeck : d));
     setDecks(updatedDecks);
     saveDeckToFirestore(updatedDeck);
 
-    const xpEarned = cardsReviewedCount * 25;
-
-    // Update user stats (streak, meta diária, activityLog, retenção e horas
-    // estudadas — tudo calculado a partir de dados reais da sessão; ver
-    // src/services/studyStreak.ts).
-    const streakUpdatedStats = applyStudySessionCompleted(stats, cardsReviewedCount, {
-      hardCount: summary.hardCount,
-      correctCount: summary.correctCount,
-      xpEarned,
-      minutesStudied: summary.minutesStudied,
-    });
+    // Update user stats (streak e meta diária calculados corretamente por dia — ver src/services/studyStreak.ts)
+    const streakUpdatedStats = applyStudySessionCompleted(stats, cardsReviewedCount);
     const newStats: UserStats = {
       ...streakUpdatedStats,
-      // "Cards Dominados" agora reflete cards que de fato atingiram um
-      // intervalo maduro no SM-2 (reps >= 3), em vez de um contador que só
-      // crescia com base na quantidade de cards revisados na sessão.
-      totalCardsMastered: countMasteredCards(updatedDecks),
-      xp: stats.xp + xpEarned,
+      totalCardsMastered: stats.totalCardsMastered + Math.floor(cardsReviewedCount / 2),
+      xp: stats.xp + cardsReviewedCount * 25,
     };
     setStats(newStats);
     saveStatsToFirestore(newStats);

@@ -12,7 +12,19 @@ export function simpleRateLimit(opts: { windowMs: number; max: number }) {
   const buckets = new Map<string, Bucket>();
 
   return function rateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
-    const key = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+    // CORREÇÃO: antes usava o header `x-forwarded-for` inteiro, direto do
+    // jeito que chegou — mas esse header é enviado pelo PRÓPRIO cliente e
+    // pode ser falsificado livremente (ex: um valor aleatório diferente em
+    // cada requisição), o que permite contornar completamente o limite,
+    // criando um "bucket" novo a cada chamada. Como o servidor normalmente
+    // roda atrás de exatamente 1 proxy confiável (Render/Railway/Fly/Nginx),
+    // usamos apenas o ÚLTIMO IP da cadeia — o trecho que o NOSSO proxy
+    // anexou de fato, não o que o cliente pode ter forjado no início.
+    const forwardedHeader = req.headers['x-forwarded-for'];
+    const forwardedList = Array.isArray(forwardedHeader) ? forwardedHeader[0] : forwardedHeader;
+    const lastHop = forwardedList?.split(',').map((ip) => ip.trim()).filter(Boolean).pop();
+    const key = lastHop || req.socket.remoteAddress || 'unknown';
+
     const now = Date.now();
     const bucket = buckets.get(key);
 
