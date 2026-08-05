@@ -14,6 +14,7 @@ import { quizDiagnosticTask } from './src/server/ai/tasks/quizDiagnostic';
 import { voiceTutorTask } from './src/server/ai/tasks/voiceTutor';
 import { generateQuizTask } from './src/server/ai/tasks/generateQuiz';
 import { recoveryPlanTask } from './src/server/ai/tasks/recoveryPlan';
+import { scannerAnalyzeTask } from './src/server/ai/tasks/scannerAnalyze';
 import { simpleRateLimit } from './src/server/middleware/rateLimit';
 import { referralRouter } from './src/server/routes/referral';
 import { notificationsRouter } from './src/server/routes/notifications';
@@ -195,9 +196,70 @@ app.post('/api/gemini/generate-quiz', async (req, res) => {
 
 // Endpoint: Scanner — processa imagens (visão) e texto extraído de documentos
 // Body: { images?: string[], texts?: string[], subject?: string, count?: number }
+// Endpoint: Scanner — Análise do documento (identifica matéria + tópicos)
+app.post('/api/gemini/scanner-analyze', async (req, res) => {
+  try {
+    const { images = [], texts = [], subjectHint = '', language = 'pt' } = req.body;
+
+    if (!images.length && !texts.length) {
+      return res.status(400).json({ error: 'Nenhuma imagem ou texto fornecido.' });
+    }
+
+    // ── OCR das imagens (reutiliza a lógica do scanner-process) ──────────────
+    async function ocrWithGeminiAnalyze(base64images: string[]): Promise<string> {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error('GEMINI_API_KEY não configurada');
+      const { GoogleGenAI } = await import('@google/genai');
+      const genai = new GoogleGenAI({ apiKey });
+      const parts: any[] = [
+        { text: 'Você é um sistema de OCR especializado em materiais educacionais. Analise todas as imagens e extraia TODO o texto visível. Preserve a estrutura. Não adicione comentários, apenas o texto extraído.' },
+      ];
+      for (const base64img of base64images) {
+        const [meta, data] = base64img.split(',');
+        const mimeMatch = meta.match(/data:([^;]+)/);
+        const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        parts.push({ inlineData: { data, mimeType } });
+      }
+      const response = await genai.models.generateContent({
+        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+        contents: [{ role: 'user', parts }],
+        config: { maxOutputTokens: 8192 },
+      });
+      return response.text || '';
+    }
+
+    let extractedFromImages = '';
+    if (images.length > 0 && process.env.GEMINI_API_KEY) {
+      try {
+        extractedFromImages = await ocrWithGeminiAnalyze(images);
+      } catch (e) {
+        console.warn('[Scanner Analyze] OCR falhou:', (e as Error).message);
+      }
+    }
+
+    const allContent = [...texts, extractedFromImages].filter(Boolean).join('\n\n');
+    if (!allContent.trim()) {
+      return res.status(400).json({ error: 'Não foi possível extrair conteúdo dos arquivos.' });
+    }
+
+    const result = await scannerAnalyzeTask({ content: allContent, subjectHint, language });
+    return res.json({ ...result, extractedContent: allContent.slice(0, 20000) });
+  } catch (error: any) {
+    console.error('[Scanner Analyze] Erro:', error);
+    return res.status(500).json({ error: error.message || 'Falha ao analisar o documento.' });
+  }
+});
+
 app.post('/api/gemini/scanner-process', async (req, res) => {
   try {
-    const { images = [], texts = [], subject = '', count = 25 } = req.body;
+    const {
+      images = [],
+      texts = [],
+      subject = '',
+      count = 25,
+      selectedTopics = [] as string[],
+      extractedContent = '',   // conteúdo já extraído pelo scanner-analyze (evita re-OCR)
+    } = req.body;
 
     if (!images.length && !texts.length) {
       return res.status(400).json({ error: 'Nenhuma imagem ou texto fornecido.' });
@@ -271,6 +333,23 @@ app.post('/api/gemini/scanner-process', async (req, res) => {
       return json.ParsedResults?.map((r: any) => r.ParsedText).join('\n') || '';
     }
 
+    // Se o conteúdo já foi extraído pelo scanner-analyze, pula o OCR
+    if (extractedContent && extractedContent.trim()) {
+      console.log('[Scanner] Usando conteúdo pré-extraído do scanner-analyze (skip OCR).');
+      const cardCount2 = Math.min(Math.max(Number(count) || 25, 1), 100);
+      const subjectLabel2 = subject.trim() || 'Conteúdo do Documento';
+      const topicsFilter = (selectedTopics as string[]).length > 0
+        ? `\n\nFoque EXCLUSIVAMENTE nos seguintes tópicos selecionados pelo usuário: ${(selectedTopics as string[]).join(', ')}`
+        : '';
+      const { generateFlashcardsTask: gft2 } = await import('./src/server/ai/tasks/generateFlashcards');
+      const prompt2 =
+        `Matéria/Assunto: ${subjectLabel2}\n\n` +
+        `CONTEÚDO FONTE:\n${extractedContent.slice(0, 15000)}\n\n` +
+        `Com base EXCLUSIVAMENTE no conteúdo acima, gere ${cardCount2} flashcards educativos.${topicsFilter}`;
+      const result2 = await gft2({ prompt: prompt2, count: cardCount2, language: 'pt', difficulty: 'medium', selectedTopics: selectedTopics as string[] });
+      return res.json(result2);
+    }
+
     let extractedFromImages = '';
     if (images.length > 0) {
       console.log(`[Scanner] Processando ${images.length} imagem(ns) com OCR…`);
@@ -339,18 +418,21 @@ app.post('/api/gemini/scanner-process', async (req, res) => {
 
     // ── Passo 3: gerar flashcards a partir do conteúdo ────────────────────────
     const { generateFlashcardsTask } = await import('./src/server/ai/tasks/generateFlashcards');
+    const topicsFilter = (selectedTopics as string[]).length > 0
+      ? `\n\nFoque EXCLUSIVAMENTE nos seguintes tópicos selecionados pelo usuário: ${(selectedTopics as string[]).join(', ')}`
+      : '';
     const prompt =
       `Matéria/Assunto: ${subjectLabel}\n\n` +
       `CONTEÚDO FONTE (extraído do documento/imagens do usuário):\n` +
       `${allContent.slice(0, 15000)}\n\n` +
-      `Com base EXCLUSIVAMENTE no conteúdo acima, gere ${cardCount} flashcards educativos abrangendo os principais conceitos, definições, fórmulas e tópicos presentes no material.`;
+      `Com base EXCLUSIVAMENTE no conteúdo acima, gere ${cardCount} flashcards educativos abrangendo os principais conceitos, definições, fórmulas e tópicos presentes no material.${topicsFilter}`;
 
     const result = await generateFlashcardsTask({
       prompt,
       count: cardCount,
       language: 'pt',
       difficulty: 'medium',
-      selectedTopics: subject.trim() ? [subject.trim()] : [],
+      selectedTopics: (selectedTopics as string[]).length > 0 ? (selectedTopics as string[]) : (subject.trim() ? [subject.trim()] : []),
     });
 
     return res.json({ ...result, extractedText: allContent.slice(0, 500) + '...' });
