@@ -326,6 +326,11 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
 
   const [step, setStep] = useState<Step>('collect');
   const [items, setItems] = useState<CapturedItem[]>([]);
+  // Ref espelhando `items` para uso no cleanup de unmount abaixo — usar
+  // `items` diretamente ali capturaria só o valor (vazio) do momento em que
+  // o efeito foi montado, por causa da closure do array de dependências [].
+  const itemsRef = useRef<CapturedItem[]>([]);
+  useEffect(() => { itemsRef.current = items; }, [items]);
   const [subject, setSubject] = useState('');
   const [cardCount, setCardCount] = useState(25);
   const [statusMsg, setStatusMsg] = useState('');
@@ -363,6 +368,17 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
       if (item?.previewUrl) URL.revokeObjectURL(item.previewUrl);
       return prev.filter(i => i.id !== id);
     });
+  }, []);
+
+  // BUG CORRIGIDO: os object URLs criados em addItem() só eram liberados em
+  // removeItem() e reset() — mas como o ScannerView é desmontado sempre que
+  // o usuário troca de aba (renderização condicional em App.tsx), fotos
+  // adicionadas e nunca processadas/removidas vazavam memória a cada troca
+  // de aba. Este efeito garante a limpeza ao desmontar o componente.
+  useEffect(() => {
+    return () => {
+      itemsRef.current.forEach(i => { if (i.previewUrl) URL.revokeObjectURL(i.previewUrl); });
+    };
   }, []);
 
   // ── File picker handlers ───────────────────────────────────────────────────
@@ -492,6 +508,18 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
     setStep('collect');
     setStatusMsg('');
     setExpandedCard(null);
+  };
+
+  // BUG CORRIGIDO: ao falhar a geração (ex.: erro transitório de rede, ou o
+  // servidor de IA fora do ar por um instante), o único botão disponível era
+  // "Tentar Novamente" ligado a reset() — que apagava TODAS as fotos e
+  // arquivos já coletados, obrigando o usuário a re-fotografar tudo do zero
+  // por causa de uma falha que nada tem a ver com os arquivos em si. Agora
+  // voltamos para a etapa de coleta preservando items/matéria/quantidade, e
+  // o usuário só perde o que já tinha se explicitamente pedir um novo scan.
+  const retryAfterError = () => {
+    setStatusMsg('');
+    setStep('collect');
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -768,16 +796,32 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
               <div>
                 <h4 className="text-rose-300 font-semibold">Ocorreu um erro</h4>
                 <p className="text-sm text-slate-400 mt-1">{statusMsg}</p>
+                {items.length > 0 && (
+                  <p className="text-xs text-emerald-400/80 mt-2">
+                    Seus {items.length} arquivo{items.length !== 1 ? 's' : ''} foram preservados — não é preciso selecionar tudo de novo.
+                  </p>
+                )}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={reset}
-              className="flex items-center gap-2 text-sm text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 px-4 py-2.5 rounded-xl transition"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Tentar Novamente
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={retryAfterError}
+                className="flex items-center gap-2 text-sm text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 px-4 py-2.5 rounded-xl transition"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Tentar Novamente
+              </button>
+              {items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={reset}
+                  className="text-xs text-slate-500 hover:text-slate-300 px-3 py-2.5 transition"
+                >
+                  Começar um novo scan do zero
+                </button>
+              )}
+            </div>
           </div>
         )}
 

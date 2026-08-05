@@ -10,6 +10,7 @@ import {
   Flame,
   AlertTriangle,
   BookOpen,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { Deck, UserStats, ActiveTab } from '../types';
 import { DeckCard } from './DeckCard';
@@ -30,6 +31,7 @@ interface DashboardViewProps {
   onOpenAdMob: () => void;
   onOpenSubscription: () => void;
   onOpenReferral?: () => void;
+  onOpenImportExport: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -39,6 +41,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   setActiveTab,
   onStartStudySession,
   onManageDeck,
+  onOpenImportExport,
 }) => {
   const t = translations[currentLanguage] || translations.pt;
 
@@ -264,14 +267,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Seus Decks de Estudo
             </h2>
           </div>
-          {decks.length > 4 && (
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => setActiveTab('explore')}
-              className="flex items-center gap-1 text-xs text-[#60a5fa] hover:text-white transition font-semibold"
+              onClick={onOpenImportExport}
+              className="flex items-center gap-1.5 text-xs text-[#60a5fa] hover:text-white transition font-semibold px-2.5 py-1.5 rounded-lg hover:bg-[#0b1a2a]/80 cursor-pointer"
+              title="Importar ou exportar cards (Anki, CSV, JSON, Quizlet...)"
             >
-              Ver todos ({decks.length}) <ChevronRight className="w-3.5 h-3.5" />
+              <ArrowLeftRight className="w-3.5 h-3.5" /> Importar/Exportar
             </button>
-          )}
+            {decks.length > 4 && (
+              <button
+                onClick={() => setActiveTab('explore')}
+                className="flex items-center gap-1 text-xs text-[#60a5fa] hover:text-white transition font-semibold"
+              >
+                Ver todos ({decks.length}) <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

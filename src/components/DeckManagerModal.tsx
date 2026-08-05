@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, Edit2, Check, BookOpen } from 'lucide-react';
+import { X, Plus, Trash2, Edit2, Check, BookOpen, AlertTriangle } from 'lucide-react';
 import { Deck, Flashcard } from '../types';
+import { isDeckDirty, validateCardEdit } from '../lib/deckEditGuard';
 
 interface DeckManagerModalProps {
   deck: Deck;
@@ -27,11 +28,37 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
   const [editSubject, setEditSubject] = useState('');
   const [editExplanation, setEditExplanation] = useState('');
   const [editDifficulty, setEditDifficulty] = useState<Flashcard['difficulty']>('medium');
+  const [editError, setEditError] = useState<string | null>(null);
 
   // Add new card state
   const [newFront, setNewFront] = useState('');
   const [newBack, setNewBack] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // BUG CORRIGIDO: todas as edições (adicionar, editar, excluir cartão) só
+  // viviam no estado local `cards` — nada era persistido até o clique em
+  // "Salvar Alterações". Fechar o modal pelo X, ou clicar em "Adicionar
+  // Cartão" (que fecha e navega para a aba Cards quando `onOpenCards` está
+  // definido), descartava silenciosamente qualquer edição feita até ali, sem
+  // nenhum aviso. Agora rastreamos se há alterações não salvas...
+  const isDirty = isDeckDirty(deck, title, cards);
+
+  const buildUpdatedDeck = (): Deck => ({
+    ...deck,
+    title: title.trim() || deck.title,
+    cards,
+  });
+
+  // ...e confirmamos antes de descartar, com opção de salvar antes de sair.
+  const handleClose = () => {
+    if (!isDirty) {
+      onClose();
+      return;
+    }
+    if (confirm('Você tem alterações não salvas neste deck. Deseja sair mesmo assim e perder essas alterações?')) {
+      onClose();
+    }
+  };
 
   const handleAddNewCard = () => {
     if (!newFront.trim() || !newBack.trim()) return;
@@ -63,16 +90,25 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
     setEditSubject(c.subject || '');
     setEditExplanation(c.explanation || '');
     setEditDifficulty(c.difficulty || 'medium');
+    setEditError(null);
   };
 
   const handleSaveEditCard = (cId: string) => {
+    // BUG CORRIGIDO: não havia validação ao editar — salvar um cartão com
+    // pergunta ou resposta em branco criava um card "quebrado" que aparece
+    // vazio durante o estudo. Agora bloqueia o salvamento e avisa o usuário.
+    const validation = validateCardEdit(editFront, editBack);
+    if (!validation.valid) {
+      setEditError(validation.error || null);
+      return;
+    }
     setCards(
       cards.map((c) =>
         c.id === cId
           ? {
               ...c,
-              front: editFront,
-              back: editBack,
+              front: editFront.trim(),
+              back: editBack.trim(),
               topic: editTopic,
               subject: editSubject,
               explanation: editExplanation,
@@ -82,6 +118,7 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
       )
     );
     setEditingCardId(null);
+    setEditError(null);
   };
 
   const handleDeleteCard = (cId: string) => {
@@ -92,15 +129,21 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
   };
 
   const handleSaveAll = () => {
-    const trimmedTitle = title.trim();
-    const updated: Deck = {
-      ...deck,
-      title: trimmedTitle || deck.title, // nunca salva título vazio
-      category: deck.category,
-      cards,
-    };
-    onSaveDeck(updated);
+    onSaveDeck(buildUpdatedDeck());
     onClose();
+  };
+
+  // BUG CORRIGIDO: clicar em "Adicionar Cartão" (fluxo com IA) fechava o
+  // modal e navegava para a aba Cards imediatamente, descartando qualquer
+  // edição pendente nesta tela. Agora salva primeiro, e só então navega.
+  const handleOpenCardsFlow = () => {
+    if (onOpenCards) {
+      if (isDirty) onSaveDeck(buildUpdatedDeck());
+      onClose();
+      onOpenCards();
+    } else {
+      setShowAddForm(!showAddForm);
+    }
   };
 
   return (
@@ -110,9 +153,17 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-[#60a5fa]" />
             <h3 className="text-lg font-bold">Gerenciador de Deck & Cartões</h3>
+            {isDirty && (
+              <span
+                className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                title="Você tem alterações não salvas"
+              >
+                <AlertTriangle className="w-3 h-3" /> Não salvo
+              </span>
+            )}
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 rounded-full text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -137,14 +188,7 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
               Lista de Cartões ({cards.length})
             </h4>
             <button
-              onClick={() => {
-                if (onOpenCards) {
-                  onClose();
-                  onOpenCards();
-                } else {
-                  setShowAddForm(!showAddForm);
-                }
-              }}
+              onClick={handleOpenCardsFlow}
               className="text-xs text-[#60a5fa] hover:underline flex items-center gap-1 font-bold"
             >
               <Plus className="w-4 h-4" /> Adicionar Cartão
@@ -248,12 +292,18 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
                         <Check className="w-3.5 h-3.5 inline mr-1" /> Salvar Alteração
                       </button>
                       <button
-                        onClick={() => setEditingCardId(null)}
+                        onClick={() => {
+                          setEditingCardId(null);
+                          setEditError(null);
+                        }}
                         className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
                       >
                         Cancelar
                       </button>
                     </div>
+                    {editError && (
+                      <p className="text-[11px] text-rose-400 font-medium">{editError}</p>
+                    )}
                   </div>
                 ) : (
                   <>

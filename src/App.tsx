@@ -5,6 +5,7 @@ import { OnboardingModal } from './components/OnboardingModal';
 import { DashboardView } from './components/DashboardView';
 import { StudySessionView } from './components/StudySessionView';
 import { AdMobBanner } from './components/AdMobBanner';
+import { ImportExportModal } from './components/ImportExportModal';
 
 // ----------------------------------------------------------------------------
 // Code-splitting: telas/modais que não são necessários no primeiro carregamento
@@ -96,6 +97,7 @@ export function App() {
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showReferralModal, setShowReferralModal] = useState(false);
+  const [showImportExportModal, setShowImportExportModal] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
 
@@ -396,6 +398,7 @@ export function App() {
                 onOpenAdMob={() => setShowAdMobModal(true)}
                 onOpenSubscription={() => setShowSubscriptionModal(true)}
                 onOpenReferral={() => setShowReferralModal(true)}
+                onOpenImportExport={() => setShowImportExportModal(true)}
               />
             )}
 
@@ -520,6 +523,14 @@ export function App() {
 
         {/* Referral / Indique e Ganhe Modal */}
         {showReferralModal && <ReferralModal stats={stats} onClose={() => setShowReferralModal(false)} />}
+
+        {showImportExportModal && (
+          <ImportExportModal
+            decks={decks}
+            onSaveDeck={handleSaveDeck}
+            onClose={() => setShowImportExportModal(false)}
+          />
+        )}
 
         {/* Lembretes de Revisão (Push Notifications) Modal */}
         {showNotificationsModal && <NotificationSettingsModal onClose={() => setShowNotificationsModal(false)} />}
