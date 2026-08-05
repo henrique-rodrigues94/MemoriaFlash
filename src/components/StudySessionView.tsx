@@ -34,10 +34,19 @@ function responsiveFontSize(text: string, kind: 'question' | 'answer' = 'questio
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/** Resumo de desempenho de uma sessão de estudo concluída — repassado ao
+ *  App.tsx para alimentar activityLog/retentionRate/timeStudiedHours em
+ *  studyStreak.ts (ver applyStudySessionCompleted). */
+export interface SessionSummary {
+  hardCount: number;
+  correctCount: number;
+  minutesStudied: number;
+}
+
 interface StudySessionViewProps {
   deck: Deck;
   currentLanguage?: SupportedLanguage;
-  onFinishSession: (updatedDeck: Deck, cardsReviewedCount: number) => void;
+  onFinishSession: (updatedDeck: Deck, cardsReviewedCount: number, summary: SessionSummary) => void;
   onSaveProgress?: (updatedDeck: Deck) => void;
   onBack: () => void;
 }
@@ -82,6 +91,12 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   const [isFlipped, setIsFlipped] = useState(false);
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
+  // Contadores reais de acerto/erro da sessão — usados para calcular a
+  // "Retenção Média" de verdade em Estatísticas (ver SessionSummary acima).
+  const [sessionHardCount, setSessionHardCount] = useState(0);
+  const [sessionCorrectCount, setSessionCorrectCount] = useState(0);
+  // Marca o início da sessão para derivar minutos estudados reais.
+  const [sessionStartedAt] = useState(() => Date.now());
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   // Inverte pergunta/resposta durante a revisão (só visual — não altera dados)
   const [invertCards, setInvertCards] = useState(false);
@@ -148,6 +163,11 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
 
     const newReviewedCount = reviewedCount + 1;
     setReviewedCount(newReviewedCount);
+    if (rating === 'hard') {
+      setSessionHardCount((prev) => prev + 1);
+    } else {
+      setSessionCorrectCount((prev) => prev + 1);
+    }
     setIsFlipped(false);
 
     // Salva progresso incremental: merge do mapa com o deck original
@@ -169,8 +189,14 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   // apenas visual durante a revisão. Salvar invertido destruiria o deck.
   const handleCompleteAndReturn = useCallback(() => {
     const mergedCards = deck.cards.map(c => updatedCardsMap.get(c.id) ?? c);
-    onFinishSession({ ...deck, cards: mergedCards }, reviewedCount);
-  }, [deck, updatedCardsMap, reviewedCount, onFinishSession]);
+    const elapsedMs = Date.now() - sessionStartedAt;
+    const minutesStudied = reviewedCount > 0 ? Math.max(1, Math.round(elapsedMs / 60000)) : 0;
+    onFinishSession(
+      { ...deck, cards: mergedCards },
+      reviewedCount,
+      { hardCount: sessionHardCount, correctCount: sessionCorrectCount, minutesStudied }
+    );
+  }, [deck, updatedCardsMap, reviewedCount, onFinishSession, sessionStartedAt, sessionHardCount, sessionCorrectCount]);
 
   const handleBackRequest = () => {
     if (reviewedCount > 0) setShowExitConfirm(true);
