@@ -31,7 +31,7 @@ export const ECONOMY = {
   REFERRAL_REFERRER_BONUS: 30, // quem indicou ganha quando o indicado ativa a conta
 
   // --- Custo de ações em créditos de IA ---
-  COST_GENERATE_DECK: 1, // por flashcard, ou por lote — ver uso no componente
+  COST_GENERATE_DECK: 1, // custo em créditos POR CARD gerado (não por lote/geração)
 } as const;
 
 export function todayKey(date: Date = new Date()): string {

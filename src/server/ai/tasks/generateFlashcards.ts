@@ -8,7 +8,7 @@ import { extractArrayField } from '../jsonUtils';
  * acentuação, sem pontuação/espaços extras. Duas perguntas quase idênticas
  * (variando só maiúscula/pontuação) caem na mesma chave.
  */
-function normalizeForDedup(text: string): string {
+export function normalizeForDedup(text: string): string {
   return (text || '')
     .toLowerCase()
     .normalize('NFD')
@@ -16,6 +16,41 @@ function normalizeForDedup(text: string): string {
     .replace(/[^\w\s]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Rede de segurança determinística para a regra 6 do prompt: apesar da
+ * instrução explícita, modelos às vezes ainda geram "explanation" que só
+ * repete/parafraseia "back" (ex.: back="Paris" / explanation="A capital da
+ * França é Paris."). Quando isso é detectado — o texto de "back" aparece
+ * quase inteiro dentro de "explanation" sem nada além disso — substituímos
+ * por um aviso didático em vez de mostrar uma explicação vazia de conteúdo.
+ */
+export function explanationJustRepeatsAnswer(back: string, explanation: string): boolean {
+  const normBack = normalizeForDedup(back);
+  // Remove os rótulos fixos que nós mesmos injetamos no prompt (regra 4) —
+  // "explicacao"/"curiosidade" não são conteúdo gerado pelo modelo, então
+  // não devem contar como "texto novo" ao medir o quanto sobra além da
+  // resposta.
+  const normExpl = normalizeForDedup(explanation)
+    .replace(/\bexplicacao\b/g, '')
+    .replace(/\bcuriosidade\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!normBack || !normExpl) return false;
+
+  // Resposta curta repetida 2+ vezes na explicação: forte sinal de que o
+  // modelo só ficou reafirmando a resposta em vez de explicar algo novo.
+  const occurrences = normExpl.split(normBack).length - 1;
+  if (occurrences >= 2 && normBack.length >= 2) return true;
+
+  // Caso geral: quanto sobra da explicação depois de remover o texto da
+  // resposta? Se sobrar muito pouco, a "explicação" é essencialmente só a
+  // resposta com enfeites, sem conteúdo didático novo.
+  const remainder = normExpl.split(normBack).join(' ').replace(/\s+/g, ' ').trim();
+  const remainderRatio = remainder.length / Math.max(normExpl.length, 1);
+  const containsBack = normExpl.includes(normBack);
+  return containsBack && remainderRatio < 0.35;
 }
 
 export async function generateFlashcardsTask(args: {
@@ -52,6 +87,9 @@ REGRAS OBRIGATÓRIAS PARA CADA FLASHCARD:
 3. "difficulty" reflete a dificuldade REAL daquele card específico, não um valor fixo repetido em todos: ${difficultyGuide}
 4. "explanation" é uma explicação didática do "back", começando com "📘 Explicação:" e incluindo uma curiosidade real e verificável do mundo real com "💡 Curiosidade:" — nunca invente fatos, datas ou números; se não tiver uma curiosidade genuína, foque em aprofundar a explicação do conceito em vez de inventar uma.
 5. "topic" é o subtópico específico do conteúdo abordado por aquele card (não repita o nome da matéria inteira).
+6. PROIBIDO copiar ou apenas reformular o texto de "back" dentro de "explanation": a explicação e a curiosidade devem acrescentar informação NOVA que não está em "back" (contexto, mecanismo, exemplo aplicado, dado histórico, comparação, consequência prática). Se "explanation" repetir o mesmo conteúdo de "back" com outras palavras, o card é considerado inválido.
+   ❌ Errado: back="Paris" / explanation="📘 Explicação: A capital da França é Paris. 💡 Curiosidade: Paris é a capital da França."
+   ✅ Certo: back="Paris" / explanation="📘 Explicação: Paris é sede do governo francês desde o século III. 💡 Curiosidade: A Torre Eiffel, símbolo da cidade, foi construída em 1889 para a Exposição Universal e era originalmente vista como provisória."
 
 Responda sempre ${langInstruction}.`;
 
@@ -111,7 +149,25 @@ Gere exatamente ${count} flashcards distintos entre si, cobrindo os conceitos, d
         console.warn(`[generateFlashcards] ${removedCount} card(s) duplicado(s) removido(s) do lote (provider: ${providerUsed}).`);
       }
 
-      return { cards, providerUsed };
+      // Rede de segurança para a regra 6 (explicação não pode só repetir a
+      // resposta). Não descartamos o card — ele continua válido como
+      // pergunta/resposta — só substituímos a explicação por um aviso
+      // honesto em vez de exibir um texto que não agrega nada.
+      let fixedExplanationCount = 0;
+      const finalCards = cards.map((card) => {
+        const back = typeof card?.back === 'string' ? card.back : '';
+        const explanation = typeof card?.explanation === 'string' ? card.explanation : '';
+        if (explanationJustRepeatsAnswer(back, explanation)) {
+          fixedExplanationCount++;
+          return { ...card, explanation: '📘 Explicação: revise este conceito com suas próprias palavras para fixar melhor o conteúdo.' };
+        }
+        return card;
+      });
+      if (fixedExplanationCount > 0) {
+        console.warn(`[generateFlashcards] ${fixedExplanationCount} explicação(ões) substituída(s) por repetir a resposta (provider: ${providerUsed}).`);
+      }
+
+      return { cards: finalCards, providerUsed };
     }
   );
 

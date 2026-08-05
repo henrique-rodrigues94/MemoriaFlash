@@ -117,8 +117,8 @@ export function App() {
   };
 
   // Storage states
-  const [decks, setDecks] = useState<Deck[]>(getStoredDecks());
-  const [stats, setStats] = useState<UserStats>(getStoredStats());
+  const [decks, setDecks] = useState<Deck[]>(() => getStoredDecks());
+  const [stats, setStats] = useState<UserStats>(() => getStoredStats());
 
 
   // Active Session / Modal States

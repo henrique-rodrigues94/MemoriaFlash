@@ -151,14 +151,21 @@ function ManualCardPreview({ card, onRemove }: { card: Flashcard; onRemove: () =
 
 function CreditsBanner({
   stats,
+  cardCount,
   onOpenAdMob,
 }: {
   stats: UserStats;
+  /** Quando informado, mostra o custo total da geração (cardCount × custo por card) em vez do custo unitário. */
+  cardCount?: number;
   onOpenAdMob?: () => void;
 }) {
   if (stats.isPro) return null;
   const credits = stats.aiCredits || 0;
   const hasCredits = credits > 0;
+  // BUG CORRIGIDO: o custo mostrado (e cobrado — ver handleGenerateCards)
+  // era um valor fixo de 1 crédito por geração inteira, não importava se o
+  // usuário pedia 10 ou 100 cards. Agora reflete 1 crédito POR CARD gerado.
+  const totalCost = (cardCount || 1) * ECONOMY.COST_GENERATE_DECK;
   return (
     <div className={`rounded-xl p-3.5 flex items-center justify-between gap-3 border ${
       hasCredits ? 'bg-blue-500/10 border-blue-500/30' : 'bg-amber-500/10 border-amber-500/30'
@@ -170,12 +177,12 @@ function CreditsBanner({
         <div>
           <p className={`text-xs font-bold ${hasCredits ? 'text-blue-300' : 'text-amber-300'}`}>
             {hasCredits
-              ? `${credits} crédito${credits !== 1 ? 's' : ''} disponível`
+              ? `${credits} crédito${credits !== 1 ? 's' : ''} disponí${credits !== 1 ? 'veis' : 'vel'}`
               : 'Sem créditos — assista um vídeo para ganhar'}
           </p>
           <p className="text-[11px] text-slate-400">
             {hasCredits
-              ? `Cada geração custa ${ECONOMY.COST_GENERATE_DECK} crédito`
+              ? `${ECONOMY.COST_GENERATE_DECK} crédito por card gerado${cardCount ? ` · esta geração custa ${totalCost} crédito${totalCost !== 1 ? 's' : ''}` : ''}`
               : 'Créditos são necessários para usar a IA'}
           </p>
         </div>
@@ -335,8 +342,12 @@ export const StudioView: React.FC<StudioViewProps> = ({
       setErrorMsg('Por favor, digite a Matéria / Assunto.');
       return;
     }
-    const cost = ECONOMY.COST_GENERATE_DECK;
-    if (!hasEnoughCredits(stats, cost)) {
+    // BUG CORRIGIDO: o custo era fixo (1 crédito), não importava quantos
+    // cards o usuário pedisse (10, 25, 50 ou 100). Agora é 1 crédito POR
+    // CARD, calculado sobre a quantidade selecionada — e a checagem de
+    // saldo usa esse total, não o preço unitário.
+    const estimatedCost = cardCount * ECONOMY.COST_GENERATE_DECK;
+    if (!hasEnoughCredits(stats, estimatedCost)) {
       onOpenAdMob?.();
       return;
     }
@@ -345,7 +356,11 @@ export const StudioView: React.FC<StudioViewProps> = ({
     setSuccessMsg(null);
     try {
       const cards = await generateAICards(subject.trim(), topics, cardCount);
-      onDeductCredit?.(cost);
+      // Cobra pela quantidade de cards REALMENTE entregues (o backend pode
+      // devolver menos que o pedido após remover duplicatas — ver
+      // generateFlashcards.ts), nunca pelo que foi apenas solicitado.
+      const actualCost = cards.length * ECONOMY.COST_GENERATE_DECK;
+      onDeductCredit?.(actualCost);
       setGeneratedAICards(cards);
     } catch (err: any) {
       setErrorMsg(err?.message || 'Ocorreu um erro ao gerar os cards com IA.');
@@ -366,7 +381,14 @@ export const StudioView: React.FC<StudioViewProps> = ({
       onSaveNewDeck({
         id: `deck-${Date.now()}`,
         title,
-        category: generatedAICards[0].topic || 'Geral',
+        // BUG CORRIGIDO: usava generatedAICards[0].topic — o TÓPICO do
+        // primeiro card (ex.: "Mitocôndria") em vez da MATÉRIA digitada
+        // (ex.: "Biologia"). Isso poluía deck.category com um valor de
+        // tópico, que depois vazava de volta para o campo "Matéria" ao
+        // reabrir o deck e clicar em "Adicionar Cartão" (StudioView
+        // pré-preenche a Matéria a partir de initialDeck.category quando
+        // os cards não têm .subject próprio — ver useEffect abaixo).
+        category: subject.trim() || generatedAICards[0].subject || 'Geral',
         description: '',
         color: '#60a5fa',
         accentBorder: 'border-l-primary',
@@ -389,7 +411,11 @@ export const StudioView: React.FC<StudioViewProps> = ({
     setTimeout(() => setSuccessMsg(null), 4000);
   };
 
-  const noCredits = !stats.isPro && (stats.aiCredits || 0) < ECONOMY.COST_GENERATE_DECK;
+  // BUG CORRIGIDO: comparava o saldo só com o preço unitário (1), então
+  // com apenas 1 crédito o botão ficava habilitado mesmo pedindo 100 cards
+  // — e a geração era então bloqueada só depois, dentro de
+  // handleGenerateCards. Agora reflete o custo real da quantidade selecionada.
+  const noCredits = !stats.isPro && (stats.aiCredits || 0) < cardCount * ECONOMY.COST_GENERATE_DECK;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -608,7 +634,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
             </div>
 
             {/* ── Créditos ── */}
-            <CreditsBanner stats={stats} onOpenAdMob={onOpenAdMob} />
+            <CreditsBanner stats={stats} cardCount={cardCount} onOpenAdMob={onOpenAdMob} />
 
             {/* ── Gerar ── */}
             <button

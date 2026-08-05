@@ -346,8 +346,11 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
   }, []);
 
   // Créditos insuficientes para gerar (usado tanto para desabilitar o botão
-  // quanto para trocar o texto — calculado uma única vez, não duas)
-  const noCredits = !!stats && !stats.isPro && (stats.aiCredits || 0) < ECONOMY.COST_GENERATE_DECK;
+  // quanto para trocar o texto — calculado uma única vez, não duas).
+  // BUG CORRIGIDO: comparava o saldo só com o preço unitário (1 crédito),
+  // então com 1 crédito só o botão parecia liberado mesmo pedindo 100 cards.
+  // Agora reflete o custo real (1 crédito por card × quantidade selecionada).
+  const noCredits = !!stats && !stats.isPro && (stats.aiCredits || 0) < cardCount * ECONOMY.COST_GENERATE_DECK;
 
   // ── Add items ──────────────────────────────────────────────────────────────
 
@@ -415,8 +418,12 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
   const processItems = async () => {
     if (!items.length) return;
 
-    const cost = ECONOMY.COST_GENERATE_DECK;
-    if (stats && !hasEnoughCredits(stats, cost)) {
+    // BUG CORRIGIDO: custo fixo de 1 crédito por geração inteira, não
+    // importava a quantidade de cards pedida. Agora é 1 crédito por card
+    // (a checagem usa a quantidade selecionada; a cobrança final usa a
+    // quantidade REALMENTE entregue — ver abaixo).
+    const estimatedCost = cardCount * ECONOMY.COST_GENERATE_DECK;
+    if (stats && !hasEnoughCredits(stats, estimatedCost)) {
       if (onOpenAdMob) onOpenAdMob();
       return;
     }
@@ -488,7 +495,10 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
       };
 
       onSaveNewDeck(deck);
-      if (stats && !stats.isPro && onDeductCredit) onDeductCredit(cost);
+      // Cobra pela quantidade de cards REALMENTE entregues, nunca pela
+      // quantidade apenas solicitada (cardCount).
+      const actualCost = normalized.length * ECONOMY.COST_GENERATE_DECK;
+      if (stats && !stats.isPro && onDeductCredit) onDeductCredit(actualCost);
       setGeneratedCards(normalized);
       setStep('done');
     } catch (err: any) {
@@ -582,7 +592,7 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
                 </p>
                 <p className="text-[11px] text-slate-400">
                   {(stats.aiCredits || 0) > 0
-                    ? `Geração custa ${ECONOMY.COST_GENERATE_DECK} crédito`
+                    ? `${ECONOMY.COST_GENERATE_DECK} crédito por card gerado · esta geração custa ${cardCount * ECONOMY.COST_GENERATE_DECK} crédito${cardCount * ECONOMY.COST_GENERATE_DECK !== 1 ? 's' : ''}`
                     : 'Assista um vídeo curto e ganhe créditos de IA'}
                 </p>
               </div>
@@ -615,12 +625,6 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
                 </div>
                 <h4 className="text-white font-semibold text-base">Clique para fazer upload</h4>
                 <p className="text-xs text-slate-400 mt-1">PDF, Word (.docx), TXT, Markdown, JPG, PNG</p>
-                <button
-                  type="button"
-                  className="mt-4 bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 border border-purple-500/30 px-5 py-2 rounded-xl text-xs font-semibold transition"
-                >
-                  Selecionar Arquivo(s)
-                </button>
               </div>
               <input
                 ref={fileInputRef}

@@ -54,10 +54,10 @@ const INITIAL_STATS: UserStats = {
 export function getStoredDecks(): Deck[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.DECKS);
-    if (!raw) return INITIAL_DECKS;
+    if (!raw) return [];
     return JSON.parse(raw);
   } catch {
-    return INITIAL_DECKS;
+    return [];
   }
 }
 
