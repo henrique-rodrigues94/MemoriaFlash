@@ -20,7 +20,7 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
   onOpenCards,
 }) => {
   const [cards, setCards] = useState<Flashcard[]>([...deck.cards]);
-  const [title, setTitle] = useState(deck.title);
+  const [title, setTitle] = useState(deck.title || '');
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [editFront, setEditFront] = useState('');
   const [editBack, setEditBack] = useState('');
@@ -84,8 +84,8 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
 
   const handleStartEditCard = (c: Flashcard) => {
     setEditingCardId(c.id);
-    setEditFront(c.front);
-    setEditBack(c.back);
+    setEditFront(c.front || '');
+    setEditBack(c.back || '');
     setEditTopic(c.topic || '');
     setEditSubject(c.subject || '');
     setEditExplanation(c.explanation || '');
