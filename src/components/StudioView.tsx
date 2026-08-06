@@ -15,6 +15,7 @@ import { getCuratedSubjectSuggestions } from '../lib/subjectAutocomplete';
 import { findClosestMatch } from '../lib/spellCheck';
 import { hasEnoughCredits } from '../services/economy/creditsEngine';
 import { ECONOMY } from '../services/economy/economyConstants';
+import { queryBankAvailability, invalidateBankStatsCache, BankAvailability } from '../services/cardBankService';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -232,6 +233,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [bankAvailability, setBankAvailability] = useState<BankAvailability | null>(null);
   const topicInputRef = useRef<HTMLInputElement>(null);
 
   // ── Cards gerados / criados ───────────────────────────────────────────────
@@ -333,7 +335,21 @@ export const StudioView: React.FC<StudioViewProps> = ({
     return () => { cancelled = true; clearTimeout(timer); };
   }, [subject, educationLevel]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Níveis de ensino disponíveis para a matéria digitada ─────────────────
+  // ── Consulta disponibilidade no banco de cards ────────────────────────────
+  // Quando matéria + tópicos mudam, consulta o banco para saber quantos cards
+  // já existem prontos (sem precisar de IA).
+  useEffect(() => {
+    if (!subject.trim() || topics.length === 0) {
+      setBankAvailability(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const availability = await queryBankAvailability(subject.trim(), topics, educationLevel);
+      if (!cancelled) setBankAvailability(availability);
+    }, 800);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [subject, topics, educationLevel]); // eslint-disable-line react-hooks/exhaustive-deps
   // Ex.: "Direito" não é uma matéria de Fundamental/Médio — nesse caso esses
   // chips ficam de fora, sobrando Faculdade/Concurso/Técnico.
   // Sugestões curadas de subáreas pra matéria ampla digitada (ex.: "direito" → "Direito Penal"…)
@@ -442,6 +458,9 @@ export const StudioView: React.FC<StudioViewProps> = ({
       const actualCost = cards.length * ECONOMY.COST_GENERATE_DECK;
       onDeductCredit?.(actualCost);
       setGeneratedAICards(cards);
+      // Invalida cache de stats do banco (novos cards foram gerados/salvos)
+      invalidateBankStatsCache(subject.trim());
+      setBankAvailability(null);
     } catch (err: any) {
       setErrorMsg(err?.message || 'Ocorreu um erro ao gerar os cards com IA.');
     } finally {
@@ -788,6 +807,30 @@ export const StudioView: React.FC<StudioViewProps> = ({
 
             {/* ── Créditos ── */}
             <CreditsBanner stats={stats} cardCount={cardCount} onOpenAdMob={onOpenAdMob} />
+
+            {/* ── Disponibilidade no banco de cards ── */}
+            {bankAvailability && topics.length > 0 && (
+              <div className="animate-fade-in rounded-xl border px-4 py-3 text-xs space-y-1.5
+                bg-[#051424]/80 border-blue-500/20">
+                <div className="flex items-center gap-2 font-bold text-[#60a5fa]">
+                  <span>🗄️</span>
+                  <span>Banco de cards compartilhado</span>
+                </div>
+                {bankAvailability.available.length > 0 && (
+                  <p className="text-emerald-400">
+                    ✓ {bankAvailability.available.length} tópico{bankAvailability.available.length !== 1 ? 's' : ''} com
+                    cards prontos no banco ({bankAvailability.totalReadyCards} cards)
+                    — sem custo de IA
+                  </p>
+                )}
+                {bankAvailability.needsGeneration.length > 0 && (
+                  <p className="text-amber-400">
+                    ⚡ {bankAvailability.needsGeneration.length} tópico{bankAvailability.needsGeneration.length !== 1 ? 's' : ''} precisam
+                    de geração via IA
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* ── Gerar ── */}
             <button

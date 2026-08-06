@@ -252,12 +252,23 @@ export async function generateFlashcardsTask(args: {
   for (const slot of slots) {
     if (slot.count <= 0) continue;
 
-    const bankCards = useBank
+    const bankResult = useBank
       ? await getCardsFromBank(prompt, slot.topicLabel, educationLevel, difficulty, slot.count)
-      : [];
-    bankHits += bankCards.length;
-    allCards.push(...bankCards);
+      : { cards: [], stale: true };
 
+    // Se o banco tem cards suficientes E não estão stale, serve direto
+    const bankCards = bankResult.cards;
+    const bankStale = bankResult.stale;
+    const enoughFromBank = bankCards.length >= slot.count && !bankStale;
+
+    bankHits += bankCards.length;
+    if (enoughFromBank) {
+      allCards.push(...bankCards);
+      continue;
+    }
+
+    // Banco vazio, insuficiente ou stale → gera via IA
+    allCards.push(...bankCards); // usa o que tem enquanto gera o restante
     const shortfall = slot.count - bankCards.length;
     if (shortfall <= 0) continue;
 
@@ -280,7 +291,7 @@ export async function generateFlashcardsTask(args: {
       // commit para garantir que o próximo pedido idêntico já encontre os
       // cards prontos — sem essa espera, dois pedidos quase simultâneos
       // para o mesmo balde poderiam ambos ir para a IA.
-      await saveCardsToBank(prompt, slot.topicLabel, educationLevel, difficulty, generated);
+      await saveCardsToBank(prompt, slot.topicLabel, educationLevel, difficulty, generated, providerUsed);
     }
   }
 

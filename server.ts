@@ -16,6 +16,7 @@ import { generateQuizTask } from './src/server/ai/tasks/generateQuiz';
 import { recoveryPlanTask } from './src/server/ai/tasks/recoveryPlan';
 import { scannerAnalyzeTask } from './src/server/ai/tasks/scannerAnalyze';
 import { generateCurriculumTask, CurriculumCategory } from './src/server/ai/tasks/generateCurriculum';
+import { getBankStatsForTopics, saveCardsToBank, BankCard } from './src/server/cardBank/cardBank';
 import { simpleRateLimit } from './src/server/middleware/rateLimit';
 import { referralRouter } from './src/server/routes/referral';
 import { notificationsRouter } from './src/server/routes/notifications';
@@ -169,6 +170,90 @@ app.get('/api/curriculum', async (req, res) => {
   } catch (err: any) {
     console.error('[/api/curriculum] error:', err);
     return res.status(500).json({ error: err?.message || 'Erro interno ao gerar currículo' });
+  }
+});
+
+// ── Banco de Cards Compartilhado ───────────────────────────────────────────
+//
+// GET  /api/card-bank/stats  → disponibilidade de cards no banco por tópico
+// POST /api/card-bank/save   → contribuir cards gerados de volta ao banco
+//
+// O fluxo de geração via /api/gemini/generate-flashcards JÁ usa o banco
+// automaticamente (lê antes de gerar, salva depois). Estas rotas extras
+// permitem ao frontend consultar disponibilidade antes de gerar e contribuir
+// cards criados manualmente ou importados de outras fontes.
+
+app.use('/api/card-bank', simpleRateLimit({ windowMs: 60_000, max: 60 }));
+
+/**
+ * GET /api/card-bank/stats
+ * Consulta quantos cards existem no banco para cada tópico de uma matéria.
+ * Útil para mostrar ao usuário "já temos X cards prontos para este tópico".
+ *
+ * Query params:
+ *   subject        string   matéria (ex: "Biologia")
+ *   topics         string   tópicos separados por vírgula (ex: "Mitose,Meiose")
+ *   educationLevel string   "medio", "faculdade", etc.
+ *   difficulty     string   "medium" (default)
+ */
+app.get('/api/card-bank/stats', async (req, res) => {
+  const { subject, topics, educationLevel = 'medio', difficulty = 'medium' } = req.query as Record<string, string>;
+  if (!subject?.trim() || !topics?.trim()) {
+    return res.status(400).json({ error: 'subject e topics são obrigatórios' });
+  }
+  const topicList = topics.split(',').map(t => t.trim()).filter(Boolean);
+  if (topicList.length === 0) return res.json({ stats: [] });
+
+  try {
+    const stats = await getBankStatsForTopics(subject.trim(), topicList, educationLevel, difficulty);
+    return res.json({ stats });
+  } catch (err: any) {
+    console.error('[/api/card-bank/stats] error:', err);
+    return res.status(500).json({ error: err?.message || 'Erro ao consultar banco de cards' });
+  }
+});
+
+/**
+ * POST /api/card-bank/save
+ * Salva cards no banco compartilhado.
+ * Chamado quando o usuário cria cards manualmente ou quando os cards
+ * gerados pela IA precisam ser persistidos fora do fluxo normal de geração.
+ *
+ * Body:
+ *   subject        string     matéria
+ *   topic          string     tópico/subtópico
+ *   educationLevel string     nível de ensino
+ *   difficulty     string     dificuldade
+ *   cards          BankCard[] cards a salvar
+ *   providerUsed   string?    qual IA gerou (opcional, "manual" se criado pelo usuário)
+ */
+app.post('/api/card-bank/save', async (req, res) => {
+  const { subject, topic, educationLevel, difficulty, cards, providerUsed } = req.body as {
+    subject: string;
+    topic: string;
+    educationLevel: string;
+    difficulty: string;
+    cards: BankCard[];
+    providerUsed?: string;
+  };
+
+  if (!subject?.trim() || !topic?.trim() || !Array.isArray(cards) || cards.length === 0) {
+    return res.status(400).json({ error: 'subject, topic e cards são obrigatórios' });
+  }
+
+  try {
+    await saveCardsToBank(
+      subject.trim(),
+      topic.trim(),
+      educationLevel ?? 'medio',
+      difficulty ?? 'medium',
+      cards,
+      providerUsed ?? 'manual',
+    );
+    return res.json({ saved: cards.length });
+  } catch (err: any) {
+    console.error('[/api/card-bank/save] error:', err);
+    return res.status(500).json({ error: err?.message || 'Erro ao salvar cards no banco' });
   }
 });
 
