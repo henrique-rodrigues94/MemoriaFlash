@@ -2,6 +2,7 @@ import { Type } from '@google/genai';
 import { aiOrchestrator } from '../index';
 import { withCache, CACHE_TTL } from '../cache/aiCache';
 import { extractArrayField } from '../jsonUtils';
+import { getCardsFromBank, saveCardsToBank, BankCard } from '../../cardBank/cardBank';
 
 /**
  * Normaliza uma pergunta para comparação de duplicatas: minúsculas, sem
@@ -54,6 +55,7 @@ export function explanationJustRepeatsAnswer(back: string, explanation: string):
 }
 
 export type EducationLevel = 'escola' | 'faculdade' | 'concurso' | 'tecnico';
+export type GenerationSourceType = 'subject' | 'document';
 
 const EDUCATION_LEVEL_LABELS: Record<EducationLevel, string> = {
   escola: 'Educação Básica / Escola (Ensino Fundamental e Médio) — linguagem simples, clara e didática, sem jargão técnico avançado',
@@ -62,23 +64,37 @@ const EDUCATION_LEVEL_LABELS: Record<EducationLevel, string> = {
   tecnico: 'Curso Técnico / Ensino Técnico Profissionalizante — foco prático, aplicado e voltado para procedimentos e uso real no dia a dia de trabalho, evitando teoria excessiva',
 };
 
-export async function generateFlashcardsTask(args: {
-  prompt: string;
-  count?: number;
-  language?: string;
-  difficulty?: string;
-  selectedTopics?: string[];
-  educationLevel?: EducationLevel;
-}) {
-  const {
-    prompt,
-    count = 6,
-    language = 'pt',
-    difficulty = 'medium',
-    selectedTopics = [],
-    educationLevel = 'escola',
-  } = args;
+/** Distribui `total` em `slots` partes o mais equilibradas possível (a diferença entre a maior e a menor parte nunca passa de 1). */
+function distributeEvenly(total: number, slots: number): number[] {
+  const base = Math.floor(total / slots);
+  const remainder = total % slots;
+  return Array.from({ length: slots }, (_, i) => base + (i < remainder ? 1 : 0));
+}
 
+function shuffle<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/**
+ * Gera exatamente `count` flashcards via IA para UM subtópico específico
+ * (ou para o assunto geral, quando `topicLabel` é o próprio assunto).
+ * Contém toda a lógica de prompt/schema/dedup/anti-repetição que antes
+ * vivia direto em generateFlashcardsTask — agora reutilizável por balde.
+ */
+async function generateCardsForTopic(args: {
+  subject: string;
+  topicLabel: string;
+  isSpecificTopic: boolean;
+  count: number;
+  language: string;
+  difficulty: string;
+  educationLevel: EducationLevel;
+}): Promise<{ cards: BankCard[]; providerUsed: string }> {
+  const { subject, topicLabel, isSpecificTopic, count, language, difficulty, educationLevel } = args;
   const langInstruction = language === 'pt' ? 'em Português' : `in ${language}`;
   const levelLabel = EDUCATION_LEVEL_LABELS[educationLevel] || EDUCATION_LEVEL_LABELS.escola;
 
@@ -86,15 +102,10 @@ export async function generateFlashcardsTask(args: {
     "'easy' = conceito fundamental/definição básica; 'medium' = aplicação prática/relação entre conceitos; " +
     "'hard' = exceção, pegadinha comum ou caso-limite; 'expert' = nível de banca de concurso/prova avançada.";
 
-  const topicsInstruction =
-    selectedTopics.length > 0
-      ? `\nSubtópicos prioritários (distribua os ${count} cards de forma EQUILIBRADA entre eles — não concentre tudo em apenas um): ${selectedTopics.join(', ')}.`
-      : '';
+  const topicsInstruction = isSpecificTopic
+    ? `\nFoque EXCLUSIVAMENTE no subtópico: "${topicLabel}".`
+    : '';
 
-  // ── Um único prompt coeso (system define o papel/regras fixas; user traz
-  // os parâmetros concretos do pedido). Evitar duplicar a mesma instrução
-  // nos dois lugares reduz o risco do modelo "misturar" versões levemente
-  // diferentes da mesma regra e economiza tokens de contexto.
   const systemPrompt = `Você é o MemoriaFlash, especialista em criar flashcards educativos de alta retenção para o método de repetição espaçada (SRS SM-2).
 
 REGRAS OBRIGATÓRIAS PARA CADA FLASHCARD:
@@ -112,7 +123,7 @@ REGRAS OBRIGATÓRIAS PARA CADA FLASHCARD:
 
 Responda sempre ${langInstruction}.`;
 
-  const userPrompt = `Assunto: "${prompt}"${topicsInstruction}
+  const userPrompt = `Assunto: "${subject}"${topicsInstruction}
 Nível de ensino do aluno: ${levelLabel}.
 Nível-alvo de dificuldade do conjunto: ${difficulty} (varie individualmente ao redor desse nível conforme a regra 3, mas mantenha a maioria dos cards nesse patamar — sempre dentro do que é esperado para o nível de ensino informado).
 Gere exatamente ${count} flashcards distintos entre si, cobrindo os conceitos, definições, fórmulas e relações mais importantes do assunto acima que fazem parte do currículo desse nível de ensino.`;
@@ -136,7 +147,7 @@ Gere exatamente ${count} flashcards distintos entre si, cobrindo os conceitos, d
 
   const result = await withCache(
     'generateFlashcards',
-    { prompt, count, language, difficulty, selectedTopics, educationLevel },
+    { subject, topicLabel, count, language, difficulty, educationLevel },
     CACHE_TTL.FLASHCARDS,
     async () => {
       const { data, providerUsed } = await aiOrchestrator.generateJSON({
@@ -187,9 +198,95 @@ Gere exatamente ${count} flashcards distintos entre si, cobrindo os conceitos, d
         console.warn(`[generateFlashcards] ${fixedExplanationCount} explicação(ões) substituída(s) por repetir a resposta (provider: ${providerUsed}).`);
       }
 
-      return { cards: finalCards, providerUsed };
+      return { cards: finalCards as unknown as BankCard[], providerUsed };
     }
   );
 
-  return { ...result, providerUsed: result.cacheHit ? 'cache' : result.providerUsed };
+  return { cards: result.cards, providerUsed: result.cacheHit ? 'cache' : result.providerUsed };
+}
+
+export async function generateFlashcardsTask(args: {
+  prompt: string;
+  count?: number;
+  language?: string;
+  difficulty?: string;
+  selectedTopics?: string[];
+  educationLevel?: EducationLevel;
+  /**
+   * 'subject' (padrão) → geração normal por matéria/tópico, PODE reaproveitar
+   * e alimentar o banco compartilhado do Firestore.
+   * 'document' → conteúdo extraído de um documento privado do usuário
+   * (fluxo do Scanner). NUNCA passa pelo banco — geração de outro usuário
+   * jamais deve vazar conteúdo do documento de ninguém, e vice-versa.
+   */
+  sourceType?: GenerationSourceType;
+}) {
+  const {
+    prompt,
+    count = 6,
+    language = 'pt',
+    difficulty = 'medium',
+    selectedTopics = [],
+    educationLevel = 'escola',
+    sourceType = 'subject',
+  } = args;
+
+  const useBank = sourceType === 'subject';
+
+  // Cada slot é um "balde" independente: matéria + (tópico específico OU o
+  // próprio assunto geral, quando nenhum tópico foi selecionado).
+  const slots = selectedTopics.length > 0
+    ? selectedTopics.map((topic, i) => ({
+        topicLabel: topic,
+        isSpecificTopic: true,
+        count: distributeEvenly(count, selectedTopics.length)[i],
+      }))
+    : [{ topicLabel: prompt, isSpecificTopic: false, count }];
+
+  let bankHits = 0;
+  let aiGenerated = 0;
+  const providersUsed = new Set<string>();
+  const allCards: BankCard[] = [];
+
+  for (const slot of slots) {
+    if (slot.count <= 0) continue;
+
+    const bankCards = useBank
+      ? await getCardsFromBank(prompt, slot.topicLabel, educationLevel, difficulty, slot.count)
+      : [];
+    bankHits += bankCards.length;
+    allCards.push(...bankCards);
+
+    const shortfall = slot.count - bankCards.length;
+    if (shortfall <= 0) continue;
+
+    const { cards: generated, providerUsed } = await generateCardsForTopic({
+      subject: prompt,
+      topicLabel: slot.topicLabel,
+      isSpecificTopic: slot.isSpecificTopic,
+      count: shortfall,
+      language,
+      difficulty,
+      educationLevel,
+    });
+    aiGenerated += generated.length;
+    providersUsed.add(providerUsed);
+    allCards.push(...generated);
+
+    if (useBank && generated.length > 0) {
+      // Não bloqueia a resposta ao usuário por causa de uma falha ao salvar
+      // no banco (já tratado dentro de saveCardsToBank), mas aguardamos o
+      // commit para garantir que o próximo pedido idêntico já encontre os
+      // cards prontos — sem essa espera, dois pedidos quase simultâneos
+      // para o mesmo balde poderiam ambos ir para a IA.
+      await saveCardsToBank(prompt, slot.topicLabel, educationLevel, difficulty, generated);
+    }
+  }
+
+  shuffle(allCards);
+
+  const providerUsed =
+    aiGenerated === 0 ? 'bank' : providersUsed.size > 0 ? Array.from(providersUsed).join('+') : 'unknown';
+
+  return { cards: allCards, providerUsed, bankHits, aiGenerated };
 }

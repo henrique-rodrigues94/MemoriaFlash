@@ -18,6 +18,7 @@ import { scannerAnalyzeTask } from './src/server/ai/tasks/scannerAnalyze';
 import { simpleRateLimit } from './src/server/middleware/rateLimit';
 import { referralRouter } from './src/server/routes/referral';
 import { notificationsRouter } from './src/server/routes/notifications';
+import { billingRouter } from './src/server/routes/billing';
 import { getCacheStats } from './src/server/ai/cache/aiCache';
 import { startCronJobs } from './src/server/cron';
 import { injectReferralMeta, readIndexHtmlTemplate } from './src/server/ogPreview';
@@ -33,6 +34,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/api/gemini', simpleRateLimit({ windowMs: 60_000, max: 30 }));
 app.use('/api/referral', simpleRateLimit({ windowMs: 60_000, max: 20 }));
 app.use('/api/notifications', simpleRateLimit({ windowMs: 60_000, max: 10 }));
+app.use('/api/billing', simpleRateLimit({ windowMs: 60_000, max: 60 }));
 // BUG CORRIGIDO: /api/log não tinha nenhum limite de requisições — como é o
 // mesmo endpoint usado pelo formulário de feedback da aba Ajuda, isso abria
 // brecha para spam (um script podia mandar milhares de "feedbacks" por
@@ -40,6 +42,7 @@ app.use('/api/notifications', simpleRateLimit({ windowMs: 60_000, max: 10 }));
 app.use('/api/log', simpleRateLimit({ windowMs: 60_000, max: 20 }));
 app.use('/api/referral', referralRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/billing', billingRouter);
 
 // Health Check
 app.get('/api/health', (_req, res) => {
@@ -346,7 +349,7 @@ app.post('/api/gemini/scanner-process', async (req, res) => {
         `Matéria/Assunto: ${subjectLabel2}\n\n` +
         `CONTEÚDO FONTE:\n${extractedContent.slice(0, 15000)}\n\n` +
         `Com base EXCLUSIVAMENTE no conteúdo acima, gere ${cardCount2} flashcards educativos.${topicsFilter}`;
-      const result2 = await gft2({ prompt: prompt2, count: cardCount2, language: 'pt', difficulty: 'medium', selectedTopics: selectedTopics as string[] });
+      const result2 = await gft2({ prompt: prompt2, count: cardCount2, language: 'pt', difficulty: 'medium', selectedTopics: selectedTopics as string[], sourceType: 'document' });
       return res.json(result2);
     }
 
@@ -433,6 +436,7 @@ app.post('/api/gemini/scanner-process', async (req, res) => {
       language: 'pt',
       difficulty: 'medium',
       selectedTopics: (selectedTopics as string[]).length > 0 ? (selectedTopics as string[]) : (subject.trim() ? [subject.trim()] : []),
+      sourceType: 'document',
     });
 
     return res.json({ ...result, extractedText: allContent.slice(0, 500) + '...' });
