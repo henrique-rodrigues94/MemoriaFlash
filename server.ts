@@ -15,6 +15,7 @@ import { voiceTutorTask } from './src/server/ai/tasks/voiceTutor';
 import { generateQuizTask } from './src/server/ai/tasks/generateQuiz';
 import { recoveryPlanTask } from './src/server/ai/tasks/recoveryPlan';
 import { scannerAnalyzeTask } from './src/server/ai/tasks/scannerAnalyze';
+import { generateCurriculumTask, CurriculumCategory } from './src/server/ai/tasks/generateCurriculum';
 import { simpleRateLimit } from './src/server/middleware/rateLimit';
 import { referralRouter } from './src/server/routes/referral';
 import { notificationsRouter } from './src/server/routes/notifications';
@@ -109,6 +110,68 @@ app.post('/api/log', async (req, res) => {
 
 // Status dos provedores de IA (útil para depuração e para um painel admin futuro).
 // Não expõe as chaves, apenas quais estão configuradas/disponíveis/em cooldown.
+// ── Currículo por matéria + nível ──────────────────────────────────────────
+// GET /api/curriculum?subject=Biologia&level=medio
+// 1. Checa Firestore (coleção `curricula`, doc `{subject_normalizado}_{level}`)
+// 2. Se não existir: gera via IA → salva no Firestore → devolve
+// 3. Cache de resposta longo (24h) porque currículo é estável
+app.get('/api/curriculum', async (req, res) => {
+  const { subject, level } = req.query as { subject?: string; level?: string };
+  if (!subject?.trim() || !level?.trim()) {
+    return res.status(400).json({ error: 'subject e level são obrigatórios' });
+  }
+
+  const normalizedSubject = subject.trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+  const docId = `${normalizedSubject}__${level}`;
+
+  try {
+    const db = getAdminFirestore();
+    if (db) {
+      // Tenta buscar do Firestore
+      const docRef = db.collection('curricula').doc(docId);
+      const snap = await docRef.get();
+      if (snap.exists) {
+        const data = snap.data() as { categories: CurriculumCategory[] };
+        if (Array.isArray(data?.categories) && data.categories.length > 0) {
+          res.setHeader('Cache-Control', 'public, max-age=86400'); // 24h
+          return res.json({ categories: data.categories, fromFirestore: true });
+        }
+      }
+    }
+
+    // Não existe no Firestore (ou Firestore indisponível) → gera via IA
+    const result = await generateCurriculumTask({
+      subject: subject.trim(),
+      educationLevel: level as any,
+      language: 'pt',
+    });
+
+    if (!result?.categories?.length) {
+      return res.status(502).json({ error: 'IA não gerou currículo válido' });
+    }
+
+    // Salva no Firestore assincronamente (não bloqueia a resposta)
+    if (db) {
+      const docRef = db.collection('curricula').doc(docId);
+      docRef.set({
+        subject: subject.trim(),
+        educationLevel: level,
+        categories: result.categories,
+        generatedAt: new Date().toISOString(),
+        providerUsed: result.providerUsed,
+      }).catch(err => console.warn('[curriculum] Firestore save error:', err));
+    }
+
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.json({ categories: result.categories, fromFirestore: false });
+  } catch (err: any) {
+    console.error('[/api/curriculum] error:', err);
+    return res.status(500).json({ error: err?.message || 'Erro interno ao gerar currículo' });
+  }
+});
+
 app.get('/api/ai/status', (_req, res) => {
   res.json({ providers: aiOrchestrator.getStatus(), cache: getCacheStats() });
 });

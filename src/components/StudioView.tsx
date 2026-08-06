@@ -10,7 +10,7 @@ import { SupportedLanguage } from '../lib/i18n';
 import { ManualCardForm } from './ManualCardForm';
 import { fetchAITopicSuggestions, generateAICards, EducationLevel } from '../lib/aiGenerator';
 import { EDUCATION_LEVEL_META, getAvailableEducationLevels, recommendEducationLevels } from '../lib/educationLevels';
-import { getCuratedCurriculum, CurriculumCategory } from '../lib/curriculumTopics';
+import { fetchCurriculum, CurriculumCategory } from '../services/curriculumService';
 import { getCuratedSubjectSuggestions } from '../lib/subjectAutocomplete';
 import { findClosestMatch } from '../lib/spellCheck';
 import { hasEnoughCredits } from '../services/economy/creditsEngine';
@@ -292,35 +292,46 @@ export const StudioView: React.FC<StudioViewProps> = ({
   };
 
   // ── Sugestões de tópicos (debounce 600ms) ─────────────────────────────────
-  // Currículo curado (tópicos/subtópicos reais, por categoria) pra matéria+nível
-  // atuais — ex.: "Matemática" + "Fundamental" retorna toda a grade BNCC.
-  // Quando existe, substitui as sugestões genéricas da IA por essa lista completa.
-  const curatedCurriculum = useMemo(
-    () => getCuratedCurriculum(subject, educationLevel),
-    [subject, educationLevel],
-  );
+  // Currículo dinâmico: buscado do Firestore (ou gerado pela IA e salvo lá)
+  // para QUALQUER matéria + nível. Sem lista fixa no código — tudo vem do banco.
+  const [curatedCurriculum, setCuratedCurriculum] = useState<CurriculumCategory[] | null>(null);
+  const [isCurriculumLoading, setIsCurriculumLoading] = useState(false);
 
   useEffect(() => {
-    if (curatedCurriculum) {
-      // Já temos o currículo completo e curado pra essa combinação —
-      // não precisa (nem faz sentido) chamar a IA por só 6-8 sugestões.
-      setSuggestedTopics([]);
-      return;
-    }
     if (subject.trim().length < 2) {
+      setCuratedCurriculum(null);
       setSuggestedTopics([]);
       return;
     }
+
+    let cancelled = false;
     const timer = setTimeout(async () => {
+      setIsCurriculumLoading(true);
       try {
-        const suggestions = await fetchAITopicSuggestions(subject, educationLevel);
-        setSuggestedTopics(suggestions.filter(t => !topics.includes(t)));
+        const result = await fetchCurriculum(subject.trim(), educationLevel);
+        if (cancelled) return;
+        if (result?.categories?.length) {
+          setCuratedCurriculum(result.categories);
+          setSuggestedTopics([]); // currículo completo substitui sugestões simples
+        } else {
+          // Fallback: sugestões simples da IA (6-8 tópicos sem categorias)
+          setCuratedCurriculum(null);
+          try {
+            const suggestions = await fetchAITopicSuggestions(subject, educationLevel);
+            if (!cancelled) setSuggestedTopics(suggestions.filter(t => !topics.includes(t)));
+          } catch {
+            // sugestões são opcionais
+          }
+        }
       } catch {
-        // silencioso — sugestões são opcionais
+        if (!cancelled) setCuratedCurriculum(null);
+      } finally {
+        if (!cancelled) setIsCurriculumLoading(false);
       }
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [subject, topics, educationLevel, curatedCurriculum]);
+    }, 700);
+
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [subject, educationLevel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Níveis de ensino disponíveis para a matéria digitada ─────────────────
   // Ex.: "Direito" não é uma matéria de Fundamental/Médio — nesse caso esses
@@ -362,6 +373,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
     setEducationLevel(level);
     setEducationLevelLocked(true);
     setTopics([]);
+    setCuratedCurriculum(null); // força re-fetch do currículo pro novo nível
   };
 
   // ── Tópicos ───────────────────────────────────────────────────────────────
@@ -652,11 +664,17 @@ export const StudioView: React.FC<StudioViewProps> = ({
               )}
             </div>
 
-            {/* ── Currículo curado (todas as categorias/subtópicos) ou sugestões da IA ── */}
+            {/* ── Grade curricular: loading / currículo do banco / sugestões simples ── */}
+            {isCurriculumLoading && subject.trim().length >= 2 && !curatedCurriculum && (
+              <div className="p-3.5 bg-[#051424]/80 rounded-2xl border border-blue-500/20 animate-fade-in flex items-center gap-3">
+                <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                <span className="text-[11px] text-[#8c91a0]">Buscando grade curricular para <strong className="text-blue-300">{subject.trim()}</strong>…</span>
+              </div>
+            )}
             {curatedCurriculum ? (
               <div className="p-3.5 bg-[#051424]/80 rounded-2xl border border-blue-500/20 animate-fade-in space-y-3">
                 <span className="block text-[11px] font-bold text-[#60a5fa] uppercase tracking-wide flex items-center gap-1.5">
-                  <Wand2 className="w-3.5 h-3.5" /> Currículo completo — clique para selecionar os tópicos:
+                  <Wand2 className="w-3.5 h-3.5" /> Grade Curricular — clique para selecionar os tópicos:
                 </span>
                 {curatedCurriculum.map((cat: CurriculumCategory) => (
                   <div key={cat.category} className="space-y-1.5">
@@ -684,7 +702,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
                   </div>
                 ))}
               </div>
-            ) : suggestedTopics.length > 0 && (
+            ) : !isCurriculumLoading && suggestedTopics.length > 0 && (
               <div className="p-3.5 bg-[#051424]/80 rounded-2xl border border-blue-500/20 animate-fade-in">
                 <span className="block text-[11px] font-bold text-[#60a5fa] mb-2 uppercase tracking-wide flex items-center gap-1.5">
                   <Wand2 className="w-3.5 h-3.5" /> Sugestões de Tópicos da IA:
