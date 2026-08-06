@@ -1,7 +1,7 @@
 // 📁 flashmind-ai/src/components/StudioView.tsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  Sparkles, PlusCircle, CheckCircle2, Loader2, Plus, X, Trash2,
+  Sparkles, PlusCircle, CheckCircle2, Loader2, Plus, X, Trash2, Check,
   BookOpen, Save, HelpCircle, Play, Lock, Lightbulb, ChevronDown,
   ChevronUp, Wand2, Tag, GraduationCap,
 } from 'lucide-react';
@@ -10,6 +10,7 @@ import { SupportedLanguage } from '../lib/i18n';
 import { ManualCardForm } from './ManualCardForm';
 import { fetchAITopicSuggestions, generateAICards, EducationLevel } from '../lib/aiGenerator';
 import { EDUCATION_LEVEL_META, getAvailableEducationLevels, recommendEducationLevels } from '../lib/educationLevels';
+import { getCuratedCurriculum, CurriculumCategory } from '../lib/curriculumTopics';
 import { getCuratedSubjectSuggestions } from '../lib/subjectAutocomplete';
 import { findClosestMatch } from '../lib/spellCheck';
 import { hasEnoughCredits } from '../services/economy/creditsEngine';
@@ -217,7 +218,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
 
   // ── Gerador IA — form state ───────────────────────────────────────────────
   const [subject, setSubject] = useState('');
-  const [educationLevel, setEducationLevel] = useState<EducationLevel>('escola');
+  const [educationLevel, setEducationLevel] = useState<EducationLevel>('medio');
   // true quando o usuário escolheu o nível manualmente (não sincroniza mais
   // com a recomendação automática enquanto ele não trocar de matéria de novo)
   const [educationLevelLocked, setEducationLevelLocked] = useState(false);
@@ -291,7 +292,21 @@ export const StudioView: React.FC<StudioViewProps> = ({
   };
 
   // ── Sugestões de tópicos (debounce 600ms) ─────────────────────────────────
+  // Currículo curado (tópicos/subtópicos reais, por categoria) pra matéria+nível
+  // atuais — ex.: "Matemática" + "Fundamental" retorna toda a grade BNCC.
+  // Quando existe, substitui as sugestões genéricas da IA por essa lista completa.
+  const curatedCurriculum = useMemo(
+    () => getCuratedCurriculum(subject, educationLevel),
+    [subject, educationLevel],
+  );
+
   useEffect(() => {
+    if (curatedCurriculum) {
+      // Já temos o currículo completo e curado pra essa combinação —
+      // não precisa (nem faz sentido) chamar a IA por só 6-8 sugestões.
+      setSuggestedTopics([]);
+      return;
+    }
     if (subject.trim().length < 2) {
       setSuggestedTopics([]);
       return;
@@ -305,11 +320,11 @@ export const StudioView: React.FC<StudioViewProps> = ({
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [subject, topics, educationLevel]);
+  }, [subject, topics, educationLevel, curatedCurriculum]);
 
   // ── Níveis de ensino disponíveis para a matéria digitada ─────────────────
-  // Ex.: "Direito" não é uma matéria de Escola (Fundamental/Médio) — nesse
-  // caso o botão "Escola" fica desabilitado, sobrando Faculdade/Concurso/Técnico.
+  // Ex.: "Direito" não é uma matéria de Fundamental/Médio — nesse caso esses
+  // chips ficam de fora, sobrando Faculdade/Concurso/Técnico.
   // Sugestões curadas de subáreas pra matéria ampla digitada (ex.: "direito" → "Direito Penal"…)
   const curatedSubjectSuggestions = useMemo(
     () => getCuratedSubjectSuggestions(subject),
@@ -322,7 +337,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
   );
   // Lista curta e ranqueada de níveis plausíveis pra matéria digitada — ex.:
   // "Direito Penal" → ['concurso', 'faculdade']; "Eletrônica" → ['tecnico', 'faculdade'];
-  // "Biologia" → ['escola']. É essa lista que vira os chips exibidos (nunca a grade fixa de 4).
+  // "Matemática" → ['fundamental', 'medio']. É essa lista que vira os chips exibidos.
   const recommendedEducationLevels = useMemo(
     () => recommendEducationLevels(subject, availableEducationLevels),
     [subject, availableEducationLevels],
@@ -331,7 +346,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
   // Enquanto o usuário não escolher um nível manualmente, aplicamos o topo
   // da recomendação automática. Se ele já tiver travado uma escolha mas ela
   // deixou de ser plausível para a nova matéria (ex.: trocou de "Biologia"
-  // no nível Escola para "Direito Penal"), reencaixamos na recomendação —
+  // no nível Fundamental para "Direito Penal"), reencaixamos na recomendação —
   // nunca deixamos um nível fora dos chips sugeridos selecionado.
   useEffect(() => {
     if (!educationLevelLocked || !recommendedEducationLevels.includes(educationLevel)) {
@@ -361,6 +376,10 @@ export const StudioView: React.FC<StudioViewProps> = ({
 
   const handleRemoveTopic = (index: number) =>
     setTopics(prev => prev.filter((_, i) => i !== index));
+
+  const handleToggleTopic = (topic: string) => {
+    setTopics(prev => (prev.includes(topic) ? prev.filter(t => t !== topic) : [...prev, topic]));
+  };
 
   // ── Card manual → persiste no baralho ────────────────────────────────────
   const handleAddManualCard = (newCard: Flashcard, targetDeckName: string) => {
@@ -633,8 +652,39 @@ export const StudioView: React.FC<StudioViewProps> = ({
               )}
             </div>
 
-            {/* ── Sugestões de tópicos da IA ── */}
-            {suggestedTopics.length > 0 && (
+            {/* ── Currículo curado (todas as categorias/subtópicos) ou sugestões da IA ── */}
+            {curatedCurriculum ? (
+              <div className="p-3.5 bg-[#051424]/80 rounded-2xl border border-blue-500/20 animate-fade-in space-y-3">
+                <span className="block text-[11px] font-bold text-[#60a5fa] uppercase tracking-wide flex items-center gap-1.5">
+                  <Wand2 className="w-3.5 h-3.5" /> Currículo completo — clique para selecionar os tópicos:
+                </span>
+                {curatedCurriculum.map((cat: CurriculumCategory) => (
+                  <div key={cat.category} className="space-y-1.5">
+                    <span className="block text-[11px] font-bold text-[#8c91a0] uppercase tracking-wide">{cat.category}</span>
+                    <div className="flex flex-wrap gap-2">
+                      {cat.topics.map((sug) => {
+                        const isSelected = topics.includes(sug);
+                        return (
+                          <button
+                            key={sug}
+                            type="button"
+                            onClick={() => handleToggleTopic(sug)}
+                            className={`px-3 py-1.5 rounded-xl border text-xs flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 ${
+                              isSelected
+                                ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
+                                : 'bg-[#0e2742] hover:bg-[#163a61] text-[#adc6ff] border-blue-500/30'
+                            }`}
+                          >
+                            {isSelected ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Plus className="w-3.5 h-3.5 text-blue-400" />}
+                            {sug}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : suggestedTopics.length > 0 && (
               <div className="p-3.5 bg-[#051424]/80 rounded-2xl border border-blue-500/20 animate-fade-in">
                 <span className="block text-[11px] font-bold text-[#60a5fa] mb-2 uppercase tracking-wide flex items-center gap-1.5">
                   <Wand2 className="w-3.5 h-3.5" /> Sugestões de Tópicos da IA:

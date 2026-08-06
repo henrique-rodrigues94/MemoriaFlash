@@ -34,12 +34,6 @@ function sumActivity(log: DailyActivity[], days: number): number {
   return log.filter((d) => d.dateKey >= cutoff).reduce((s, d) => s + d.cardsReviewed, 0);
 }
 
-/** Soma XP dos últimos 7 dias. */
-function weeklyXP(log: DailyActivity[]): number {
-  const cutoff = dateKeyDaysAgo(6);
-  return log.filter((d) => d.dateKey >= cutoff).reduce((s, d) => s + d.xpEarned, 0);
-}
-
 export const StatsView: React.FC<StatsViewProps> = ({ stats, decks }) => {
   const totalCardsAllDecks = decks.reduce((sum, d) => sum + d.cards.length, 0);
   const activityLog: DailyActivity[] = stats.activityLog || [];
@@ -77,7 +71,6 @@ export const StatsView: React.FC<StatsViewProps> = ({ stats, decks }) => {
   const dueIn3Days = dueByCutoff(endOfDayInNDays(3));
   const dueIn7Days = dueByCutoff(endOfDayInNDays(7));
 
-  const xpThisWeek = weeklyXP(activityLog);
   const bestStreak = Math.max(stats.bestStreakDays || 0, stats.streakDays);
   const uniqueCategories = new Set(decks.map((d) => d.category)).size;
 
@@ -159,8 +152,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ stats, decks }) => {
           </div>
         </div>
 
-        {/* 4 Summary Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {/* Summary Stats Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <div className="p-4 rounded-2xl bg-[#0b1a2a] border border-[#424754]/30 space-y-1">
             <div className="text-[10px] font-mono text-[#8c91a0] uppercase">Cards Dominados</div>
             <div className="text-2xl font-extrabold text-white">{stats.totalCardsMastered}</div>
@@ -172,16 +165,6 @@ export const StatsView: React.FC<StatsViewProps> = ({ stats, decks }) => {
             <div className="text-2xl font-extrabold text-[#ffb786]">{stats.streakDays} Dias</div>
             <div className="text-[10px] text-[#ffb786] font-medium">
               Recorde: {bestStreak}d
-            </div>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-[#0b1a2a] border border-[#424754]/30 space-y-1">
-            <div className="text-[10px] font-mono text-[#8c91a0] uppercase">XP Esta Semana</div>
-            <div className="text-2xl font-extrabold text-[#60a5fa]">
-              +{xpThisWeek.toLocaleString('pt-BR')}
-            </div>
-            <div className="text-[10px] text-[#60a5fa] font-medium">
-              Total: {stats.xp.toLocaleString('pt-BR')} XP
             </div>
           </div>
 

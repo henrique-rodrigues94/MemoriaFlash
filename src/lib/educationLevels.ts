@@ -2,22 +2,26 @@
 /**
  * Níveis de ensino disponíveis para gerar flashcards.
  *
- * 'escola'    → Educação Básica (fusão de Ensino Fundamental + Ensino Médio).
- *               Matérias escolares clássicas: Matemática, Biologia, História…
- * 'faculdade' → Ensino Superior / Graduação. Cursos como Direito, Medicina,
- *               Engenharia, Administração, etc.
- * 'concurso'  → Preparação para concursos públicos (questões estilo banca
- *               examinadora — CESPE, FGV, FCC…).
- * 'tecnico'   → Curso técnico / profissionalizante (nível técnico, prático).
+ * 'fundamental' → Ensino Fundamental (1º ao 9º ano). Matérias escolares
+ *                 clássicas: Matemática, Biologia, História…
+ * 'medio'       → Ensino Médio (1º ao 3º ano).
+ * 'faculdade'   → Ensino Superior / Graduação. Cursos como Direito, Medicina,
+ *                 Engenharia, Administração, etc.
+ * 'concurso'    → Preparação para concursos públicos (questões estilo banca
+ *                 examinadora — CESPE, FGV, FCC…).
+ * 'tecnico'     → Curso técnico / profissionalizante (nível técnico, prático).
  */
-export type EducationLevel = 'escola' | 'faculdade' | 'concurso' | 'tecnico';
+export type EducationLevel = 'fundamental' | 'medio' | 'faculdade' | 'concurso' | 'tecnico';
 
 export const EDUCATION_LEVEL_META: { value: EducationLevel; label: string; icon: string }[] = [
-  { value: 'escola', label: 'Escola', icon: '🏫' },
+  { value: 'fundamental', label: 'Fundamental', icon: '🏫' },
+  { value: 'medio', label: 'Médio', icon: '📘' },
   { value: 'faculdade', label: 'Faculdade', icon: '🎓' },
   { value: 'concurso', label: 'Concurso', icon: '🏛️' },
   { value: 'tecnico', label: 'Técnico', icon: '🛠️' },
 ];
+
+const ALL_LEVELS: EducationLevel[] = ['fundamental', 'medio', 'faculdade', 'concurso', 'tecnico'];
 
 // ── Normalização ────────────────────────────────────────────────────────────
 
@@ -33,8 +37,10 @@ function matchesAny(s: string, terms: string[]): boolean {
   return terms.some((term) => s.includes(term));
 }
 
-// ── Matérias tipicamente da Educação Básica (Escola) ────────────────────────
-// Se o assunto digitado casar com uma dessas, 'escola' é permitido/recomendado.
+// ── Matérias tipicamente da Educação Básica (Fundamental + Médio) ──────────
+// Se o assunto digitado casar com uma dessas, tanto 'fundamental' quanto
+// 'medio' ficam disponíveis/recomendados — a mesma matéria (ex.: Matemática)
+// é estudada nos dois, só que com conteúdo diferente por nível.
 
 const ESCOLA_SUBJECTS = [
   'matematica', 'portugues', 'lingua portuguesa', 'redacao', 'gramatica', 'literatura',
@@ -47,8 +53,9 @@ const ESCOLA_SUBJECTS = [
 
 // ── Assuntos tipicamente de nível Superior/Profissional ─────────────────────
 // Se o assunto casar com um desses (curso de graduação, profissão
-// regulamentada, área técnica avançada), 'escola' é desabilitado — essas
-// matérias não fazem parte do currículo do Ensino Fundamental/Médio.
+// regulamentada, área técnica avançada), 'fundamental' e 'medio' são
+// desabilitados — essas matérias não fazem parte do currículo da Educação
+// Básica.
 
 const NON_ESCOLA_SUBJECTS = [
   'direito', 'medicina', 'enfermagem', 'odontologia', 'farmacia', 'veterinaria',
@@ -94,21 +101,20 @@ const TECNICO_SIGNALS = [
  * Heurística:
  *  - Assunto vazio/curto → libera todos (usuário ainda está digitando).
  *  - Assunto bate com algo claramente de nível superior/profissional →
- *    remove 'escola' da lista (mantém faculdade/concurso/técnico).
+ *    remove 'fundamental' e 'medio' da lista (mantém faculdade/concurso/técnico).
  *  - Assunto bate com uma matéria escolar clássica → todos os níveis
- *    continuam liberados (ex.: "Matemática" existe em todos os níveis).
+ *    continuam liberados (ex.: "Matemática" existe em fundamental, médio E faculdade).
  *  - Assunto desconhecido (não bate com nenhuma lista) → libera todos,
  *    por segurança (preferimos não travar o usuário por falso negativo).
  */
 export function getAvailableEducationLevels(subject: string): EducationLevel[] {
-  const all: EducationLevel[] = ['escola', 'faculdade', 'concurso', 'tecnico'];
   const s = normalize(subject);
-  if (s.length < 3) return all;
+  if (s.length < 3) return ALL_LEVELS;
 
   const matchesNonEscola = matchesAny(s, NON_ESCOLA_SUBJECTS);
-  if (matchesNonEscola) return all.filter((level) => level !== 'escola');
+  if (matchesNonEscola) return ALL_LEVELS.filter((level) => level !== 'fundamental' && level !== 'medio');
 
-  return all;
+  return ALL_LEVELS;
 }
 
 /**
@@ -118,16 +124,16 @@ export function getAvailableEducationLevels(subject: string): EducationLevel[] {
  * incoerente), esta função tenta ACERTAR a(s) intenção(ões) mais comuns de
  * quem digitou aquele assunto.
  *
- * Pode retornar mais de um nível quando ambos são igualmente plausíveis —
- * ex.: "Direito Penal" é estudado tanto na Faculdade quanto por quem faz
- * Concurso, então os dois aparecem, nessa ordem. "Eletrônica" sozinha
- * costuma ser curso Técnico. "Matemática" é conteúdo de Escola.
+ * Pode retornar mais de um nível quando vários são igualmente plausíveis —
+ * ex.: "Matemática" retorna Fundamental + Médio (a mesma matéria existe nos
+ * dois, com conteúdo diferente); "Direito Penal" retorna Concurso +
+ * Faculdade; "Eletrônica" sozinha costuma ser curso Técnico.
  *
  * A lista nunca inclui um nível fora de `available` e nunca vem vazia.
  */
 export function recommendEducationLevels(
   subject: string,
-  available: EducationLevel[] = ['escola', 'faculdade', 'concurso', 'tecnico'],
+  available: EducationLevel[] = ALL_LEVELS,
 ): EducationLevel[] {
   const s = normalize(subject);
   const ranked: EducationLevel[] = [];
@@ -142,7 +148,10 @@ export function recommendEducationLevels(
 
     if (isConcurso) add('concurso');
     if (isTecnico) add('tecnico');
-    if (isEscola) add('escola');
+    if (isEscola) {
+      add('fundamental');
+      add('medio');
+    }
 
     // Assunto profissional/específico (ex.: um ramo do Direito) sem sinal de
     // Escola: a Faculdade é sempre uma leitura plausível ADICIONAL ao que já
@@ -162,7 +171,7 @@ export function recommendEducationLevels(
  */
 export function recommendEducationLevel(
   subject: string,
-  available: EducationLevel[] = ['escola', 'faculdade', 'concurso', 'tecnico'],
+  available: EducationLevel[] = ALL_LEVELS,
 ): EducationLevel {
   return recommendEducationLevels(subject, available)[0];
 }

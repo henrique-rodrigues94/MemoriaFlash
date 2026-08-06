@@ -9,7 +9,7 @@ export type { EducationLevel };
  */
 export const fetchAITopicSuggestions = async (
   subject: string,
-  educationLevel: EducationLevel = 'escola',
+  educationLevel: EducationLevel = 'medio',
 ): Promise<string[]> => {
   if (!subject.trim()) return [];
   const res = await fetch('/api/gemini/suggest-topics', {
@@ -32,7 +32,7 @@ export const generateAICards = async (
   subject: string,
   topics: string[],
   count: number,
-  educationLevel: EducationLevel = 'escola',
+  educationLevel: EducationLevel = 'medio',
 ): Promise<Flashcard[]> => {
   const res = await fetch('/api/gemini/generate-flashcards', {
     method: 'POST',

@@ -54,11 +54,12 @@ export function explanationJustRepeatsAnswer(back: string, explanation: string):
   return containsBack && remainderRatio < 0.35;
 }
 
-export type EducationLevel = 'escola' | 'faculdade' | 'concurso' | 'tecnico';
+export type EducationLevel = 'fundamental' | 'medio' | 'faculdade' | 'concurso' | 'tecnico';
 export type GenerationSourceType = 'subject' | 'document';
 
 const EDUCATION_LEVEL_LABELS: Record<EducationLevel, string> = {
-  escola: 'Educação Básica / Escola (Ensino Fundamental e Médio) — linguagem simples, clara e didática, sem jargão técnico avançado',
+  fundamental: 'Ensino Fundamental (1º ao 9º ano) — linguagem simples, clara e didática, sem jargão técnico avançado',
+  medio: 'Ensino Médio (1º ao 3º ano) — linguagem formal porém acessível, com foco em preparar para o ENEM/vestibular',
   faculdade: 'Ensino Superior / Faculdade — linguagem técnica e aprofundada, nível de graduação',
   concurso: 'Preparação para Concurso Público — foco em precisão de lei seca, jurisprudência/entendimento consolidado e pegadinhas comuns de banca examinadora (estilo CESPE/FGV/FCC), redigido como questão objetiva de prova',
   tecnico: 'Curso Técnico / Ensino Técnico Profissionalizante — foco prático, aplicado e voltado para procedimentos e uso real no dia a dia de trabalho, evitando teoria excessiva',
@@ -96,7 +97,7 @@ async function generateCardsForTopic(args: {
 }): Promise<{ cards: BankCard[]; providerUsed: string }> {
   const { subject, topicLabel, isSpecificTopic, count, language, difficulty, educationLevel } = args;
   const langInstruction = language === 'pt' ? 'em Português' : `in ${language}`;
-  const levelLabel = EDUCATION_LEVEL_LABELS[educationLevel] || EDUCATION_LEVEL_LABELS.escola;
+  const levelLabel = EDUCATION_LEVEL_LABELS[educationLevel] || EDUCATION_LEVEL_LABELS.medio;
 
   const difficultyGuide =
     "'easy' = conceito fundamental/definição básica; 'medium' = aplicação prática/relação entre conceitos; " +
@@ -227,7 +228,7 @@ export async function generateFlashcardsTask(args: {
     language = 'pt',
     difficulty = 'medium',
     selectedTopics = [],
-    educationLevel = 'escola',
+    educationLevel = 'medio',
     sourceType = 'subject',
   } = args;
 

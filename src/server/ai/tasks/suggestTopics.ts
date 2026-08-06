@@ -3,10 +3,11 @@ import { aiOrchestrator } from '../index';
 import { withCache, CACHE_TTL } from '../cache/aiCache';
 import { extractArrayField } from '../jsonUtils';
 
-export type EducationLevel = 'escola' | 'faculdade' | 'concurso' | 'tecnico';
+export type EducationLevel = 'fundamental' | 'medio' | 'faculdade' | 'concurso' | 'tecnico';
 
 const EDUCATION_LEVEL_LABELS: Record<EducationLevel, string> = {
-  escola: 'Educação Básica / Escola (Ensino Fundamental e Médio, currículo brasileiro/BNCC)',
+  fundamental: 'Ensino Fundamental (1º ao 9º ano, currículo brasileiro/BNCC)',
+  medio: 'Ensino Médio (1º ao 3º ano, currículo brasileiro/BNCC, com foco em preparar para o ENEM/vestibular)',
   faculdade: 'Ensino Superior / Faculdade (nível universitário/graduação)',
   concurso: 'Preparação para Concurso Público (nível de banca examinadora — questões objetivas estilo CESPE/FGV/FCC, foco em lei seca e jurisprudência/entendimento consolidado quando aplicável)',
   tecnico: 'Curso Técnico / Ensino Técnico Profissionalizante (nível técnico, prático e voltado para o mercado de trabalho)',
@@ -17,9 +18,9 @@ export async function suggestTopicsTask(args: {
   language?: string;
   educationLevel?: EducationLevel;
 }) {
-  const { title, language = 'pt', educationLevel = 'escola' } = args;
+  const { title, language = 'pt', educationLevel = 'medio' } = args;
   const langInstruction = language === 'pt' ? 'em Português' : `in ${language}`;
-  const levelLabel = EDUCATION_LEVEL_LABELS[educationLevel] || EDUCATION_LEVEL_LABELS.escola;
+  const levelLabel = EDUCATION_LEVEL_LABELS[educationLevel] || EDUCATION_LEVEL_LABELS.medio;
 
   const systemPrompt = `Você é um assistente pedagógico especialista em currículo educacional.
 Sua tarefa é sugerir subtópicos e sub-temas de estudo relevantes para um determinado assunto, ADEQUADOS a um nível de ensino específico.
