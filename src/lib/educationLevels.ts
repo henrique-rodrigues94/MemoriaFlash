@@ -112,38 +112,57 @@ export function getAvailableEducationLevels(subject: string): EducationLevel[] {
 }
 
 /**
- * Recomenda o nível de ensino mais provável para o assunto digitado, dentro
- * do conjunto de níveis disponíveis. Diferente de `getAvailableEducationLevels`
- * (que só bloqueia o que é claramente incoerente), esta função tenta ACERTAR
- * a intenção mais comum de quem digitou aquele assunto — ex.: "Direito Penal"
- * quase sempre é estudado visando concurso público, não uma aula de faculdade
- * genérica; "Eletrônica" sozinha costuma ser curso técnico.
+ * Recomenda, em ordem de prioridade, os níveis de ensino plausíveis para o
+ * assunto digitado — dentro do conjunto de níveis disponíveis. Diferente de
+ * `getAvailableEducationLevels` (que só bloqueia o que é claramente
+ * incoerente), esta função tenta ACERTAR a(s) intenção(ões) mais comuns de
+ * quem digitou aquele assunto.
  *
- * Prioridade de detecção: Concurso > Técnico > Escola > Faculdade (fallback).
- * Retorna sempre um valor presente em `available`.
+ * Pode retornar mais de um nível quando ambos são igualmente plausíveis —
+ * ex.: "Direito Penal" é estudado tanto na Faculdade quanto por quem faz
+ * Concurso, então os dois aparecem, nessa ordem. "Eletrônica" sozinha
+ * costuma ser curso Técnico. "Matemática" é conteúdo de Escola.
+ *
+ * A lista nunca inclui um nível fora de `available` e nunca vem vazia.
+ */
+export function recommendEducationLevels(
+  subject: string,
+  available: EducationLevel[] = ['escola', 'faculdade', 'concurso', 'tecnico'],
+): EducationLevel[] {
+  const s = normalize(subject);
+  const ranked: EducationLevel[] = [];
+  const add = (level: EducationLevel) => {
+    if (available.includes(level) && !ranked.includes(level)) ranked.push(level);
+  };
+
+  if (s.length >= 3) {
+    const isConcurso = matchesAny(s, CONCURSO_SIGNALS);
+    const isTecnico = matchesAny(s, TECNICO_SIGNALS);
+    const isEscola = matchesAny(s, ESCOLA_SUBJECTS);
+
+    if (isConcurso) add('concurso');
+    if (isTecnico) add('tecnico');
+    if (isEscola) add('escola');
+
+    // Assunto profissional/específico (ex.: um ramo do Direito) sem sinal de
+    // Escola: a Faculdade é sempre uma leitura plausível ADICIONAL ao que já
+    // foi detectado (ex.: Direito Penal → Concurso + Faculdade).
+    if (!isEscola && (isConcurso || isTecnico)) add('faculdade');
+  }
+
+  // Nada bateu com nenhum sinal conhecido → fallback único em Faculdade
+  // (leitura mais genérica e segura para um assunto não reconhecido).
+  if (ranked.length === 0) add('faculdade');
+
+  return ranked.length > 0 ? ranked : [available[0]];
+}
+
+/**
+ * Atalho: retorna apenas o nível de maior prioridade de `recommendEducationLevels`.
  */
 export function recommendEducationLevel(
   subject: string,
   available: EducationLevel[] = ['escola', 'faculdade', 'concurso', 'tecnico'],
 ): EducationLevel {
-  const s = normalize(subject);
-  const pick = (level: EducationLevel): EducationLevel | null =>
-    available.includes(level) ? level : null;
-
-  if (s.length >= 3) {
-    if (matchesAny(s, CONCURSO_SIGNALS)) {
-      const level = pick('concurso');
-      if (level) return level;
-    }
-    if (matchesAny(s, TECNICO_SIGNALS)) {
-      const level = pick('tecnico');
-      if (level) return level;
-    }
-    if (matchesAny(s, ESCOLA_SUBJECTS)) {
-      const level = pick('escola');
-      if (level) return level;
-    }
-  }
-
-  return pick('faculdade') || pick('escola') || available[0];
+  return recommendEducationLevels(subject, available)[0];
 }

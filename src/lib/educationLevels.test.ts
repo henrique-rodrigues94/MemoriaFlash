@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getAvailableEducationLevels, recommendEducationLevel } from './educationLevels';
+import { getAvailableEducationLevels, recommendEducationLevels, recommendEducationLevel } from './educationLevels';
 
 describe('getAvailableEducationLevels', () => {
   it('libera todos os níveis para assunto vazio ou muito curto', () => {
@@ -30,34 +30,39 @@ describe('getAvailableEducationLevels', () => {
   });
 });
 
-describe('recommendEducationLevel', () => {
-  it('recomenda "concurso" para ramos do Direito tipicamente cobrados em prova objetiva', () => {
-    expect(recommendEducationLevel('Direito Penal')).toBe('concurso');
-    expect(recommendEducationLevel('Direito Constitucional')).toBe('concurso');
+describe('recommendEducationLevels', () => {
+  it('recomenda concurso + faculdade para ramos do Direito cobrados em prova objetiva', () => {
+    expect(recommendEducationLevels('Direito Penal')).toEqual(['concurso', 'faculdade']);
+    expect(recommendEducationLevels('Direito Constitucional')).toEqual(['concurso', 'faculdade']);
   });
 
-  it('recomenda "concurso" quando o assunto menciona concurso/edital/banca diretamente', () => {
-    expect(recommendEducationLevel('Concurso INSS - Raciocínio Lógico')).toBe('concurso');
+  it('recomenda concurso quando o assunto menciona concurso/edital/banca diretamente', () => {
+    expect(recommendEducationLevels('Concurso INSS - Raciocínio Lógico')[0]).toBe('concurso');
   });
 
-  it('recomenda "tecnico" para áreas técnicas/profissionalizantes', () => {
-    expect(recommendEducationLevel('Eletrônica')).toBe('tecnico');
-    expect(recommendEducationLevel('Segurança do Trabalho')).toBe('tecnico');
+  it('recomenda técnico + faculdade para áreas técnicas/profissionalizantes', () => {
+    expect(recommendEducationLevels('Eletrônica')).toEqual(['tecnico', 'faculdade']);
+    expect(recommendEducationLevels('Segurança do Trabalho')).toEqual(['tecnico', 'faculdade']);
   });
 
-  it('recomenda "escola" para matérias escolares clássicas', () => {
-    expect(recommendEducationLevel('Matemática')).toBe('escola');
-    expect(recommendEducationLevel('Biologia')).toBe('escola');
+  it('recomenda somente escola para matérias escolares clássicas', () => {
+    expect(recommendEducationLevels('Matemática')).toEqual(['escola']);
+    expect(recommendEducationLevels('Biologia')).toEqual(['escola']);
   });
 
-  it('usa "faculdade" como fallback para assuntos desconhecidos/genéricos', () => {
-    expect(recommendEducationLevel('Xadrez Avançado')).toBe('faculdade');
+  it('usa "faculdade" como fallback único para assuntos desconhecidos/genéricos', () => {
+    expect(recommendEducationLevels('Xadrez Avançado')).toEqual(['faculdade']);
   });
 
   it('nunca recomenda um nível fora da lista de disponíveis', () => {
     const available = ['faculdade', 'concurso', 'tecnico'] as const;
-    const rec = recommendEducationLevel('Direito Penal', [...available]);
-    expect(available).toContain(rec);
-    expect(rec).not.toBe('escola');
+    const rec = recommendEducationLevels('Direito Penal', [...available]);
+    expect(rec.every(l => (available as readonly string[]).includes(l))).toBe(true);
+    expect(rec).not.toContain('escola');
+  });
+
+  it('recommendEducationLevel (singular) retorna o topo da lista ranqueada', () => {
+    expect(recommendEducationLevel('Direito Penal')).toBe('concurso');
+    expect(recommendEducationLevel('Matemática')).toBe('escola');
   });
 });

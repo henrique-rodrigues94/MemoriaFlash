@@ -9,7 +9,8 @@ import { Deck, UserStats, Flashcard } from '../types';
 import { SupportedLanguage } from '../lib/i18n';
 import { ManualCardForm } from './ManualCardForm';
 import { fetchAITopicSuggestions, generateAICards, EducationLevel } from '../lib/aiGenerator';
-import { EDUCATION_LEVEL_META, getAvailableEducationLevels, recommendEducationLevel } from '../lib/educationLevels';
+import { EDUCATION_LEVEL_META, getAvailableEducationLevels, recommendEducationLevels } from '../lib/educationLevels';
+import { getCuratedSubjectSuggestions } from '../lib/subjectAutocomplete';
 import { findClosestMatch } from '../lib/spellCheck';
 import { hasEnoughCredits } from '../services/economy/creditsEngine';
 import { ECONOMY } from '../services/economy/economyConstants';
@@ -309,33 +310,40 @@ export const StudioView: React.FC<StudioViewProps> = ({
   // ── Níveis de ensino disponíveis para a matéria digitada ─────────────────
   // Ex.: "Direito" não é uma matéria de Escola (Fundamental/Médio) — nesse
   // caso o botão "Escola" fica desabilitado, sobrando Faculdade/Concurso/Técnico.
+  // Sugestões curadas de subáreas pra matéria ampla digitada (ex.: "direito" → "Direito Penal"…)
+  const curatedSubjectSuggestions = useMemo(
+    () => getCuratedSubjectSuggestions(subject),
+    [subject],
+  );
+
   const availableEducationLevels = useMemo(
     () => getAvailableEducationLevels(subject),
     [subject],
   );
-  const recommendedEducationLevel = useMemo(
-    () => recommendEducationLevel(subject, availableEducationLevels),
+  // Lista curta e ranqueada de níveis plausíveis pra matéria digitada — ex.:
+  // "Direito Penal" → ['concurso', 'faculdade']; "Eletrônica" → ['tecnico', 'faculdade'];
+  // "Biologia" → ['escola']. É essa lista que vira os chips exibidos (nunca a grade fixa de 4).
+  const recommendedEducationLevels = useMemo(
+    () => recommendEducationLevels(subject, availableEducationLevels),
     [subject, availableEducationLevels],
   );
 
-  // Enquanto o usuário não escolher um nível manualmente, aplicamos a
-  // recomendação automática (ex.: "Direito Penal" → Concurso; "Eletrônica" →
-  // Técnico; "Biologia" → Escola). Se ele já tiver travado uma escolha mas
-  // ela deixou de ser válida para a nova matéria (ex.: trocou de "Biologia"
+  // Enquanto o usuário não escolher um nível manualmente, aplicamos o topo
+  // da recomendação automática. Se ele já tiver travado uma escolha mas ela
+  // deixou de ser plausível para a nova matéria (ex.: trocou de "Biologia"
   // no nível Escola para "Direito Penal"), reencaixamos na recomendação —
-  // nunca deixamos um nível indisponível selecionado.
+  // nunca deixamos um nível fora dos chips sugeridos selecionado.
   useEffect(() => {
-    if (!educationLevelLocked || !availableEducationLevels.includes(educationLevel)) {
-      setEducationLevel(recommendEducationLevel(subject, availableEducationLevels));
+    if (!educationLevelLocked || !recommendedEducationLevels.includes(educationLevel)) {
+      setEducationLevel(recommendedEducationLevels[0]);
     }
-  }, [availableEducationLevels, subject]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [recommendedEducationLevels]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Trocar de nível de ensino muda o universo de tópicos válidos (ex: um
   // tópico de "Cálculo Diferencial" escolhido no nível Faculdade não faz
   // sentido se o usuário muda para Escola) — limpa a seleção manual ao
   // trocar de nível para evitar tópicos incoerentes com o pedido.
   const handleEducationLevelChange = (level: EducationLevel) => {
-    if (!availableEducationLevels.includes(level)) return;
     setEducationLevel(level);
     setEducationLevelLocked(true);
     setTopics([]);
@@ -529,7 +537,12 @@ export const StudioView: React.FC<StudioViewProps> = ({
                   </div>
                 )}
                 <datalist id="subject-suggestions">
-                  {existingSubjects.map(s => <option key={s} value={s} />)}
+                  {/* Autocomplete curado (ex.: "direito" → "Direito Penal", "Direito Civil"…)
+                      aparece primeiro; matérias que o usuário já usou completam a lista. */}
+                  {curatedSubjectSuggestions.map(s => <option key={`curated-${s}`} value={s} />)}
+                  {existingSubjects
+                    .filter(s => !curatedSubjectSuggestions.includes(s))
+                    .map(s => <option key={s} value={s} />)}
                 </datalist>
               </div>
               {subjectSuggestion && subjectSuggestion.toUpperCase() !== subject.trim().toUpperCase() && (
@@ -538,47 +551,37 @@ export const StudioView: React.FC<StudioViewProps> = ({
                   onAccept={() => handleSubjectChange(subjectSuggestion)}
                 />
               )}
-            </div>
 
-            {/* ── Nível de Ensino (obrigatório) ── */}
-            <div>
-              <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5">
-                <GraduationCap className="w-3.5 h-3.5" /> Nível de Ensino
-              </label>
-              <div className="grid grid-cols-4 gap-2">
-                {EDUCATION_LEVEL_META.map(level => {
-                  const isAvailable = availableEducationLevels.includes(level.value);
-                  const isSelected = educationLevel === level.value;
-                  const isRecommended = isAvailable && recommendedEducationLevel === level.value;
-                  return (
-                    <button
-                      key={level.value}
-                      type="button"
-                      disabled={!isAvailable}
-                      title={isAvailable ? undefined : `"${subject.trim() || 'esse assunto'}" não é uma matéria de Escola`}
-                      onClick={() => handleEducationLevelChange(level.value)}
-                      className={`relative flex flex-col items-center gap-0.5 py-2.5 px-2 rounded-xl text-xs font-bold text-center border transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:grayscale ${
-                        isSelected
-                          ? 'bg-[#60a5fa]/15 border-[#60a5fa] text-[#60a5fa]'
-                          : 'bg-[#051424] border-[#424754]/50 text-[#c2c6d6] hover:border-[#60a5fa]/50'
-                      }`}
-                    >
-                      {isRecommended && !isSelected && (
-                        <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[8px] font-extrabold uppercase tracking-wide shadow">
-                          Sugerido
-                        </span>
-                      )}
-                      <span className="text-base leading-none" aria-hidden="true">{level.icon}</span>
-                      {level.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="mt-1.5 text-[11px] text-[#8c91a0]">
-                {availableEducationLevels.length < EDUCATION_LEVEL_META.length
-                  ? `"${subject.trim()}" não faz parte do currículo escolar — escolha Faculdade, Concurso ou Técnico.`
-                  : 'Os tópicos sugeridos e os cards gerados são ajustados ao currículo desse nível.'}
-              </p>
+              {/* ── Nível de Ensino: chips inline com só o que é plausível pra matéria ── */}
+              {subject.trim().length >= 2 && (
+                <div className="flex items-center flex-wrap gap-1.5 mt-2.5">
+                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#8c91a0]">
+                    <GraduationCap className="w-3 h-3" /> Nível:
+                  </span>
+                  {recommendedEducationLevels.map((levelValue, i) => {
+                    const level = EDUCATION_LEVEL_META.find(l => l.value === levelValue)!;
+                    const isSelected = educationLevel === levelValue;
+                    return (
+                      <button
+                        key={level.value}
+                        type="button"
+                        onClick={() => handleEducationLevelChange(level.value)}
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border transition cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#60a5fa]/15 border-[#60a5fa] text-[#60a5fa]'
+                            : 'bg-[#051424] border-[#424754]/50 text-[#c2c6d6] hover:border-[#60a5fa]/50'
+                        }`}
+                      >
+                        <span aria-hidden="true">{level.icon}</span>
+                        {level.label}
+                        {i === 0 && recommendedEducationLevels.length > 1 && !isSelected && (
+                          <span className="text-[8px] font-extrabold text-emerald-400 uppercase">· sugerido</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* ── Nome do Baralho (opcional) ── */}
