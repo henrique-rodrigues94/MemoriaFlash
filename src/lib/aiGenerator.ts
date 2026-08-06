@@ -1,6 +1,7 @@
 import { Flashcard } from '../types';
+import { EducationLevel } from './educationLevels';
 
-export type EducationLevel = 'fundamental' | 'medio' | 'faculdade';
+export type { EducationLevel };
 
 /**
  * Busca sugestões de tópicos reais via IA no backend.
@@ -8,7 +9,7 @@ export type EducationLevel = 'fundamental' | 'medio' | 'faculdade';
  */
 export const fetchAITopicSuggestions = async (
   subject: string,
-  educationLevel: EducationLevel = 'medio',
+  educationLevel: EducationLevel = 'escola',
 ): Promise<string[]> => {
   if (!subject.trim()) return [];
   const res = await fetch('/api/gemini/suggest-topics', {
@@ -31,7 +32,7 @@ export const generateAICards = async (
   subject: string,
   topics: string[],
   count: number,
-  educationLevel: EducationLevel = 'medio',
+  educationLevel: EducationLevel = 'escola',
 ): Promise<Flashcard[]> => {
   const res = await fetch('/api/gemini/generate-flashcards', {
     method: 'POST',

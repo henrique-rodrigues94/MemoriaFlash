@@ -3,12 +3,13 @@ import { aiOrchestrator } from '../index';
 import { withCache, CACHE_TTL } from '../cache/aiCache';
 import { extractArrayField } from '../jsonUtils';
 
-export type EducationLevel = 'fundamental' | 'medio' | 'faculdade';
+export type EducationLevel = 'escola' | 'faculdade' | 'concurso' | 'tecnico';
 
 const EDUCATION_LEVEL_LABELS: Record<EducationLevel, string> = {
-  fundamental: 'Ensino Fundamental (6º ao 9º ano, currículo brasileiro/BNCC)',
-  medio: 'Ensino Médio (currículo brasileiro/BNCC)',
+  escola: 'Educação Básica / Escola (Ensino Fundamental e Médio, currículo brasileiro/BNCC)',
   faculdade: 'Ensino Superior / Faculdade (nível universitário/graduação)',
+  concurso: 'Preparação para Concurso Público (nível de banca examinadora — questões objetivas estilo CESPE/FGV/FCC, foco em lei seca e jurisprudência/entendimento consolidado quando aplicável)',
+  tecnico: 'Curso Técnico / Ensino Técnico Profissionalizante (nível técnico, prático e voltado para o mercado de trabalho)',
 };
 
 export async function suggestTopicsTask(args: {
@@ -16,21 +17,23 @@ export async function suggestTopicsTask(args: {
   language?: string;
   educationLevel?: EducationLevel;
 }) {
-  const { title, language = 'pt', educationLevel = 'medio' } = args;
+  const { title, language = 'pt', educationLevel = 'escola' } = args;
   const langInstruction = language === 'pt' ? 'em Português' : `in ${language}`;
-  const levelLabel = EDUCATION_LEVEL_LABELS[educationLevel] || EDUCATION_LEVEL_LABELS.medio;
+  const levelLabel = EDUCATION_LEVEL_LABELS[educationLevel] || EDUCATION_LEVEL_LABELS.escola;
 
   const systemPrompt = `Você é um assistente pedagógico especialista em currículo educacional.
 Sua tarefa é sugerir subtópicos e sub-temas de estudo relevantes para um determinado assunto, ADEQUADOS a um nível de ensino específico.
-REGRA CRÍTICA: Retorne APENAS subtópicos específicos relacionados ao assunto "${title}" que sejam efetivamente ensinados no nível "${levelLabel}".
+REGRA CRÍTICA: Retorne APENAS subtópicos específicos relacionados ao assunto "${title}" que sejam efetivamente relevantes para "${levelLabel}".
 NÃO retorne frases genéricas como "Fundamentos de X" ou "Revisão Geral".
-NÃO inclua subtópicos avançados demais (que só aparecem em níveis superiores) nem básicos demais (de níveis anteriores) para o nível pedido.
+NÃO inclua subtópicos avançados demais (de outro nível) nem básicos demais para o nível pedido.
 Cada tópico deve ser um subtema REAL, específico do assunto e do nível de ensino solicitados.`;
 
-  const userPrompt = `Liste de 6 a 8 subtópicos e sub-temas de estudo ESPECÍFICOS e REAIS sobre o assunto "${title}", cobrindo o conteúdo programático típico do nível "${levelLabel}" ${langInstruction}.
-Por exemplo, se o assunto for "Anatomia Humana" no Ensino Médio, os subtópicos seriam: "Sistema Cardiovascular", "Sistema Nervoso Central", "Ossos do Crânio", etc.
-Se o assunto for "Matemática" no Ensino Fundamental, seriam tópicos como "Frações e Números Decimais", "Equações do 1º Grau", "Geometria Plana e Espacial", etc — nunca conteúdo de Cálculo ou nível universitário.
-Se o assunto for "Matemática" na Faculdade, seriam tópicos como "Cálculo Diferencial e Integral", "Álgebra Linear e Matrizes", "Estatística Descritiva", etc.
+  const userPrompt = `Liste de 6 a 8 subtópicos e sub-temas de estudo ESPECÍFICOS e REAIS sobre o assunto "${title}", cobrindo o conteúdo programático típico de "${levelLabel}" ${langInstruction}.
+Exemplos de calibragem por nível:
+- "Matemática" em Escola: tópicos como "Frações e Números Decimais", "Equações do 1º Grau", "Geometria Plana e Espacial".
+- "Matemática" em Faculdade: tópicos como "Cálculo Diferencial e Integral", "Álgebra Linear e Matrizes", "Estatística Descritiva".
+- "Direito Constitucional" em Concurso: tópicos como "Controle de Constitucionalidade", "Direitos e Garantias Fundamentais (lei seca)", "Organização dos Poderes — pontos mais cobrados em prova objetiva".
+- "Eletrônica" em Técnico: tópicos práticos como "Leitura de Multímetro", "Montagem de Circuitos Básicos", "Normas de Segurança NR-10".
 Retorne subtópicos ESPECÍFICOS para "${title}" no nível "${levelLabel}".`;
 
   const schemaHint = `{ "topics": string[] } — de 6 a 8 strings com subtópicos específicos do assunto.`;

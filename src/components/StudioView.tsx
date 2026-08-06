@@ -1,5 +1,5 @@
 // 📁 flashmind-ai/src/components/StudioView.tsx
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Sparkles, PlusCircle, CheckCircle2, Loader2, Plus, X, Trash2,
   BookOpen, Save, HelpCircle, Play, Lock, Lightbulb, ChevronDown,
@@ -9,17 +9,12 @@ import { Deck, UserStats, Flashcard } from '../types';
 import { SupportedLanguage } from '../lib/i18n';
 import { ManualCardForm } from './ManualCardForm';
 import { fetchAITopicSuggestions, generateAICards, EducationLevel } from '../lib/aiGenerator';
+import { EDUCATION_LEVEL_META, getAvailableEducationLevels, recommendEducationLevel } from '../lib/educationLevels';
 import { findClosestMatch } from '../lib/spellCheck';
 import { hasEnoughCredits } from '../services/economy/creditsEngine';
 import { ECONOMY } from '../services/economy/economyConstants';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-
-const EDUCATION_LEVELS: { value: EducationLevel; label: string }[] = [
-  { value: 'fundamental', label: 'Ensino Fundamental' },
-  { value: 'medio', label: 'Ensino Médio' },
-  { value: 'faculdade', label: 'Faculdade' },
-];
 
 interface StudioViewProps {
   decks: Deck[];
@@ -221,7 +216,10 @@ export const StudioView: React.FC<StudioViewProps> = ({
 
   // ── Gerador IA — form state ───────────────────────────────────────────────
   const [subject, setSubject] = useState('');
-  const [educationLevel, setEducationLevel] = useState<EducationLevel>('medio');
+  const [educationLevel, setEducationLevel] = useState<EducationLevel>('escola');
+  // true quando o usuário escolheu o nível manualmente (não sincroniza mais
+  // com a recomendação automática enquanto ele não trocar de matéria de novo)
+  const [educationLevelLocked, setEducationLevelLocked] = useState(false);
   const [deckName, setDeckName] = useState('');
   // true quando o usuário editou o nome manualmente (não sincroniza com matéria)
   const [deckNameLocked, setDeckNameLocked] = useState(false);
@@ -269,6 +267,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
     const upper = value.toUpperCase();
     setSubject(upper);
     setSubjectSuggestion(findClosestMatch(upper, existingSubjects));
+    setEducationLevelLocked(false); // assunto novo → recalcula a recomendação de nível
     // Sincroniza nome do baralho enquanto o usuário não tiver editado manualmente
     if (!deckNameLocked) {
       setDeckName(upper.trim());
@@ -307,12 +306,38 @@ export const StudioView: React.FC<StudioViewProps> = ({
     return () => clearTimeout(timer);
   }, [subject, topics, educationLevel]);
 
+  // ── Níveis de ensino disponíveis para a matéria digitada ─────────────────
+  // Ex.: "Direito" não é uma matéria de Escola (Fundamental/Médio) — nesse
+  // caso o botão "Escola" fica desabilitado, sobrando Faculdade/Concurso/Técnico.
+  const availableEducationLevels = useMemo(
+    () => getAvailableEducationLevels(subject),
+    [subject],
+  );
+  const recommendedEducationLevel = useMemo(
+    () => recommendEducationLevel(subject, availableEducationLevels),
+    [subject, availableEducationLevels],
+  );
+
+  // Enquanto o usuário não escolher um nível manualmente, aplicamos a
+  // recomendação automática (ex.: "Direito Penal" → Concurso; "Eletrônica" →
+  // Técnico; "Biologia" → Escola). Se ele já tiver travado uma escolha mas
+  // ela deixou de ser válida para a nova matéria (ex.: trocou de "Biologia"
+  // no nível Escola para "Direito Penal"), reencaixamos na recomendação —
+  // nunca deixamos um nível indisponível selecionado.
+  useEffect(() => {
+    if (!educationLevelLocked || !availableEducationLevels.includes(educationLevel)) {
+      setEducationLevel(recommendEducationLevel(subject, availableEducationLevels));
+    }
+  }, [availableEducationLevels, subject]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Trocar de nível de ensino muda o universo de tópicos válidos (ex: um
   // tópico de "Cálculo Diferencial" escolhido no nível Faculdade não faz
-  // sentido se o usuário muda para Ensino Fundamental) — limpa a seleção
-  // manual ao trocar de nível para evitar tópicos incoerentes com o pedido.
+  // sentido se o usuário muda para Escola) — limpa a seleção manual ao
+  // trocar de nível para evitar tópicos incoerentes com o pedido.
   const handleEducationLevelChange = (level: EducationLevel) => {
+    if (!availableEducationLevels.includes(level)) return;
     setEducationLevel(level);
+    setEducationLevelLocked(true);
     setTopics([]);
   };
 
@@ -520,24 +545,39 @@ export const StudioView: React.FC<StudioViewProps> = ({
               <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5">
                 <GraduationCap className="w-3.5 h-3.5" /> Nível de Ensino
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                {EDUCATION_LEVELS.map(level => (
-                  <button
-                    key={level.value}
-                    type="button"
-                    onClick={() => handleEducationLevelChange(level.value)}
-                    className={`py-2.5 px-2 rounded-xl text-xs font-bold text-center border transition ${
-                      educationLevel === level.value
-                        ? 'bg-[#60a5fa]/15 border-[#60a5fa] text-[#60a5fa]'
-                        : 'bg-[#051424] border-[#424754]/50 text-[#c2c6d6] hover:border-[#60a5fa]/50'
-                    }`}
-                  >
-                    {level.label}
-                  </button>
-                ))}
+              <div className="grid grid-cols-4 gap-2">
+                {EDUCATION_LEVEL_META.map(level => {
+                  const isAvailable = availableEducationLevels.includes(level.value);
+                  const isSelected = educationLevel === level.value;
+                  const isRecommended = isAvailable && recommendedEducationLevel === level.value;
+                  return (
+                    <button
+                      key={level.value}
+                      type="button"
+                      disabled={!isAvailable}
+                      title={isAvailable ? undefined : `"${subject.trim() || 'esse assunto'}" não é uma matéria de Escola`}
+                      onClick={() => handleEducationLevelChange(level.value)}
+                      className={`relative flex flex-col items-center gap-0.5 py-2.5 px-2 rounded-xl text-xs font-bold text-center border transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:grayscale ${
+                        isSelected
+                          ? 'bg-[#60a5fa]/15 border-[#60a5fa] text-[#60a5fa]'
+                          : 'bg-[#051424] border-[#424754]/50 text-[#c2c6d6] hover:border-[#60a5fa]/50'
+                      }`}
+                    >
+                      {isRecommended && !isSelected && (
+                        <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[8px] font-extrabold uppercase tracking-wide shadow">
+                          Sugerido
+                        </span>
+                      )}
+                      <span className="text-base leading-none" aria-hidden="true">{level.icon}</span>
+                      {level.label}
+                    </button>
+                  );
+                })}
               </div>
               <p className="mt-1.5 text-[11px] text-[#8c91a0]">
-                Os tópicos sugeridos e os cards gerados são ajustados ao currículo desse nível.
+                {availableEducationLevels.length < EDUCATION_LEVEL_META.length
+                  ? `"${subject.trim()}" não faz parte do currículo escolar — escolha Faculdade, Concurso ou Técnico.`
+                  : 'Os tópicos sugeridos e os cards gerados são ajustados ao currículo desse nível.'}
               </p>
             </div>
 

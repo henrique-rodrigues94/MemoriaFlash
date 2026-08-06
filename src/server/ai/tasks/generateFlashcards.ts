@@ -53,12 +53,13 @@ export function explanationJustRepeatsAnswer(back: string, explanation: string):
   return containsBack && remainderRatio < 0.35;
 }
 
-export type EducationLevel = 'fundamental' | 'medio' | 'faculdade';
+export type EducationLevel = 'escola' | 'faculdade' | 'concurso' | 'tecnico';
 
 const EDUCATION_LEVEL_LABELS: Record<EducationLevel, string> = {
-  fundamental: 'Ensino Fundamental (6º ao 9º ano) — linguagem simples e direta, sem jargão técnico avançado',
-  medio: 'Ensino Médio — linguagem formal, mas acessível, alinhada ao currículo do Ensino Médio',
+  escola: 'Educação Básica / Escola (Ensino Fundamental e Médio) — linguagem simples, clara e didática, sem jargão técnico avançado',
   faculdade: 'Ensino Superior / Faculdade — linguagem técnica e aprofundada, nível de graduação',
+  concurso: 'Preparação para Concurso Público — foco em precisão de lei seca, jurisprudência/entendimento consolidado e pegadinhas comuns de banca examinadora (estilo CESPE/FGV/FCC), redigido como questão objetiva de prova',
+  tecnico: 'Curso Técnico / Ensino Técnico Profissionalizante — foco prático, aplicado e voltado para procedimentos e uso real no dia a dia de trabalho, evitando teoria excessiva',
 };
 
 export async function generateFlashcardsTask(args: {
@@ -75,11 +76,11 @@ export async function generateFlashcardsTask(args: {
     language = 'pt',
     difficulty = 'medium',
     selectedTopics = [],
-    educationLevel = 'medio',
+    educationLevel = 'escola',
   } = args;
 
   const langInstruction = language === 'pt' ? 'em Português' : `in ${language}`;
-  const levelLabel = EDUCATION_LEVEL_LABELS[educationLevel] || EDUCATION_LEVEL_LABELS.medio;
+  const levelLabel = EDUCATION_LEVEL_LABELS[educationLevel] || EDUCATION_LEVEL_LABELS.escola;
 
   const difficultyGuide =
     "'easy' = conceito fundamental/definição básica; 'medium' = aplicação prática/relação entre conceitos; " +
