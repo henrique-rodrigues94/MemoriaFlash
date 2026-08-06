@@ -277,24 +277,31 @@ function CameraModal({ onCapture, onClose }: CameraModalProps) {
 
 // ─── Topic Selector Card ──────────────────────────────────────────────────────
 
+const CARDS_PER_TOPIC_OPTIONS = [3, 5, 8, 10, 15, 20] as const;
+
 interface TopicCardProps {
   topic: AnalyzedTopic;
   selected: boolean;
+  cardCount: number;
   onToggle: () => void;
+  onCardCountChange: (count: number) => void;
 }
 
-function TopicCard({ topic, selected, onToggle }: TopicCardProps) {
+function TopicCard({ topic, selected, cardCount, onToggle, onCardCountChange }: TopicCardProps) {
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={`w-full text-left p-3.5 rounded-xl border transition-all ${
+    <div
+      className={`w-full rounded-xl border transition-all ${
         selected
           ? 'bg-purple-600/20 border-purple-500/60 shadow-sm shadow-purple-900/20'
-          : 'bg-slate-950/50 border-slate-800 hover:border-slate-600'
+          : 'bg-slate-950/50 border-slate-800'
       }`}
     >
-      <div className="flex items-start gap-3">
+      {/* Header row — click to toggle */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full text-left p-3.5 flex items-start gap-3"
+      >
         {/* Checkbox */}
         <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
           selected ? 'bg-purple-600 border-purple-500' : 'border-slate-600'
@@ -309,14 +316,55 @@ function TopicCard({ topic, selected, onToggle }: TopicCardProps) {
             <p className="text-xs text-slate-500 mt-0.5 leading-relaxed line-clamp-2">{topic.description}</p>
           )}
         </div>
+        {/* Estimated cards badge */}
         <span className={`text-[10px] font-bold px-2 py-1 rounded-full shrink-0 mt-0.5 ${
           selected ? 'bg-purple-500/20 text-purple-300' : 'bg-slate-800 text-slate-500'
         }`}>
-          ~{topic.cardEstimate}
+          IA~{topic.cardEstimate}
         </span>
-      </div>
-    </button>
+      </button>
+
+      {/* Per-topic card count picker — visible only when selected */}
+      {selected && (
+        <div className="px-3.5 pb-3.5 flex items-center gap-2">
+          <span className="text-[11px] text-slate-400 shrink-0">Cards deste tópico:</span>
+          <div className="flex gap-1.5 flex-wrap">
+            {CARDS_PER_TOPIC_OPTIONS.map(n => (
+              <button
+                key={n}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onCardCountChange(n); }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all ${
+                  cardCount === n
+                    ? 'bg-purple-600 border-purple-500 text-white shadow shadow-purple-900/40'
+                    : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-purple-500/50 hover:text-purple-300'
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <span className={`ml-auto text-[11px] font-bold shrink-0 ${
+            cardCount > topic.cardEstimate ? 'text-amber-400' : 'text-emerald-400'
+          }`}>
+            {cardCount} card{cardCount !== 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
+    </div>
   );
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Choose a sensible default count from CARDS_PER_TOPIC_OPTIONS based on AI estimate */
+function defaultCountForTopic(estimate: number): number {
+  if (estimate <= 4) return 3;
+  if (estimate <= 7) return 5;
+  if (estimate <= 12) return 8;
+  if (estimate <= 17) return 10;
+  if (estimate <= 22) return 15;
+  return 20;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -331,7 +379,6 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
   useEffect(() => { itemsRef.current = items; }, [items]);
 
   const [subject, setSubject] = useState('');
-  const [cardCount, setCardCount] = useState(25);
   const [statusMsg, setStatusMsg] = useState('');
   const [generatedCards, setGeneratedCards] = useState<any[]>([]);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
@@ -342,10 +389,19 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
   // Analysis state
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [selectedTopicIds, setSelectedTopicIds] = useState<Set<string>>(new Set());
+  // Per-topic card count: topicId -> number of cards
+  const [topicCardCounts, setTopicCardCounts] = useState<Record<string, number>>({});
 
   useEffect(() => { setHasGetUserMedia(!!(navigator.mediaDevices?.getUserMedia)); }, []);
 
-  const noCredits = !!stats && !stats.isPro && (stats.aiCredits || 0) < cardCount * ECONOMY.COST_GENERATE_DECK;
+  // Total cards = sum of per-topic counts for selected topics
+  const totalCardCount = analysisResult
+    ? analysisResult.topics
+        .filter(t => selectedTopicIds.has(t.id))
+        .reduce((sum, t) => sum + (topicCardCounts[t.id] ?? defaultCountForTopic(t.cardEstimate)), 0)
+    : 0;
+
+  const noCredits = !!stats && !stats.isPro && (stats.aiCredits || 0) < totalCardCount * ECONOMY.COST_GENERATE_DECK;
 
   // ── Add / Remove items ────────────────────────────────────────────────────
 
@@ -435,6 +491,10 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
       setAnalysisResult(data);
       // Pre-seleciona todos os tópicos
       setSelectedTopicIds(new Set(data.topics.map(t => t.id)));
+      // Inicializa contagem por tópico com base na estimativa da IA
+      const initialCounts: Record<string, number> = {};
+      data.topics.forEach(t => { initialCounts[t.id] = defaultCountForTopic(t.cardEstimate); });
+      setTopicCardCounts(initialCounts);
       // Aplica matéria identificada se o usuário não digitou nada
       if (!subject.trim() && data.subject) setSubject(data.subject);
       setStep('review');
@@ -449,7 +509,7 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
   const generateCards = async () => {
     if (!analysisResult) return;
 
-    const estimatedCost = cardCount * ECONOMY.COST_GENERATE_DECK;
+    const estimatedCost = totalCardCount * ECONOMY.COST_GENERATE_DECK;
     if (stats && !hasEnoughCredits(stats, estimatedCost)) {
       if (onOpenAdMob) onOpenAdMob();
       return;
@@ -459,9 +519,14 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
     setProcessingLabel('Gerando flashcards com IA…');
 
     try {
-      const selectedTopics = analysisResult.topics
+      const selectedTopicsWithCounts = analysisResult.topics
         .filter(t => selectedTopicIds.has(t.id))
-        .map(t => t.title);
+        .map(t => ({
+          title: t.title,
+          count: topicCardCounts[t.id] ?? defaultCountForTopic(t.cardEstimate),
+        }));
+
+      const selectedTopics = selectedTopicsWithCounts.map(t => t.title);
 
       const res = await fetch('/api/gemini/scanner-process', {
         method: 'POST',
@@ -470,8 +535,9 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
           images: [],
           texts: [],
           subject: subject.trim() || analysisResult.subject,
-          count: cardCount,
+          count: totalCardCount,
           selectedTopics,
+          topicsWithCounts: selectedTopicsWithCounts,
           extractedContent: analysisResult.extractedContent,
         }),
       });
@@ -538,15 +604,23 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
   };
 
   const selectAll = () => {
-    if (analysisResult) setSelectedTopicIds(new Set(analysisResult.topics.map(t => t.id)));
+    if (!analysisResult) return;
+    setSelectedTopicIds(new Set(analysisResult.topics.map(t => t.id)));
+    // Ensure all topics have a default count
+    setTopicCardCounts(prev => {
+      const next = { ...prev };
+      analysisResult.topics.forEach(t => {
+        if (!(t.id in next)) next[t.id] = defaultCountForTopic(t.cardEstimate);
+      });
+      return next;
+    });
   };
 
   const selectNone = () => setSelectedTopicIds(new Set());
 
-  // Estimated cards based on selected topics
-  const selectedEstimate = analysisResult
-    ? analysisResult.topics.filter(t => selectedTopicIds.has(t.id)).reduce((s, t) => s + t.cardEstimate, 0)
-    : 0;
+  const setTopicCount = (topicId: string, count: number) => {
+    setTopicCardCounts(prev => ({ ...prev, [topicId]: count }));
+  };
 
   // ── Reset ─────────────────────────────────────────────────────────────────
 
@@ -555,12 +629,12 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
     setItems([]);
     setGeneratedCards([]);
     setSubject('');
-    setCardCount(25);
     setStep('collect');
     setStatusMsg('');
     setExpandedCard(null);
     setAnalysisResult(null);
     setSelectedTopicIds(new Set());
+    setTopicCardCounts({});
   };
 
   const retryAfterError = () => {
@@ -639,7 +713,7 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
                 </p>
                 <p className="text-[11px] text-slate-400">
                   {(stats.aiCredits || 0) > 0
-                    ? `${ECONOMY.COST_GENERATE_DECK} crédito por card · esta geração custa ${cardCount * ECONOMY.COST_GENERATE_DECK} créditos`
+                    ? `${ECONOMY.COST_GENERATE_DECK} crédito por card · esta geração custa ${totalCardCount * ECONOMY.COST_GENERATE_DECK} créditos`
                     : 'Assista um vídeo curto e ganhe créditos de IA'}
                 </p>
               </div>
@@ -811,7 +885,9 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
                     key={topic.id}
                     topic={topic}
                     selected={selectedTopicIds.has(topic.id)}
+                    cardCount={topicCardCounts[topic.id] ?? defaultCountForTopic(topic.cardEstimate)}
                     onToggle={() => toggleTopic(topic.id)}
+                    onCardCountChange={(count) => setTopicCount(topic.id, count)}
                   />
                 ))}
               </div>
@@ -821,41 +897,54 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
                 <Hash className="w-4 h-4 text-slate-500" />
                 <p className="text-xs text-slate-400">
                   <span className="text-slate-200 font-semibold">{selectedTopicIds.size}</span> de {analysisResult.topics.length} tópicos selecionados ·
-                  estimativa: <span className="text-purple-300 font-semibold">~{selectedEstimate} cards</span>
+                  estimativa: <span className="text-purple-300 font-semibold">~{totalCardCount} cards</span>
                 </p>
               </div>
             </div>
 
-            {/* Card count + Generate */}
+            {/* Generation summary + Generate button */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Quantidade de flashcards</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[25, 50, 100].map(n => (
-                    <button key={n} type="button" onClick={() => setCardCount(n)}
-                      className={`py-3 rounded-xl text-sm font-semibold border transition ${
-                        cardCount === n
-                          ? 'bg-purple-600/30 border-purple-500 text-purple-200'
-                          : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-200'
-                      }`}>
-                      {n}
-                      {n === 25 && <span className="block text-[10px] opacity-70 mt-0.5">Rápido</span>}
-                      {n === 50 && <span className="block text-[10px] opacity-70 mt-0.5">Completo</span>}
-                      {n === 100 && <span className="block text-[10px] opacity-70 mt-0.5">Intensivo</span>}
-                    </button>
-                  ))}
+              {/* Per-topic breakdown summary */}
+              {selectedTopicIds.size > 0 && (
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5" /> Resumo da geração
+                  </label>
+                  <div className="rounded-xl bg-slate-950/60 border border-slate-800 divide-y divide-slate-800/80">
+                    {analysisResult.topics.filter(t => selectedTopicIds.has(t.id)).map(t => {
+                      const count = topicCardCounts[t.id] ?? defaultCountForTopic(t.cardEstimate);
+                      return (
+                        <div key={t.id} className="flex items-center justify-between px-3.5 py-2.5 gap-2">
+                          <span className="text-xs text-slate-300 truncate flex-1">{t.title}</span>
+                          <span className="text-[11px] font-bold text-purple-300 shrink-0">{count} card{count !== 1 ? 's' : ''}</span>
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center justify-between px-3.5 py-2.5 gap-2 bg-purple-500/5">
+                      <span className="text-xs font-bold text-slate-200">Total</span>
+                      <span className="text-sm font-bold text-purple-300">{totalCardCount} cards</span>
+                    </div>
+                  </div>
+                  {stats && !stats.isPro && (
+                    <p className="text-[11px] text-slate-500 text-right">
+                      Custo: <span className={`font-bold ${(stats.aiCredits || 0) >= totalCardCount * ECONOMY.COST_GENERATE_DECK ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {totalCardCount * ECONOMY.COST_GENERATE_DECK} crédito{totalCardCount !== 1 ? 's' : ''}
+                      </span>
+                      {' '}· disponível: <span className="font-bold text-slate-300">{stats.aiCredits || 0}</span>
+                    </p>
+                  )}
                 </div>
-              </div>
+              )}
 
               <button type="button" onClick={generateCards}
-                disabled={noCredits || selectedTopicIds.size === 0}
+                disabled={noCredits || selectedTopicIds.size === 0 || totalCardCount === 0}
                 className="w-full bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-bold py-4 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
                 {noCredits ? (
                   <><Lock className="w-5 h-5" /> Sem Créditos — Assista um Anúncio</>
                 ) : selectedTopicIds.size === 0 ? (
                   <><AlertCircle className="w-5 h-5" /> Selecione ao menos 1 tópico</>
                 ) : (
-                  <><Sparkles className="w-5 h-5" /> Gerar {cardCount} Flashcards — {selectedTopicIds.size} tópico{selectedTopicIds.size !== 1 ? 's' : ''}</>
+                  <><Sparkles className="w-5 h-5" /> Gerar {totalCardCount} Flashcards — {selectedTopicIds.size} tópico{selectedTopicIds.size !== 1 ? 's' : ''}</>
                 )}
               </button>
 
