@@ -53,16 +53,33 @@ export function explanationJustRepeatsAnswer(back: string, explanation: string):
   return containsBack && remainderRatio < 0.35;
 }
 
+export type EducationLevel = 'fundamental' | 'medio' | 'faculdade';
+
+const EDUCATION_LEVEL_LABELS: Record<EducationLevel, string> = {
+  fundamental: 'Ensino Fundamental (6º ao 9º ano) — linguagem simples e direta, sem jargão técnico avançado',
+  medio: 'Ensino Médio — linguagem formal, mas acessível, alinhada ao currículo do Ensino Médio',
+  faculdade: 'Ensino Superior / Faculdade — linguagem técnica e aprofundada, nível de graduação',
+};
+
 export async function generateFlashcardsTask(args: {
   prompt: string;
   count?: number;
   language?: string;
   difficulty?: string;
   selectedTopics?: string[];
+  educationLevel?: EducationLevel;
 }) {
-  const { prompt, count = 6, language = 'pt', difficulty = 'medium', selectedTopics = [] } = args;
+  const {
+    prompt,
+    count = 6,
+    language = 'pt',
+    difficulty = 'medium',
+    selectedTopics = [],
+    educationLevel = 'medio',
+  } = args;
 
   const langInstruction = language === 'pt' ? 'em Português' : `in ${language}`;
+  const levelLabel = EDUCATION_LEVEL_LABELS[educationLevel] || EDUCATION_LEVEL_LABELS.medio;
 
   const difficultyGuide =
     "'easy' = conceito fundamental/definição básica; 'medium' = aplicação prática/relação entre conceitos; " +
@@ -90,12 +107,14 @@ REGRAS OBRIGATÓRIAS PARA CADA FLASHCARD:
 6. PROIBIDO copiar ou apenas reformular o texto de "back" dentro de "explanation": a explicação e a curiosidade devem acrescentar informação NOVA que não está em "back" (contexto, mecanismo, exemplo aplicado, dado histórico, comparação, consequência prática). Se "explanation" repetir o mesmo conteúdo de "back" com outras palavras, o card é considerado inválido.
    ❌ Errado: back="Paris" / explanation="📘 Explicação: A capital da França é Paris. 💡 Curiosidade: Paris é a capital da França."
    ✅ Certo: back="Paris" / explanation="📘 Explicação: Paris é sede do governo francês desde o século III. 💡 Curiosidade: A Torre Eiffel, símbolo da cidade, foi construída em 1889 para a Exposição Universal e era originalmente vista como provisória."
+7. Todo o conteúdo (pergunta, resposta e explicação) deve respeitar o nível de ensino informado: ${levelLabel}. Não use conceitos, fórmulas ou vocabulário de um nível mais avançado do que o pedido, nem trate o aluno como se fosse mais novo/menos preparado do que o nível indicado.
 
 Responda sempre ${langInstruction}.`;
 
   const userPrompt = `Assunto: "${prompt}"${topicsInstruction}
-Nível-alvo de dificuldade do conjunto: ${difficulty} (varie individualmente ao redor desse nível conforme a regra 3, mas mantenha a maioria dos cards nesse patamar).
-Gere exatamente ${count} flashcards distintos entre si, cobrindo os conceitos, definições, fórmulas e relações mais importantes do assunto acima.`;
+Nível de ensino do aluno: ${levelLabel}.
+Nível-alvo de dificuldade do conjunto: ${difficulty} (varie individualmente ao redor desse nível conforme a regra 3, mas mantenha a maioria dos cards nesse patamar — sempre dentro do que é esperado para o nível de ensino informado).
+Gere exatamente ${count} flashcards distintos entre si, cobrindo os conceitos, definições, fórmulas e relações mais importantes do assunto acima que fazem parte do currículo desse nível de ensino.`;
 
   const schemaHint = `[{ "front": string, "back": string, "explanation": string, "topic": string, "difficulty": "easy"|"medium"|"hard"|"expert" }, ...] — um array com exatamente ${count} objetos ("cards"), cada um com todos os 5 campos preenchidos.`;
 
@@ -116,7 +135,7 @@ Gere exatamente ${count} flashcards distintos entre si, cobrindo os conceitos, d
 
   const result = await withCache(
     'generateFlashcards',
-    { prompt, count, language, difficulty, selectedTopics },
+    { prompt, count, language, difficulty, selectedTopics, educationLevel },
     CACHE_TTL.FLASHCARDS,
     async () => {
       const { data, providerUsed } = await aiOrchestrator.generateJSON({

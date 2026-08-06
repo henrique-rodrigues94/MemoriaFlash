@@ -3,17 +3,23 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Sparkles, PlusCircle, CheckCircle2, Loader2, Plus, X, Trash2,
   BookOpen, Save, HelpCircle, Play, Lock, Lightbulb, ChevronDown,
-  ChevronUp, Wand2, Tag,
+  ChevronUp, Wand2, Tag, GraduationCap,
 } from 'lucide-react';
 import { Deck, UserStats, Flashcard } from '../types';
 import { SupportedLanguage } from '../lib/i18n';
 import { ManualCardForm } from './ManualCardForm';
-import { fetchAITopicSuggestions, generateAICards } from '../lib/aiGenerator';
+import { fetchAITopicSuggestions, generateAICards, EducationLevel } from '../lib/aiGenerator';
 import { findClosestMatch } from '../lib/spellCheck';
 import { hasEnoughCredits } from '../services/economy/creditsEngine';
 import { ECONOMY } from '../services/economy/economyConstants';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+
+const EDUCATION_LEVELS: { value: EducationLevel; label: string }[] = [
+  { value: 'fundamental', label: 'Ensino Fundamental' },
+  { value: 'medio', label: 'Ensino Médio' },
+  { value: 'faculdade', label: 'Faculdade' },
+];
 
 interface StudioViewProps {
   decks: Deck[];
@@ -215,6 +221,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
 
   // ── Gerador IA — form state ───────────────────────────────────────────────
   const [subject, setSubject] = useState('');
+  const [educationLevel, setEducationLevel] = useState<EducationLevel>('medio');
   const [deckName, setDeckName] = useState('');
   // true quando o usuário editou o nome manualmente (não sincroniza com matéria)
   const [deckNameLocked, setDeckNameLocked] = useState(false);
@@ -291,14 +298,23 @@ export const StudioView: React.FC<StudioViewProps> = ({
     }
     const timer = setTimeout(async () => {
       try {
-        const suggestions = await fetchAITopicSuggestions(subject);
+        const suggestions = await fetchAITopicSuggestions(subject, educationLevel);
         setSuggestedTopics(suggestions.filter(t => !topics.includes(t)));
       } catch {
         // silencioso — sugestões são opcionais
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [subject, topics]);
+  }, [subject, topics, educationLevel]);
+
+  // Trocar de nível de ensino muda o universo de tópicos válidos (ex: um
+  // tópico de "Cálculo Diferencial" escolhido no nível Faculdade não faz
+  // sentido se o usuário muda para Ensino Fundamental) — limpa a seleção
+  // manual ao trocar de nível para evitar tópicos incoerentes com o pedido.
+  const handleEducationLevelChange = (level: EducationLevel) => {
+    setEducationLevel(level);
+    setTopics([]);
+  };
 
   // ── Tópicos ───────────────────────────────────────────────────────────────
   const handleAddTopic = useCallback((topicToAdd?: string) => {
@@ -355,7 +371,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      const cards = await generateAICards(subject.trim(), topics, cardCount);
+      const cards = await generateAICards(subject.trim(), topics, cardCount, educationLevel);
       // Cobra pela quantidade de cards REALMENTE entregues (o backend pode
       // devolver menos que o pedido após remover duplicatas — ver
       // generateFlashcards.ts), nunca pelo que foi apenas solicitado.
@@ -497,6 +513,32 @@ export const StudioView: React.FC<StudioViewProps> = ({
                   onAccept={() => handleSubjectChange(subjectSuggestion)}
                 />
               )}
+            </div>
+
+            {/* ── Nível de Ensino (obrigatório) ── */}
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5">
+                <GraduationCap className="w-3.5 h-3.5" /> Nível de Ensino
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {EDUCATION_LEVELS.map(level => (
+                  <button
+                    key={level.value}
+                    type="button"
+                    onClick={() => handleEducationLevelChange(level.value)}
+                    className={`py-2.5 px-2 rounded-xl text-xs font-bold text-center border transition ${
+                      educationLevel === level.value
+                        ? 'bg-[#60a5fa]/15 border-[#60a5fa] text-[#60a5fa]'
+                        : 'bg-[#051424] border-[#424754]/50 text-[#c2c6d6] hover:border-[#60a5fa]/50'
+                    }`}
+                  >
+                    {level.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[11px] text-[#8c91a0]">
+                Os tópicos sugeridos e os cards gerados são ajustados ao currículo desse nível.
+              </p>
             </div>
 
             {/* ── Nome do Baralho (opcional) ── */}

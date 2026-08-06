@@ -1,15 +1,20 @@
 import { Flashcard } from '../types';
 
+export type EducationLevel = 'fundamental' | 'medio' | 'faculdade';
+
 /**
  * Busca sugestões de tópicos reais via IA no backend.
  * Lança erro amigável se nenhum provedor de IA estiver disponível.
  */
-export const fetchAITopicSuggestions = async (subject: string): Promise<string[]> => {
+export const fetchAITopicSuggestions = async (
+  subject: string,
+  educationLevel: EducationLevel = 'medio',
+): Promise<string[]> => {
   if (!subject.trim()) return [];
   const res = await fetch('/api/gemini/suggest-topics', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: subject, language: 'pt' }),
+    body: JSON.stringify({ title: subject, language: 'pt', educationLevel }),
   });
   if (!res.ok) {
     throw new Error('Não há servidor de IA disponível no momento. Tente novamente mais tarde.');
@@ -25,7 +30,8 @@ export const fetchAITopicSuggestions = async (subject: string): Promise<string[]
 export const generateAICards = async (
   subject: string,
   topics: string[],
-  count: number
+  count: number,
+  educationLevel: EducationLevel = 'medio',
 ): Promise<Flashcard[]> => {
   const res = await fetch('/api/gemini/generate-flashcards', {
     method: 'POST',
@@ -36,6 +42,7 @@ export const generateAICards = async (
       language: 'pt',
       difficulty: 'medium',
       selectedTopics: topics,
+      educationLevel,
     }),
   });
 
