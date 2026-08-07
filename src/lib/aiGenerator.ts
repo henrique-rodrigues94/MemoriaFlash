@@ -33,6 +33,7 @@ export const generateAICards = async (
   topics: string[],
   count: number,
   educationLevel: EducationLevel = 'medio',
+  existingFronts: string[] = [],
 ): Promise<Flashcard[]> => {
   const res = await fetch('/api/gemini/generate-flashcards', {
     method: 'POST',
@@ -44,6 +45,7 @@ export const generateAICards = async (
       difficulty: 'medium',
       selectedTopics: topics,
       educationLevel,
+      existingFronts,
     }),
   });
 

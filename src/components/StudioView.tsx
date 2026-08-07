@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   Sparkles, PlusCircle, CheckCircle2, Loader2, Plus, X, Trash2, Check,
   BookOpen, Save, HelpCircle, Play, Lock, Lightbulb, ChevronDown,
-  ChevronUp, Wand2, Tag, GraduationCap,
+  ChevronUp, Wand2, Tag, GraduationCap, RefreshCw,
 } from 'lucide-react';
 import { Deck, UserStats, Flashcard } from '../types';
 import { SupportedLanguage } from '../lib/i18n';
@@ -56,10 +56,12 @@ function AICardPreview({ card, index, onRemove }: { card: Flashcard; index: numb
   const [expanded, setExpanded] = useState(false);
   return (
     <div className="bg-[#0b1a2a]/95 border border-[#adc6ff]/20 rounded-2xl overflow-hidden shadow-xl">
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setExpanded(e => !e)}
-        className="w-full text-left p-4 flex items-start gap-3 hover:bg-white/5 transition"
+        onKeyDown={e => e.key === 'Enter' && setExpanded(v => !v)}
+        className="w-full text-left p-4 flex items-start gap-3 hover:bg-white/5 transition cursor-pointer"
       >
         <span className="text-[11px] font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 rounded-lg px-2 py-1 shrink-0 mt-0.5">
           #{index + 1}
@@ -83,7 +85,7 @@ function AICardPreview({ card, index, onRemove }: { card: Flashcard; index: numb
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
-      </button>
+      </div>
 
       {expanded && (
         <div className="px-4 pb-4 space-y-3 border-t border-[#424754]/40 pt-3">
@@ -235,6 +237,30 @@ export const StudioView: React.FC<StudioViewProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [bankAvailability, setBankAvailability] = useState<BankAvailability | null>(null);
   const topicInputRef = useRef<HTMLInputElement>(null);
+
+  // Tópicos que JÁ existem no baralho atual (quando editando um deck existente).
+  // Usado para destacar visualmente esses tópicos na grade curricular e
+  // garantir que a geração produza cards DIFERENTES dos já existentes.
+  const existingDeckTopics = useMemo<Set<string>>(() => {
+    if (!initialDeck?.cards?.length) return new Set();
+    const s = new Set<string>();
+    initialDeck.cards.forEach(c => {
+      if (c.topic) s.add(c.topic);
+      if (c.subject) s.add(c.subject);
+    });
+    return s;
+  }, [initialDeck]);
+
+  // Fronts dos cards já existentes no baralho — usados para deduplicação
+  // na geração: a IA não deve gerar cards com a mesma pergunta.
+  const existingFronts = useMemo<Set<string>>(() => {
+    if (!initialDeck?.cards?.length) return new Set();
+    return new Set(
+      initialDeck.cards.map(c =>
+        (c.front || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w\s]/g, '').trim()
+      ).filter(Boolean)
+    );
+  }, [initialDeck]);
 
   // ── Cards gerados / criados ───────────────────────────────────────────────
   const [generatedAICards, setGeneratedAICards] = useState<Flashcard[]>([]);
@@ -451,7 +477,13 @@ export const StudioView: React.FC<StudioViewProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      const cards = await generateAICards(subject.trim(), topics, cardCount, educationLevel);
+      const cards = await generateAICards(
+        subject.trim(),
+        topics,
+        cardCount,
+        educationLevel,
+        Array.from(existingFronts),
+      );
       // Cobra pela quantidade de cards REALMENTE entregues (o backend pode
       // devolver menos que o pedido após remover duplicatas — ver
       // generateFlashcards.ts), nunca pelo que foi apenas solicitado.
@@ -692,28 +724,52 @@ export const StudioView: React.FC<StudioViewProps> = ({
             )}
             {curatedCurriculum ? (
               <div className="p-3.5 bg-[#051424]/80 rounded-2xl border border-blue-500/20 animate-fade-in space-y-3">
-                <span className="block text-[11px] font-bold text-[#60a5fa] uppercase tracking-wide flex items-center gap-1.5">
-                  <Wand2 className="w-3.5 h-3.5" /> Grade Curricular — clique para selecionar os tópicos:
-                </span>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="block text-[11px] font-bold text-[#60a5fa] uppercase tracking-wide flex items-center gap-1.5">
+                    <Wand2 className="w-3.5 h-3.5" /> Grade Curricular — clique para selecionar os tópicos:
+                  </span>
+                  {existingDeckTopics.size > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap text-[10px]">
+                      <span className="flex items-center gap-1 text-amber-400">
+                        <RefreshCw className="w-3 h-3" /> Já tem cards (gerará novos diferentes)
+                      </span>
+                      <span className="flex items-center gap-1 text-emerald-400">
+                        <Check className="w-3 h-3" /> Selecionado
+                      </span>
+                    </div>
+                  )}
+                </div>
                 {curatedCurriculum.map((cat: CurriculumCategory) => (
                   <div key={cat.category} className="space-y-1.5">
                     <span className="block text-[11px] font-bold text-[#8c91a0] uppercase tracking-wide">{cat.category}</span>
                     <div className="flex flex-wrap gap-2">
                       {cat.topics.map((sug) => {
                         const isSelected = topics.includes(sug);
+                        const alreadyInDeck = existingDeckTopics.has(sug);
                         return (
                           <button
                             key={sug}
                             type="button"
                             onClick={() => handleToggleTopic(sug)}
+                            title={alreadyInDeck ? 'Este tópico já tem cards no baralho — novos cards serão diferentes' : undefined}
                             className={`px-3 py-1.5 rounded-xl border text-xs flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 ${
                               isSelected
                                 ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300'
-                                : 'bg-[#0e2742] hover:bg-[#163a61] text-[#adc6ff] border-blue-500/30'
+                                : alreadyInDeck
+                                  ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                  : 'bg-[#0e2742] hover:bg-[#163a61] text-[#adc6ff] border-blue-500/30'
                             }`}
                           >
-                            {isSelected ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Plus className="w-3.5 h-3.5 text-blue-400" />}
+                            {isSelected
+                              ? <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              : alreadyInDeck
+                                ? <RefreshCw className="w-3 h-3 text-amber-400" />
+                                : <Plus className="w-3.5 h-3.5 text-blue-400" />
+                            }
                             {sug}
+                            {alreadyInDeck && !isSelected && (
+                              <span className="text-[9px] font-bold text-amber-400/70 bg-amber-500/10 px-1 rounded">+novo</span>
+                            )}
                           </button>
                         );
                       })}

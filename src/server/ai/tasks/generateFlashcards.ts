@@ -221,6 +221,11 @@ export async function generateFlashcardsTask(args: {
    * jamais deve vazar conteúdo do documento de ninguém, e vice-versa.
    */
   sourceType?: GenerationSourceType;
+  /**
+   * Fronts normalizados de cards já existentes no baralho do usuário.
+   * A geração filtra esses fronts para não duplicar cards que o usuário já tem.
+   */
+  existingFronts?: string[];
 }) {
   const {
     prompt,
@@ -230,19 +235,29 @@ export async function generateFlashcardsTask(args: {
     selectedTopics = [],
     educationLevel = 'medio',
     sourceType = 'subject',
+    existingFronts = [],
   } = args;
 
   const useBank = sourceType === 'subject';
 
+  // Set de fronts já existentes no baralho do usuário (para deduplicação)
+  const existingFrontsSet = new Set<string>(existingFronts);
+
   // Cada slot é um "balde" independente: matéria + (tópico específico OU o
   // próprio assunto geral, quando nenhum tópico foi selecionado).
-  const slots = selectedTopics.length > 0
-    ? selectedTopics.map((topic, i) => ({
-        topicLabel: topic,
-        isSpecificTopic: true,
-        count: distributeEvenly(count, selectedTopics.length)[i],
-      }))
+  // IMPORTANTE: count por tópico é distribuído APENAS entre os tópicos que
+  // realmente receberão cards (count > 0), para nunca zerar um slot.
+  const topicsWithCount = selectedTopics.length > 0
+    ? selectedTopics
+        .map((topic, i) => ({
+          topicLabel: topic,
+          isSpecificTopic: true,
+          count: distributeEvenly(count, selectedTopics.length)[i],
+        }))
+        .filter(s => s.count > 0)  // remove slots zerados
     : [{ topicLabel: prompt, isSpecificTopic: false, count }];
+
+  const slots = topicsWithCount;
 
   let bankHits = 0;
   let aiGenerated = 0;
@@ -295,10 +310,24 @@ export async function generateFlashcardsTask(args: {
     }
   }
 
-  shuffle(allCards);
+  // Remove cards cujo front já existe no baralho do usuário
+  const dedupedCards = existingFrontsSet.size > 0
+    ? allCards.filter(c => {
+        const normFront = normalizeForDedup(c.front || '');
+        return !existingFrontsSet.has(normFront);
+      })
+    : allCards;
+
+  // Avisa no log se muitos cards foram filtrados (indica necessidade de ampliar o prompt)
+  const removedByDedup = allCards.length - dedupedCards.length;
+  if (removedByDedup > 0) {
+    console.info(`[generateFlashcards] ${removedByDedup} card(s) filtrado(s) por já existirem no baralho do usuário.`);
+  }
+
+  shuffle(dedupedCards);
 
   const providerUsed =
     aiGenerated === 0 ? 'bank' : providersUsed.size > 0 ? Array.from(providersUsed).join('+') : 'unknown';
 
-  return { cards: allCards, providerUsed, bankHits, aiGenerated };
+  return { cards: dedupedCards, providerUsed, bankHits, aiGenerated };
 }

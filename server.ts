@@ -264,10 +264,15 @@ app.get('/api/ai/status', (_req, res) => {
 // Endpoint: Generate Flashcards from Topic or Content
 app.post('/api/gemini/generate-flashcards', async (req, res) => {
   try {
-    const { prompt } = req.body;
+    const { prompt, existingFronts } = req.body;
     if (!prompt) return res.status(400).json({ error: 'Prompt or content is required' });
 
-    const result = await generateFlashcardsTask(req.body);
+    // Garante que existingFronts é um array de strings (pode vir undefined do cliente antigo)
+    const safeExistingFronts: string[] = Array.isArray(existingFronts)
+      ? existingFronts.filter((f: unknown) => typeof f === 'string')
+      : [];
+
+    const result = await generateFlashcardsTask({ ...req.body, existingFronts: safeExistingFronts });
     return res.json(result);
   } catch (error: any) {
     console.error('Error generating flashcards:', error);
