@@ -11,6 +11,7 @@ import { ManualCardForm } from './ManualCardForm';
 import { fetchAITopicSuggestions, generateAICards, EducationLevel } from '../lib/aiGenerator';
 import { EDUCATION_LEVEL_META, getAvailableEducationLevels, recommendEducationLevels } from '../lib/educationLevels';
 import { fetchCurriculum, CurriculumCategory } from '../services/curriculumService';
+import { identifySubjectLevels, loadAllLevelCurricula, LevelInfo, LevelCurriculum } from '../services/subjectLevelsService';
 import { getCuratedSubjectSuggestions } from '../lib/subjectAutocomplete';
 import { findClosestMatch } from '../lib/spellCheck';
 import { hasEnoughCredits } from '../services/economy/creditsEngine';
@@ -319,47 +320,73 @@ export const StudioView: React.FC<StudioViewProps> = ({
     setDeckNameSuggestion(null);
   };
 
-  // ── Sugestões de tópicos (debounce 600ms) ─────────────────────────────────
-  // Currículo dinâmico: buscado do Firestore (ou gerado pela IA e salvo lá)
-  // para QUALQUER matéria + nível. Sem lista fixa no código — tudo vem do banco.
-  const [curatedCurriculum, setCuratedCurriculum] = useState<CurriculumCategory[] | null>(null);
-  const [isCurriculumLoading, setIsCurriculumLoading] = useState(false);
+  // ── Identificação de níveis + carregamento de currículos ─────────────────
+  // A IA identifica quais níveis fazem sentido para a matéria digitada.
+  // Todos os currículos são carregados em paralelo; o usuário navega por abas.
+  const [detectedLevels, setDetectedLevels] = useState<LevelInfo[]>([]);
+  const [levelCurricula, setLevelCurricula] = useState<Map<EducationLevel, LevelCurriculum>>(new Map());
+  const [activeLevel, setActiveLevel] = useState<EducationLevel | null>(null);
+  const [isLevelsLoading, setIsLevelsLoading] = useState(false);
+
+  // Currículo da aba ativa (para compatibilidade com o restante da UI)
+  const curatedCurriculum: CurriculumCategory[] | null = useMemo(() => {
+    if (!activeLevel) return null;
+    const lc = levelCurricula.get(activeLevel);
+    return lc?.categories?.length ? lc.categories : null;
+  }, [activeLevel, levelCurricula]);
+
+  const isCurriculumLoading = useMemo(() => {
+    if (!activeLevel) return isLevelsLoading;
+    return levelCurricula.get(activeLevel)?.loading ?? isLevelsLoading;
+  }, [activeLevel, levelCurricula, isLevelsLoading]);
 
   useEffect(() => {
     if (subject.trim().length < 2) {
-      setCuratedCurriculum(null);
+      setDetectedLevels([]);
+      setLevelCurricula(new Map());
+      setActiveLevel(null);
       setSuggestedTopics([]);
       return;
     }
 
     let cancelled = false;
+    setIsLevelsLoading(true);
+
     const timer = setTimeout(async () => {
-      setIsCurriculumLoading(true);
-      try {
-        const result = await fetchCurriculum(subject.trim(), educationLevel);
-        if (cancelled) return;
-        if (result?.categories?.length) {
-          setCuratedCurriculum(result.categories);
-          setSuggestedTopics([]); // currículo completo substitui sugestões simples
-        } else {
-          // Fallback: sugestões simples da IA (6-8 tópicos sem categorias)
-          setCuratedCurriculum(null);
-          try {
-            const suggestions = await fetchAITopicSuggestions(subject, educationLevel);
-            if (!cancelled) setSuggestedTopics(suggestions.filter(t => !topics.includes(t)));
-          } catch {
-            // sugestões são opcionais
-          }
-        }
-      } catch {
-        if (!cancelled) setCuratedCurriculum(null);
-      } finally {
-        if (!cancelled) setIsCurriculumLoading(false);
+      // 1. IA identifica os níveis relevantes
+      const levelsResult = await identifySubjectLevels(subject.trim());
+      if (cancelled) return;
+
+      if (!levelsResult?.levels?.length) {
+        // Fallback: sugestões simples sem currículo
+        setIsLevelsLoading(false);
+        try {
+          const suggestions = await fetchAITopicSuggestions(subject, educationLevel);
+          if (!cancelled) setSuggestedTopics(suggestions.filter(t => !topics.includes(t)));
+        } catch { /* silencioso */ }
+        return;
       }
+
+      const levels = levelsResult.levels;
+      setDetectedLevels(levels);
+      setSuggestedTopics([]);
+
+      // Sincroniza educationLevel com o nível principal detectado
+      const primaryLevel = levels[0].level;
+      if (!cancelled) {
+        setActiveLevel(primaryLevel);
+        setEducationLevel(primaryLevel);
+        setIsLevelsLoading(false);
+      }
+
+      // 2. Carrega todos os currículos em paralelo
+      await loadAllLevelCurricula(subject.trim(), levels, (updated) => {
+        if (!cancelled) setLevelCurricula(updated);
+      });
     }, 700);
 
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [subject, educationLevel]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [subject]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Consulta disponibilidade no banco de cards ────────────────────────────
   // Quando matéria + tópicos mudam, consulta o banco para saber quantos cards
@@ -384,28 +411,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
     [subject],
   );
 
-  const availableEducationLevels = useMemo(
-    () => getAvailableEducationLevels(subject),
-    [subject],
-  );
-  // Lista curta e ranqueada de níveis plausíveis pra matéria digitada — ex.:
-  // "Direito Penal" → ['concurso', 'faculdade']; "Eletrônica" → ['tecnico', 'faculdade'];
-  // "Matemática" → ['fundamental', 'medio']. É essa lista que vira os chips exibidos.
-  const recommendedEducationLevels = useMemo(
-    () => recommendEducationLevels(subject, availableEducationLevels),
-    [subject, availableEducationLevels],
-  );
-
-  // Enquanto o usuário não escolher um nível manualmente, aplicamos o topo
-  // da recomendação automática. Se ele já tiver travado uma escolha mas ela
-  // deixou de ser plausível para a nova matéria (ex.: trocou de "Biologia"
-  // no nível Fundamental para "Direito Penal"), reencaixamos na recomendação —
-  // nunca deixamos um nível fora dos chips sugeridos selecionado.
-  useEffect(() => {
-    if (!educationLevelLocked || !recommendedEducationLevels.includes(educationLevel)) {
-      setEducationLevel(recommendedEducationLevels[0]);
-    }
-  }, [recommendedEducationLevels]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Nota: detecção de níveis agora feita pela IA via identifySubjectLevels().
 
   // Trocar de nível de ensino muda o universo de tópicos válidos (ex: um
   // tópico de "Cálculo Diferencial" escolhido no nível Faculdade não faz
@@ -414,8 +420,8 @@ export const StudioView: React.FC<StudioViewProps> = ({
   const handleEducationLevelChange = (level: EducationLevel) => {
     setEducationLevel(level);
     setEducationLevelLocked(true);
+    setActiveLevel(level);
     setTopics([]);
-    setCuratedCurriculum(null); // força re-fetch do currículo pro novo nível
   };
 
   // ── Tópicos ───────────────────────────────────────────────────────────────
@@ -634,34 +640,63 @@ export const StudioView: React.FC<StudioViewProps> = ({
                 />
               )}
 
-              {/* ── Nível de Ensino: chips inline com só o que é plausível pra matéria ── */}
+              {/* ── Níveis detectados pela IA ── */}
               {subject.trim().length >= 2 && (
-                <div className="flex items-center flex-wrap gap-1.5 mt-2.5">
-                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#8c91a0]">
-                    <GraduationCap className="w-3 h-3" /> Nível:
-                  </span>
-                  {recommendedEducationLevels.map((levelValue, i) => {
-                    const level = EDUCATION_LEVEL_META.find(l => l.value === levelValue)!;
-                    const isSelected = educationLevel === levelValue;
-                    return (
-                      <button
-                        key={level.value}
-                        type="button"
-                        onClick={() => handleEducationLevelChange(level.value)}
-                        className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border transition cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#60a5fa]/15 border-[#60a5fa] text-[#60a5fa]'
-                            : 'bg-[#051424] border-[#424754]/50 text-[#c2c6d6] hover:border-[#60a5fa]/50'
-                        }`}
-                      >
-                        <span aria-hidden="true">{level.icon}</span>
-                        {level.label}
-                        {i === 0 && recommendedEducationLevels.length > 1 && !isSelected && (
-                          <span className="text-[8px] font-extrabold text-emerald-400 uppercase">· sugerido</span>
-                        )}
-                      </button>
-                    );
-                  })}
+                <div className="mt-2.5">
+                  {isLevelsLoading && detectedLevels.length === 0 && (
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400" />
+                      Identificando níveis para <strong className="text-blue-300">{subject.trim()}</strong>…
+                    </div>
+                  )}
+                  {detectedLevels.length > 0 && (
+                    <div className="space-y-1">
+                      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#8c91a0]">
+                        <GraduationCap className="w-3 h-3" /> Níveis identificados pela IA:
+                      </span>
+                      <div className="flex items-center flex-wrap gap-1.5">
+                        {detectedLevels.map((levelInfo, i) => {
+                          const lc = levelCurricula.get(levelInfo.level);
+                          const isActive = activeLevel === levelInfo.level;
+                          const isLoading = lc?.loading ?? true;
+                          const hasContent = (lc?.categories?.length ?? 0) > 0;
+                          return (
+                            <button
+                              key={levelInfo.level}
+                              type="button"
+                              onClick={() => {
+                                setActiveLevel(levelInfo.level);
+                                setEducationLevel(levelInfo.level);
+                              }}
+                              title={levelInfo.reason}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition cursor-pointer ${
+                                isActive
+                                  ? 'bg-[#60a5fa]/20 border-[#60a5fa] text-[#60a5fa] shadow-sm shadow-blue-500/20'
+                                  : 'bg-[#051424] border-[#424754]/50 text-[#c2c6d6] hover:border-[#60a5fa]/50 hover:text-white'
+                              }`}
+                            >
+                              <span>{levelInfo.icon}</span>
+                              {levelInfo.label}
+                              {isLoading
+                                ? <Loader2 className="w-3 h-3 animate-spin opacity-50" />
+                                : hasContent
+                                  ? <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                  : null
+                              }
+                              {i === 0 && detectedLevels.length > 1 && (
+                                <span className="text-[8px] font-extrabold text-emerald-400 uppercase leading-none">principal</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {activeLevel && detectedLevels.find(l => l.level === activeLevel)?.reason && (
+                        <p className="text-[10px] text-slate-500 italic mt-0.5">
+                          💡 {detectedLevels.find(l => l.level === activeLevel)?.reason}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -719,14 +754,23 @@ export const StudioView: React.FC<StudioViewProps> = ({
             {isCurriculumLoading && subject.trim().length >= 2 && !curatedCurriculum && (
               <div className="p-3.5 bg-[#051424]/80 rounded-2xl border border-blue-500/20 animate-fade-in flex items-center gap-3">
                 <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
-                <span className="text-[11px] text-[#8c91a0]">Buscando grade curricular para <strong className="text-blue-300">{subject.trim()}</strong>…</span>
+                <span className="text-[11px] text-[#8c91a0]">
+                  Carregando grade curricular
+                  {activeLevel && detectedLevels.find(l => l.level === activeLevel) && (
+                    <> — {detectedLevels.find(l => l.level === activeLevel)!.icon} <strong className="text-blue-300">{detectedLevels.find(l => l.level === activeLevel)!.label}</strong></>
+                  )}…
+                </span>
               </div>
             )}
             {curatedCurriculum ? (
               <div className="p-3.5 bg-[#051424]/80 rounded-2xl border border-blue-500/20 animate-fade-in space-y-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="block text-[11px] font-bold text-[#60a5fa] uppercase tracking-wide flex items-center gap-1.5">
-                    <Wand2 className="w-3.5 h-3.5" /> Grade Curricular — clique para selecionar os tópicos:
+                    <Wand2 className="w-3.5 h-3.5" />
+                    {activeLevel && detectedLevels.find(l => l.level === activeLevel)
+                      ? <>{detectedLevels.find(l => l.level === activeLevel)!.icon} Grade {detectedLevels.find(l => l.level === activeLevel)!.label} — clique para selecionar:</>
+                      : <>Grade Curricular — clique para selecionar os tópicos:</>
+                    }
                   </span>
                   {existingDeckTopics.size > 0 && (
                     <div className="flex items-center gap-2 flex-wrap text-[10px]">

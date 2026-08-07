@@ -16,6 +16,7 @@ import { generateQuizTask } from './src/server/ai/tasks/generateQuiz';
 import { recoveryPlanTask } from './src/server/ai/tasks/recoveryPlan';
 import { scannerAnalyzeTask } from './src/server/ai/tasks/scannerAnalyze';
 import { generateCurriculumTask, CurriculumCategory } from './src/server/ai/tasks/generateCurriculum';
+import { identifySubjectLevelsTask } from './src/server/ai/tasks/identifySubjectLevels';
 import { getBankStatsForTopics, saveCardsToBank, BankCard } from './src/server/cardBank/cardBank';
 import { simpleRateLimit } from './src/server/middleware/rateLimit';
 import { referralRouter } from './src/server/routes/referral';
@@ -116,6 +117,25 @@ app.post('/api/log', async (req, res) => {
 // 1. Checa Firestore (coleção `curricula`, doc `{subject_normalizado}_{level}`)
 // 2. Se não existir: gera via IA → salva no Firestore → devolve
 // 3. Cache de resposta longo (24h) porque currículo é estável
+// ── Identificação de níveis de ensino por matéria (via IA) ────────────────
+// GET /api/subject-levels?subject=Perito+Criminal
+// Retorna quais níveis fazem sentido para aquele assunto + breve justificativa.
+// Resultado cacheado no servidor — IA chamada apenas na 1ª vez por assunto.
+app.get('/api/subject-levels', async (req, res) => {
+  const { subject } = req.query as { subject?: string };
+  if (!subject?.trim() || subject.trim().length < 2) {
+    return res.status(400).json({ error: 'subject obrigatório (mín. 2 caracteres)' });
+  }
+  try {
+    const result = await identifySubjectLevelsTask(subject.trim());
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // 24h — muda muito raramente
+    return res.json(result);
+  } catch (err: any) {
+    console.error('[/api/subject-levels] error:', err);
+    return res.status(500).json({ error: err?.message || 'Erro ao identificar níveis' });
+  }
+});
+
 app.get('/api/curriculum', async (req, res) => {
   const { subject, level } = req.query as { subject?: string; level?: string };
   if (!subject?.trim() || !level?.trim()) {
