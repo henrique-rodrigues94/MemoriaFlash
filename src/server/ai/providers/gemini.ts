@@ -1,45 +1,72 @@
+// 📁 flashmind-ai/src/server/ai/providers/gemini.ts
+//
+// Google Gemini — PROVEDOR PRINCIPAL
+// Camada gratuita generosa via Google AI Studio (GEMINI_API_KEY).
+// Suporta structured output nativo (responseSchema) → JSON garantido.
+//
+// Variáveis de ambiente:
+//   GEMINI_API_KEY          obrigatória
+//   GEMINI_MODEL            opcional (padrão: gemini-2.5-flash)
+//   GEMINI_MAX_OUTPUT_TOKENS opcional (padrão: 8192)
+
 import { GoogleGenAI } from '@google/genai';
 import { AIProvider, AIProviderError, GenerateJSONParams } from '../types';
 
-// Modelo válido e atual com camada gratuita generosa via Google AI Studio.
-// (Atualizado para a linha mais recente disponível. Se a Google lançar um
-// modelo mais novo, troque só esta linha — ou use GEMINI_MODEL no .env.)
-const DEFAULT_MODEL = 'gemini-3.6-flash';
+// gemini-2.5-flash: melhor custo-benefício, contexto 1M tokens, saída 65k tokens
+const DEFAULT_MODEL      = 'gemini-2.5-flash';
+const DEFAULT_MAX_TOKENS = 8192;
 
-// Lido na hora da chamada (lazy) — ver comentário em openrouter.ts.
+let _client: GoogleGenAI | null = null;
+
+function getClient(): GoogleGenAI {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new AIProviderError('GEMINI_API_KEY não configurada', 'gemini');
+  if (!_client) {
+    _client = new GoogleGenAI({ apiKey: key, httpOptions: { headers: { 'User-Agent': 'memoriaflash/1.0' } } });
+  }
+  return _client;
+}
+
 function getModel(): string {
   return process.env.GEMINI_MODEL || DEFAULT_MODEL;
 }
 
-let client: GoogleGenAI | null = null;
-function getClient(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-  if (!client) {
-    client = new GoogleGenAI({ apiKey, httpOptions: { headers: { 'User-Agent': 'memoriaflash' } } });
-  }
-  return client;
+function getMaxTokens(params: GenerateJSONParams): number {
+  return params.maxOutputTokens
+    ?? (parseInt(process.env.GEMINI_MAX_OUTPUT_TOKENS || '0') || DEFAULT_MAX_TOKENS);
+}
+
+function classifyError(err: any): AIProviderError {
+  const msg    = err?.message || String(err);
+  const status = err?.status ?? err?.response?.status ?? err?.httpStatus;
+  const isRate = status === 429 || /quota|rate.?limit|resource.?exhausted/i.test(msg);
+  return new AIProviderError(
+    isRate ? `Gemini: cota atingida (${msg.slice(0, 120)})` : `Gemini: ${msg.slice(0, 200)}`,
+    'gemini',
+    isRate,
+    status,
+  );
 }
 
 export const geminiProvider: AIProvider = {
-  id: 'gemini',
-  label: 'Google Gemini (gratuito)',
-  tier: 'free',
+  id:    'gemini',
+  label: 'Google Gemini',
+  tier:  'free',
+
   isConfigured: () => !!process.env.GEMINI_API_KEY,
 
   async generateJSON(params: GenerateJSONParams): Promise<unknown> {
     const ai = getClient();
-    if (!ai) throw new AIProviderError('GEMINI_API_KEY não configurada', 'gemini');
 
     try {
       const config: Record<string, unknown> = {
         systemInstruction: params.systemPrompt,
         responseMimeType: 'application/json',
-        // CRÍTICO: sem isso o Gemini usa o default interno (~2k tokens) e trunca
-        // arrays grandes silenciosamente (ex: retorna 54 de 100 cards pedidos).
-        // gemini-2.5-flash suporta até 65536 tokens de saída.
-        maxOutputTokens: params.maxOutputTokens ?? parseInt(process.env.GEMINI_MAX_OUTPUT_TOKENS || '8192'),
+        maxOutputTokens: getMaxTokens(params),
+        temperature: params.temperature ?? 0.7,
       };
+
+      // Structured output nativo — garante schema sem depender do parsing
       if (params.geminiSchema) {
         config.responseSchema = params.geminiSchema;
       }
@@ -51,12 +78,13 @@ export const geminiProvider: AIProvider = {
       });
 
       const text = response.text;
-      if (!text) throw new Error('Resposta vazia do Gemini');
+      if (!text?.trim()) throw new Error('Resposta vazia do Gemini');
+
+      // Com responseSchema, a resposta já é JSON válido — parse direto
       return JSON.parse(text);
     } catch (err: any) {
-      const status = err?.status ?? err?.response?.status;
-      const isRateLimited = status === 429 || /quota|rate.?limit/i.test(err?.message || '');
-      throw new AIProviderError(err?.message || 'Falha ao chamar Gemini', 'gemini', isRateLimited, status);
+      if (err instanceof AIProviderError) throw err;
+      throw classifyError(err);
     }
   },
 };

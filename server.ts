@@ -15,6 +15,7 @@ import { voiceTutorTask } from './src/server/ai/tasks/voiceTutor';
 import { generateQuizTask } from './src/server/ai/tasks/generateQuiz';
 import { recoveryPlanTask } from './src/server/ai/tasks/recoveryPlan';
 import { scannerAnalyzeTask } from './src/server/ai/tasks/scannerAnalyze';
+import { extractTextFromImages, getOCRStatus } from './src/server/ocr/ocrService';
 import { generateCurriculumTask, CurriculumCategory } from './src/server/ai/tasks/generateCurriculum';
 import { identifySubjectLevelsTask } from './src/server/ai/tasks/identifySubjectLevels';
 import { getBucketStats, saveCardBucket, BankCard, CardContentType } from './src/server/db/db';
@@ -248,8 +249,26 @@ app.post('/api/card-bank/save', async (req, res) => {
   }
 });
 
+// ── Status dos providers de OCR ──────────────────────────────────────────────
+app.get('/api/ocr/status', (_req, res) => {
+  const status = getOCRStatus();
+  res.json({
+    ...status,
+    primaryProvider:  status.gemini   ? 'gemini'   : status.ocrspace ? 'ocrspace' : 'none',
+    fallbackProvider: status.gemini && status.ocrspace ? 'ocrspace' : 'none',
+  });
+});
+
 app.get('/api/ai/status', (_req, res) => {
-  res.json({ providers: aiOrchestrator.getStatus(), cache: getCacheStats() });
+  const providers = aiOrchestrator.getStatus();
+  const activeCount = providers.filter(p => p.available).length;
+  const totalCount  = providers.length;
+  res.json({
+    ok: activeCount > 0,
+    summary: `${activeCount}/${totalCount} provedores disponíveis`,
+    providers,
+    cache: getCacheStats(),
+  });
 });
 
 // Endpoint: Generate Flashcards from Topic or Content
@@ -352,45 +371,32 @@ app.post('/api/gemini/scanner-analyze', async (req, res) => {
       return res.status(400).json({ error: 'Nenhuma imagem ou texto fornecido.' });
     }
 
-    // ── OCR das imagens (reutiliza a lógica do scanner-process) ──────────────
-    async function ocrWithGeminiAnalyze(base64images: string[]): Promise<string> {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) throw new Error('GEMINI_API_KEY não configurada');
-      const { GoogleGenAI } = await import('@google/genai');
-      const genai = new GoogleGenAI({ apiKey });
-      const parts: any[] = [
-        { text: 'Você é um sistema de OCR especializado em materiais educacionais. Analise todas as imagens e extraia TODO o texto visível. Preserve a estrutura. Não adicione comentários, apenas o texto extraído.' },
-      ];
-      for (const base64img of base64images) {
-        const [meta, data] = base64img.split(',');
-        const mimeMatch = meta.match(/data:([^;]+)/);
-        const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-        parts.push({ inlineData: { data, mimeType } });
-      }
-      const response = await genai.models.generateContent({
-        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
-        contents: [{ role: 'user', parts }],
-        config: { maxOutputTokens: 8192 },
-      });
-      return response.text || '';
-    }
-
+    // OCR via ocrService (Gemini Vision → OCR.space)
     let extractedFromImages = '';
-    if (images.length > 0 && process.env.GEMINI_API_KEY) {
-      try {
-        extractedFromImages = await ocrWithGeminiAnalyze(images);
-      } catch (e) {
-        console.warn('[Scanner Analyze] OCR falhou:', (e as Error).message);
+    let ocrWarnings: string[] = [];
+    if (images.length > 0) {
+      const ocrResult = await extractTextFromImages(images as string[]);
+      extractedFromImages = ocrResult.text;
+      ocrWarnings = ocrResult.warnings;
+      if (ocrResult.provider !== 'none') {
+        console.info(`[Scanner Analyze] OCR: ${ocrResult.provider} — ${ocrResult.totalChars} chars`);
       }
     }
 
-    const allContent = [...texts, extractedFromImages].filter(Boolean).join('\n\n');
+    const allContent = [...(texts as string[]), extractedFromImages].filter(Boolean).join('\n\n');
     if (!allContent.trim()) {
-      return res.status(400).json({ error: 'Não foi possível extrair conteúdo dos arquivos.' });
+      return res.status(400).json({
+        error: 'Não foi possível extrair conteúdo dos arquivos.',
+        warnings: ocrWarnings,
+      });
     }
 
     const result = await scannerAnalyzeTask({ content: allContent, subjectHint, language });
-    return res.json({ ...result, extractedContent: allContent.slice(0, 20000) });
+    return res.json({
+      ...result,
+      extractedContent: allContent.slice(0, 20000),
+      ocrWarnings: ocrWarnings.length > 0 ? ocrWarnings : undefined,
+    });
   } catch (error: any) {
     console.error('[Scanner Analyze] Erro:', error);
     return res.status(500).json({ error: error.message || 'Falha ao analisar o documento.' });
@@ -415,139 +421,16 @@ app.post('/api/gemini/scanner-process', async (req, res) => {
     const cardCount = Math.min(Math.max(Number(count) || 25, 1), 100);
     const subjectLabel = subject.trim() || 'Conteúdo do Documento';
 
-    // ── Passo 1: extrair texto de imagens via OCR (fallback em cadeia) ──────────
-    //
-    // Ordem de tentativa:
-    //   1. Gemini Vision (gemini-2.5-flash) — gratuito com GEMINI_API_KEY (principal)
-    //   2. OCR.space                        — 25k req/mês grátis, OCRSPACE_API_KEY
-    //
-    // Configure as chaves no .env:
-    //   GEMINI_API_KEY=...   (https://aistudio.google.com/apikey)
-    //   OCRSPACE_API_KEY=... (https://ocr.space/ocrapi/freekey)
-
-    /** Extrai texto de MÚLTIPLAS imagens via Gemini Vision (gratuito). */
-    async function ocrWithGemini(base64images: string[]): Promise<string> {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) throw new Error('GEMINI_API_KEY não configurada');
-
-      const { GoogleGenAI } = await import('@google/genai');
-      const genai = new GoogleGenAI({ apiKey });
-
-      const parts: any[] = [
-        {
-          text: 'Você é um sistema de OCR especializado em materiais educacionais. Analise todas as imagens e extraia TODO o texto visível — títulos, parágrafos, listas, fórmulas, tabelas. Preserve a estrutura. Não adicione comentários, apenas o texto extraído de cada imagem, separando com "--- Página N ---".',
-        },
-      ];
-      for (const base64img of base64images) {
-        const [meta, data] = base64img.split(',');
-        const mimeMatch = meta.match(/data:([^;]+)/);
-        const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-        parts.push({ inlineData: { data, mimeType } });
-      }
-
-      const response = await genai.models.generateContent({
-        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
-        contents: [{ role: 'user', parts }],
-        config: { maxOutputTokens: 8192 },
-      });
-      return response.text || '';
-    }
-
-    /** Extrai texto de UMA imagem via OCR.space (25k req/mês grátis). */
-    async function ocrWithOCRSpace(base64img: string): Promise<string> {
-      const apiKey = process.env.OCRSPACE_API_KEY || 'helloworld'; // chave pública de teste (limitada)
-      const [, data] = base64img.split(',');
-
-      const formData = new FormData();
-      formData.append('base64Image', `data:image/jpeg;base64,${data}`);
-      formData.append('language', 'por'); // Português
-      formData.append('isOverlayRequired', 'false');
-      formData.append('detectOrientation', 'true');
-      formData.append('scale', 'true');
-      formData.append('OCREngine', '2'); // Engine 2 = melhor precisão
-
-      const res = await fetch('https://api.ocr.space/parse/image', {
-        method: 'POST',
-        headers: { apikey: apiKey },
-        body: formData,
-        signal: AbortSignal.timeout(30000),
-      });
-
-      if (!res.ok) throw new Error(`OCR.space HTTP ${res.status}`);
-      const json = await res.json();
-      if (json.IsErroredOnProcessing) throw new Error(json.ErrorMessage?.[0] || 'OCR.space erro');
-
-      return json.ParsedResults?.map((r: any) => r.ParsedText).join('\n') || '';
-    }
-
-    // Se o conteúdo já foi extraído pelo scanner-analyze, pula o OCR
-    if (extractedContent && extractedContent.trim()) {
-      console.log('[Scanner] Usando conteúdo pré-extraído do scanner-analyze (skip OCR).');
-      const cardCount2 = Math.min(Math.max(Number(count) || 25, 1), 100);
-      const subjectLabel2 = subject.trim() || 'Conteúdo do Documento';
-      const topicsFilter = (selectedTopics as string[]).length > 0
-        ? `\n\nFoque EXCLUSIVAMENTE nos seguintes tópicos selecionados pelo usuário: ${(selectedTopics as string[]).join(', ')}`
-        : '';
-      const { generateFlashcardsTask: gft2 } = await import('./src/server/ai/tasks/generateFlashcards');
-      const prompt2 =
-        `Matéria/Assunto: ${subjectLabel2}\n\n` +
-        `CONTEÚDO FONTE:\n${extractedContent.slice(0, 15000)}\n\n` +
-        `Com base EXCLUSIVAMENTE no conteúdo acima, gere ${cardCount2} flashcards educativos.${topicsFilter}`;
-      const result2 = await gft2({ prompt: prompt2, count: cardCount2, language: 'pt', difficulty: 'medium', selectedTopics: selectedTopics as string[], sourceType: 'document' });
-      return res.json(result2);
-    }
-
+    // ── Passo 1: extrair texto via ocrService (Gemini Vision → OCR.space) ─────
     let extractedFromImages = '';
+    let ocrWarnings: string[] = [];
     if (images.length > 0) {
-      console.log(`[Scanner] Processando ${images.length} imagem(ns) com OCR…`);
-      const pageTexts: string[] = [];
-
-      // Tenta Gemini em lote primeiro (1 chamada para todas as imagens)
-      let geminiDone = false;
-      if (process.env.GEMINI_API_KEY) {
-        try {
-          console.log('[Scanner OCR] Tentando Gemini Vision (lote)…');
-          const text = await ocrWithGemini(images);
-          if (text.trim()) {
-            pageTexts.push(text);
-            geminiDone = true;
-            console.log('[Scanner OCR] ✓ Gemini Vision extraiu o conteúdo.');
-          }
-        } catch (e) {
-          console.warn('[Scanner OCR] Gemini Vision falhou:', (e as Error).message);
-        }
-      }
-
-      // Se Gemini não funcionou, processa imagem por imagem com OCR.space
-      if (!geminiDone) {
-        for (let i = 0; i < images.length; i++) {
-          const img = images[i];
-          let pageText = '';
-
-          // Tentativa: OCR.space
-          if (!pageText) {
-            try {
-              console.log(`[Scanner OCR] Imagem ${i + 1}: tentando OCR.space…`);
-              pageText = await ocrWithOCRSpace(img);
-              if (pageText.trim()) console.log(`[Scanner OCR] ✓ OCR.space extraiu imagem ${i + 1}`);
-            } catch (e) {
-              console.warn(`[Scanner OCR] OCR.space falhou na imagem ${i + 1}:`, (e as Error).message);
-            }
-          }
-
-          if (pageText.trim()) {
-            pageTexts.push(`=== Página ${i + 1} ===\n${pageText}`);
-          } else {
-            pageTexts.push(`=== Página ${i + 1} ===\n[Não foi possível extrair texto desta imagem]`);
-          }
-        }
-      }
-
-      extractedFromImages = pageTexts.join('\n\n');
-
-      if (!extractedFromImages.trim()) {
-        console.warn('[Scanner OCR] Nenhum provider de OCR disponível. Configure GEMINI_API_KEY ou OCRSPACE_API_KEY.');
-        extractedFromImages = `[${images.length} imagem(ns) enviada(s) — nenhum provider de OCR configurado. Configure GEMINI_API_KEY ou OCRSPACE_API_KEY no .env]`;
+      console.info(`[Scanner] OCR de ${images.length} imagem(ns)…`);
+      const ocrResult = await extractTextFromImages(images as string[]);
+      extractedFromImages = ocrResult.text;
+      ocrWarnings = ocrResult.warnings;
+      if (ocrResult.provider !== 'none') {
+        console.info(`[Scanner] OCR: ${ocrResult.provider} — ${ocrResult.totalChars} chars extraídos`);
       }
     }
 
@@ -638,7 +521,7 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`MemoriaFlash full-stack server running on http://0.0.0.0:${PORT}`);
-    console.log('Provedores de IA configurados:', aiOrchestrator.getStatus().filter((p) => p.configured).map((p) => p.id).join(', ') || '(nenhum — usando apenas o gerador local)');
+    // Log de provedores já feito em src/server/ai/index.ts
     startCronJobs();
   });
 }
