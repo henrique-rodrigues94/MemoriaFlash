@@ -17,7 +17,7 @@ import { recoveryPlanTask } from './src/server/ai/tasks/recoveryPlan';
 import { scannerAnalyzeTask } from './src/server/ai/tasks/scannerAnalyze';
 import { generateCurriculumTask, CurriculumCategory } from './src/server/ai/tasks/generateCurriculum';
 import { identifySubjectLevelsTask } from './src/server/ai/tasks/identifySubjectLevels';
-import { getBankStatsForTopics, saveCardsToBank, BankCard } from './src/server/cardBank/cardBank';
+import { getBucketStats, saveCardBucket, BankCard, CardContentType } from './src/server/db/db';
 import { simpleRateLimit } from './src/server/middleware/rateLimit';
 import { referralRouter } from './src/server/routes/referral';
 import { notificationsRouter } from './src/server/routes/notifications';
@@ -142,27 +142,10 @@ app.get('/api/curriculum', async (req, res) => {
     return res.status(400).json({ error: 'subject e level são obrigatórios' });
   }
 
-  const normalizedSubject = subject.trim().toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_');
-  const docId = `${normalizedSubject}__${level}`;
-
   try {
-    const db = getAdminFirestore();
-    if (db) {
-      // Tenta buscar do Firestore
-      const docRef = db.collection('curricula').doc(docId);
-      const snap = await docRef.get();
-      if (snap.exists) {
-        const data = snap.data() as { categories: CurriculumCategory[] };
-        if (Array.isArray(data?.categories) && data.categories.length > 0) {
-          res.setHeader('Cache-Control', 'public, max-age=86400'); // 24h
-          return res.json({ categories: data.categories, fromFirestore: true });
-        }
-      }
-    }
-
-    // Não existe no Firestore (ou Firestore indisponível) → gera via IA
+    // generateCurriculumTask já usa db.ts internamente:
+    //  1. Lê de curricula/{id} — 1 read
+    //  2. Se não tiver ou expirado → gera via IA → salva no banco
     const result = await generateCurriculumTask({
       subject: subject.trim(),
       educationLevel: level as any,
@@ -173,20 +156,8 @@ app.get('/api/curriculum', async (req, res) => {
       return res.status(502).json({ error: 'IA não gerou currículo válido' });
     }
 
-    // Salva no Firestore assincronamente (não bloqueia a resposta)
-    if (db) {
-      const docRef = db.collection('curricula').doc(docId);
-      docRef.set({
-        subject: subject.trim(),
-        educationLevel: level,
-        categories: result.categories,
-        generatedAt: new Date().toISOString(),
-        providerUsed: result.providerUsed,
-      }).catch(err => console.warn('[curriculum] Firestore save error:', err));
-    }
-
     res.setHeader('Cache-Control', 'public, max-age=86400');
-    return res.json({ categories: result.categories, fromFirestore: false });
+    return res.json({ categories: result.categories, fromFirestore: result.cacheHit ?? false });
   } catch (err: any) {
     console.error('[/api/curriculum] error:', err);
     return res.status(500).json({ error: err?.message || 'Erro interno ao gerar currículo' });
@@ -225,7 +196,7 @@ app.get('/api/card-bank/stats', async (req, res) => {
   if (topicList.length === 0) return res.json({ stats: [] });
 
   try {
-    const stats = await getBankStatsForTopics(subject.trim(), topicList, educationLevel, difficulty);
+    const stats = await getBucketStats(subject.trim(), topicList, educationLevel as any, difficulty as CardContentType);
     return res.json({ stats });
   } catch (err: any) {
     console.error('[/api/card-bank/stats] error:', err);
@@ -262,11 +233,11 @@ app.post('/api/card-bank/save', async (req, res) => {
   }
 
   try {
-    await saveCardsToBank(
+    await saveCardBucket(
       subject.trim(),
       topic.trim(),
-      educationLevel ?? 'medio',
-      difficulty ?? 'medium',
+      (educationLevel ?? 'medio') as any,
+      (difficulty ?? 'definition') as CardContentType,
       cards,
       providerUsed ?? 'manual',
     );

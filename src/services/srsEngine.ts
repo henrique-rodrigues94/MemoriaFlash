@@ -28,16 +28,30 @@ export function calculateSM2(
   if (efactor < 1.3) efactor = 1.3;
 
   if (q < 3) {
-    // If answer was hard/incorrect, reset repetitions & interval to 1
+    // Difícil: reinicia repetições, mas mantém intervalo mínimo de 1 dia
     reps = 0;
     interval = 1;
   } else {
     if (reps === 0) {
-      interval = 1;
+      // Primeira revisão — diferencia por avaliação
+      if (rating === 'easy') {
+        interval = 4;  // Fácil de cara → 4 dias
+      } else {
+        interval = 1;  // Bom na 1ª vez → 1 dia (base SM-2)
+      }
     } else if (reps === 1) {
-      interval = 6;
+      // Segunda revisão — diferencia por avaliação
+      if (rating === 'easy') {
+        interval = 10; // Fácil → acelera mais
+      } else {
+        interval = 6;  // Bom → 6 dias (padrão SM-2)
+      }
     } else {
       interval = Math.round(interval * efactor);
+      // Fácil recebe um bônus extra de 20% no intervalo calculado
+      if (rating === 'easy') {
+        interval = Math.round(interval * 1.2);
+      }
     }
     reps += 1;
   }

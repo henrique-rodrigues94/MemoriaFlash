@@ -16,8 +16,8 @@
 
 import { Type } from '@google/genai';
 import { aiOrchestrator } from '../index';
-import { withCache, CACHE_TTL } from '../cache/aiCache';
 import { EducationLevel } from './generateCurriculum';
+import { getSubjectLevels, saveSubjectLevels } from '../../db/db';
 
 export interface SubjectLevelInfo {
   level: EducationLevel;
@@ -110,41 +110,45 @@ Ordene do maior priority (1) para o menor. Inclua apenas níveis genuinamente re
     required: ['subjectNormalized', 'levels'],
   };
 
-  const cached = await withCache(
-    'identifySubjectLevels',
-    { subject: cacheKey },
-    CACHE_TTL.TOPICS * 5,
-    async () => {
-      const { data, providerUsed } = await aiOrchestrator.generateJSON({
-        systemPrompt,
-        userPrompt,
-        schemaHint: `{ "subjectNormalized": string, "levels": [{ "level": EducationLevel, "priority": number, "reason": string }] }`,
-        geminiSchema,
-      });
+  // 1. Tenta buscar do banco (subjects/{id}) — 1 read, sem IA
+  const cached = await getSubjectLevels(subject);
+  if (cached) {
+    const levels: SubjectLevelInfo[] = cached.data.levels.map((l: any) => ({
+      level: l.level as EducationLevel,
+      label: LEVEL_META[l.level as EducationLevel]?.label ?? l.level,
+      icon:  LEVEL_META[l.level as EducationLevel]?.icon ?? '📚',
+      reason: l.reason ?? '',
+      priority: l.priority ?? 2,
+    }));
+    return { levels, subjectNormalized: cached.data.subject, providerUsed: 'db-cache' };
+  }
 
-      const raw = data as any;
-      const rawLevels: Array<{ level: string; priority: number; reason: string }> =
-        Array.isArray(raw?.levels) ? raw.levels : [];
+  // 2. Não tem no banco — gera via IA
+  const { data, providerUsed } = await aiOrchestrator.generateJSON({
+    systemPrompt,
+    userPrompt,
+    schemaHint: `{ "subjectNormalized": string, "levels": [{ "level": EducationLevel, "priority": number, "reason": string }] }`,
+    geminiSchema,
+  });
 
-      // Filtra só níveis válidos e garante ordem por priority
-      const validLevels = rawLevels
-        .filter(l => ALL_LEVELS.includes(l.level as EducationLevel))
-        .sort((a, b) => a.priority - b.priority);
+  const raw = data as any;
+  const rawLevels: Array<{ level: string; priority: number; reason: string }> =
+    Array.isArray(raw?.levels) ? raw.levels : [];
 
-      if (validLevels.length === 0) {
-        // Fallback: pelo menos faculdade
-        return { subjectNormalized: subject, levels: [{ level: 'faculdade', priority: 1, reason: 'nível padrão' }], providerUsed };
-      }
+  const validLevels = rawLevels
+    .filter(l => ALL_LEVELS.includes(l.level as EducationLevel))
+    .sort((a, b) => a.priority - b.priority);
 
-      return {
-        subjectNormalized: (raw?.subjectNormalized as string) || subject,
-        levels: validLevels,
-        providerUsed,
-      };
-    },
-  );
+  const finalLevels = validLevels.length > 0
+    ? validLevels
+    : [{ level: 'faculdade' as EducationLevel, priority: 1, reason: 'nível padrão' }];
 
-  const levels: SubjectLevelInfo[] = cached.levels.map((l: any) => ({
+  const subjectNormalized = (raw?.subjectNormalized as string) || subject;
+
+  // 3. Salva no banco para próximas requisições (assíncrono, não bloqueia)
+  saveSubjectLevels(subject, finalLevels as any, providerUsed).catch(() => {});
+
+  const levels: SubjectLevelInfo[] = finalLevels.map((l: any) => ({
     level: l.level as EducationLevel,
     label: LEVEL_META[l.level as EducationLevel]?.label ?? l.level,
     icon:  LEVEL_META[l.level as EducationLevel]?.icon ?? '📚',
@@ -152,9 +156,5 @@ Ordene do maior priority (1) para o menor. Inclua apenas níveis genuinamente re
     priority: l.priority ?? 2,
   }));
 
-  return {
-    levels,
-    subjectNormalized: cached.subjectNormalized,
-    providerUsed: cached.cacheHit ? 'cache' : cached.providerUsed,
-  };
+  return { levels, subjectNormalized, providerUsed };
 }

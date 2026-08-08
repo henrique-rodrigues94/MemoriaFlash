@@ -1,8 +1,8 @@
 import { Type } from '@google/genai';
 import { aiOrchestrator } from '../index';
-import { withCache, CACHE_TTL } from '../cache/aiCache';
 import { extractArrayField } from '../jsonUtils';
-import { getCardsFromBank, saveCardsToBank, BankCard } from '../../cardBank/cardBank';
+import { getCardBucket, saveCardBucket, prefetchCardBuckets, BankCard, CardContentType } from '../../db/db';
+import { bucketId } from '../../db/firestoreSchema';
 
 /**
  * Normaliza uma pergunta para comparação de duplicatas: minúsculas, sem
@@ -94,8 +94,9 @@ async function generateCardsForTopic(args: {
   language: string;
   difficulty: string;
   educationLevel: EducationLevel;
+  cardTypeInstruction: string;
 }): Promise<{ cards: BankCard[]; providerUsed: string }> {
-  const { subject, topicLabel, isSpecificTopic, count, language, difficulty, educationLevel } = args;
+  const { subject, topicLabel, isSpecificTopic, count, language, difficulty, educationLevel, cardTypeInstruction } = args;
   const langInstruction = language === 'pt' ? 'em Português' : `in ${language}`;
   const levelLabel = EDUCATION_LEVEL_LABELS[educationLevel] || EDUCATION_LEVEL_LABELS.medio;
 
@@ -122,6 +123,10 @@ REGRAS OBRIGATÓRIAS PARA CADA FLASHCARD:
    ✅ Certo: back="Paris" / explanation="📘 Explicação: Paris é sede do governo francês desde o século III. 💡 Curiosidade: A Torre Eiffel, símbolo da cidade, foi construída em 1889 para a Exposição Universal e era originalmente vista como provisória."
 7. Todo o conteúdo (pergunta, resposta e explicação) deve respeitar o nível de ensino informado: ${levelLabel}. Não use conceitos, fórmulas ou vocabulário de um nível mais avançado do que o pedido, nem trate o aluno como se fosse mais novo/menos preparado do que o nível indicado.
 
+FORMATO DOS CARDS — TIPO SOLICITADO PELO USUÁRIO:
+${cardTypeInstruction}
+Aplique esse formato em TODOS os ${count} cards gerados.
+
 Responda sempre ${langInstruction}.`;
 
   const userPrompt = `Assunto: "${subject}"${topicsInstruction}
@@ -146,64 +151,47 @@ Gere exatamente ${count} flashcards distintos entre si, cobrindo os conceitos, d
     },
   };
 
-  const result = await withCache(
-    'generateFlashcards',
-    { subject, topicLabel, count, language, difficulty, educationLevel },
-    CACHE_TTL.FLASHCARDS,
-    async () => {
-      const { data, providerUsed } = await aiOrchestrator.generateJSON({
-        systemPrompt,
-        userPrompt,
-        schemaHint,
-        geminiSchema,
-        // Gerações maiores (25/50/100 cards) precisam de mais tokens de saída
-        // para não truncar o JSON — senão o parser retorna 0 cards.
-        maxOutputTokens: Math.max(8192, count * 350),
-      });
-      const rawCards = extractArrayField(data, ['cards', 'flashcards']) as Array<Record<string, unknown>>;
+  const { data, providerUsed } = await aiOrchestrator.generateJSON({
+    systemPrompt,
+    userPrompt,
+    schemaHint,
+    geminiSchema,
+    maxOutputTokens: Math.max(8192, count * 350),
+  });
 
-      // Rede de segurança determinística: a instrução no prompt (regra 2)
-      // reduz duplicatas, mas modelos gratuitos/menores nem sempre obedecem
-      // à risca em lotes grandes (25–100 cards). Removemos aqui qualquer
-      // card cuja pergunta normalizada já apareceu antes no mesmo lote,
-      // mantendo a primeira ocorrência.
-      const seen = new Set<string>();
-      const cards = rawCards.filter((card) => {
-        const front = typeof card?.front === 'string' ? card.front : '';
-        const key = normalizeForDedup(front);
-        if (!key || seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
+  const rawCards = extractArrayField(data, ['cards', 'flashcards']) as Array<Record<string, unknown>>;
 
-      const removedCount = rawCards.length - cards.length;
-      if (removedCount > 0) {
-        console.warn(`[generateFlashcards] ${removedCount} card(s) duplicado(s) removido(s) do lote (provider: ${providerUsed}).`);
-      }
+  // Dedup intra-lote: remove cards com front repetido no mesmo batch
+  const seen = new Set<string>();
+  const cards = rawCards.filter((card) => {
+    const front = typeof card?.front === 'string' ? card.front : '';
+    const key = normalizeForDedup(front);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
-      // Rede de segurança para a regra 6 (explicação não pode só repetir a
-      // resposta). Não descartamos o card — ele continua válido como
-      // pergunta/resposta — só substituímos a explicação por um aviso
-      // honesto em vez de exibir um texto que não agrega nada.
-      let fixedExplanationCount = 0;
-      const finalCards = cards.map((card) => {
-        const back = typeof card?.back === 'string' ? card.back : '';
-        const explanation = typeof card?.explanation === 'string' ? card.explanation : '';
-        if (explanationJustRepeatsAnswer(back, explanation)) {
-          fixedExplanationCount++;
-          return { ...card, explanation: '📘 Explicação: revise este conceito com suas próprias palavras para fixar melhor o conteúdo.' };
-        }
-        return card;
-      });
-      if (fixedExplanationCount > 0) {
-        console.warn(`[generateFlashcards] ${fixedExplanationCount} explicação(ões) substituída(s) por repetir a resposta (provider: ${providerUsed}).`);
-      }
+  const removedCount = rawCards.length - cards.length;
+  if (removedCount > 0) {
+    console.info(`[generateFlashcards] ${removedCount} card(s) duplicado(s) removido(s) (provider: ${providerUsed}).`);
+  }
 
-      return { cards: finalCards as unknown as BankCard[], providerUsed };
+  // Substitui explicações que só repetem a resposta
+  let fixedExplanationCount = 0;
+  const finalCards = cards.map((card) => {
+    const back = typeof card?.back === 'string' ? card.back : '';
+    const explanation = typeof card?.explanation === 'string' ? card.explanation : '';
+    if (explanationJustRepeatsAnswer(back, explanation)) {
+      fixedExplanationCount++;
+      return { ...card, explanation: '📘 Revise este conceito com suas próprias palavras para fixar melhor o conteúdo.' };
     }
-  );
+    return card;
+  });
+  if (fixedExplanationCount > 0) {
+    console.info(`[generateFlashcards] ${fixedExplanationCount} explicação(ões) corrigida(s) (provider: ${providerUsed}).`);
+  }
 
-  return { cards: result.cards, providerUsed: result.cacheHit ? 'cache' : result.providerUsed };
+  return { cards: finalCards as unknown as BankCard[], providerUsed };
 }
 
 export async function generateFlashcardsTask(args: {
@@ -226,6 +214,8 @@ export async function generateFlashcardsTask(args: {
    * A geração filtra esses fronts para não duplicar cards que o usuário já tem.
    */
   existingFronts?: string[];
+  /** Tipo de card a gerar: 'definition' | 'quiz' | 'gap' | 'comparison' | 'applied' | 'review' */
+  cardContentType?: string;
 }) {
   const {
     prompt,
@@ -236,7 +226,19 @@ export async function generateFlashcardsTask(args: {
     educationLevel = 'medio',
     sourceType = 'subject',
     existingFronts = [],
+    cardContentType = 'definition',
   } = args;
+
+  // Prompt adicional baseado no tipo de card escolhido pelo usuário
+  const CARD_TYPE_PROMPTS: Record<string, string> = {
+    definition:  'Gere flashcards no formato Pergunta→Definição/Conceito. A frente deve ser uma pergunta direta sobre o conceito. O verso deve trazer a definição completa e precisa.',
+    quiz:        'Gere flashcards estilo questão de prova/concurso. A frente apresenta um enunciado desafiador com "pegadinhas" quando relevante. O verso traz a resposta correta e a justificativa.',
+    gap:         'Gere flashcards de completar lacuna. A frente é uma frase com a palavra-chave omitida por ___. O verso traz a(s) palavra(s) que completam e uma breve explicação.',
+    comparison:  'Gere flashcards de comparação. A frente pergunta a diferença/semelhança/relação entre dois conceitos. O verso apresenta a comparação de forma estruturada.',
+    applied:     'Gere flashcards com situações práticas. A frente apresenta um cenário real e pergunta como aplicar o conceito. O verso traz o procedimento correto, lei aplicável ou solução fundamentada.',
+    review:      'Gere flashcards de revisão rápida. Frente e verso devem ser ultra-concisos (máx 1 linha). Foco em fatos, datas, fórmulas, siglas e definições de memorização imediata.',
+  };
+  const cardTypeInstruction = CARD_TYPE_PROMPTS[cardContentType] ?? CARD_TYPE_PROMPTS['definition'];
 
   const useBank = sourceType === 'subject';
 
@@ -264,26 +266,32 @@ export async function generateFlashcardsTask(args: {
   const providersUsed = new Set<string>();
   const allCards: BankCard[] = [];
 
+  // Prefetch todos os buckets em paralelo antes do loop — reduz latência total
+  // de N × (1 Firestore read) para ~1 × (1 Firestore read) em paralelo.
+  const prefetchedBuckets = useBank
+    ? await prefetchCardBuckets(prompt, slots.map(s => s.topicLabel), educationLevel, cardContentType as CardContentType)
+    : new Map<string, { cards: BankCard[]; stale: boolean }>();
+
   for (const slot of slots) {
     if (slot.count <= 0) continue;
 
-    const bankResult = useBank
-      ? await getCardsFromBank(prompt, slot.topicLabel, educationLevel, difficulty, slot.count)
-      : { cards: [], stale: true };
+    // 1. Usa resultado do prefetch (já em memória, 0 reads adicionais)
+    const bId = bucketId(prompt, slot.topicLabel, educationLevel, cardContentType as CardContentType);
+    const bankResult = prefetchedBuckets.get(bId) ?? { cards: [], stale: true };
 
-    // Se o banco tem cards suficientes E não estão stale, serve direto
     const bankCards = bankResult.cards;
     const bankStale = bankResult.stale;
     const enoughFromBank = bankCards.length >= slot.count && !bankStale;
 
     bankHits += bankCards.length;
     if (enoughFromBank) {
+      // Banco tem cards suficientes e frescos — zero IA
       allCards.push(...bankCards);
       continue;
     }
 
-    // Banco vazio, insuficiente ou stale → gera via IA
-    allCards.push(...bankCards); // usa o que tem enquanto gera o restante
+    // 2. Banco vazio, insuficiente ou stale → gera via IA
+    allCards.push(...bankCards); // aproveita o que tiver enquanto completa
     const shortfall = slot.count - bankCards.length;
     if (shortfall <= 0) continue;
 
@@ -295,18 +303,24 @@ export async function generateFlashcardsTask(args: {
       language,
       difficulty,
       educationLevel,
+      cardTypeInstruction,
     });
     aiGenerated += generated.length;
     providersUsed.add(providerUsed);
     allCards.push(...generated);
 
+    // 3. Salva no banco para próximas requisições (1 write por slot)
+    // Aguardamos o commit para garantir que requests paralelos encontrem
+    // os dados antes de chamar a IA novamente.
     if (useBank && generated.length > 0) {
-      // Não bloqueia a resposta ao usuário por causa de uma falha ao salvar
-      // no banco (já tratado dentro de saveCardsToBank), mas aguardamos o
-      // commit para garantir que o próximo pedido idêntico já encontre os
-      // cards prontos — sem essa espera, dois pedidos quase simultâneos
-      // para o mesmo balde poderiam ambos ir para a IA.
-      await saveCardsToBank(prompt, slot.topicLabel, educationLevel, difficulty, generated, providerUsed);
+      await saveCardBucket(
+        prompt,
+        slot.topicLabel,
+        educationLevel,
+        cardContentType as CardContentType,
+        generated,
+        providerUsed,
+      );
     }
   }
 

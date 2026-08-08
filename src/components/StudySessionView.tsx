@@ -47,9 +47,11 @@ function previewInterval(card: Flashcard, rating: RatingGrade): string {
   if (d === 0) return 'Hoje';
   if (d === 1) return '1 dia';
   if (d < 7)   return `${d} dias`;
-  if (d < 14)  return '1 sem';
+  if (d === 7)  return '1 sem';
+  if (d < 14)  return `${d} dias`;
   if (d < 30)  return `${Math.round(d / 7)} sem`;
-  if (d < 365) return `${Math.round(d / 30)} mês`;
+  if (d < 60)  return `${Math.round(d / 30)} mês`;
+  if (d < 365) return `${Math.round(d / 30)} meses`;
   return `${Math.round(d / 365)} ano`;
 }
 

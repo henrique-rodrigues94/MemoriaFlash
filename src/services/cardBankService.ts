@@ -51,12 +51,12 @@ export async function queryBankAvailability(
   subject: string,
   topics: string[],
   educationLevel: string,
-  difficulty = 'medium',
+  cardType = 'definition',
 ): Promise<BankAvailability> {
   const empty: BankAvailability = { available: [], needsGeneration: [], totalReadyCards: 0 };
   if (!subject.trim() || topics.length === 0) return empty;
 
-  const cacheKey = statsCacheKey(subject, topics, educationLevel, difficulty);
+  const cacheKey = statsCacheKey(subject, topics, educationLevel, cardType);
   const cached = statsCache.get(cacheKey);
   if (cached && Date.now() - cached.fetchedAt < STATS_CACHE_MS) {
     return classifyStats(cached.data);
@@ -67,7 +67,7 @@ export async function queryBankAvailability(
       subject: subject.trim(),
       topics: topics.join(','),
       educationLevel,
-      difficulty,
+      difficulty: cardType, // API ainda usa 'difficulty' como param name
     });
     const res = await fetch(`/api/card-bank/stats?${params}`);
     if (!res.ok) return empty;
