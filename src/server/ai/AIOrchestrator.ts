@@ -84,6 +84,21 @@ export class AIOrchestrator {
             ? err
             : new AIProviderError(err instanceof Error ? err.message : String(err), provider.id);
 
+          // Chave/modelo inválido ou rota inexistente não se recuperam com uma
+          // nova tentativa. Pule imediatamente para o próximo provedor para o
+          // usuário não aguardar os 2 backoffs antes de receber o fallback.
+          const isPermanentClientError = [400, 401, 403, 404].includes(aiErr.httpStatus ?? 0);
+          const isTimeout = /\btimeout\b/i.test(aiErr.message);
+          if (isPermanentClientError || isTimeout) {
+            this.recordFailure(provider.id, false);
+            errors.push(`${provider.id}[${isTimeout ? 'timeout' : `HTTP ${aiErr.httpStatus}`}]: ${aiErr.message}`);
+            if (provider.tier !== 'local') {
+              this.setCooldown(provider.id, GENERIC_ERROR_COOLDOWN_MS, aiErr.message);
+            }
+            console.warn(`[AIOrchestrator] "${provider.id}" falhou (${isTimeout ? 'timeout' : `HTTP ${aiErr.httpStatus}`}); usando o próximo provedor.`);
+            break;
+          }
+
           // Rate limit = não adianta retry no mesmo provedor agora
           if (aiErr.isRateLimited) {
             this.recordFailure(provider.id, true);

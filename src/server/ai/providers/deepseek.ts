@@ -15,7 +15,9 @@ import { buildJSONInstruction, extractJSON } from '../jsonUtils';
 
 const DEFAULT_MODEL    = 'deepseek-chat'; // V3 — melhor custo-benefício
 const ENDPOINT         = 'https://api.deepseek.com/chat/completions';
-const DEFAULT_TIMEOUT  = 30_000;
+// Em caso de indisponibilidade, 30 s tornavam o fallback muito lento. Quinze
+// segundos dão margem para respostas normais e deixam o próximo provedor agir.
+const DEFAULT_TIMEOUT  = 15_000;
 
 function getModel():   string { return process.env.DEEPSEEK_MODEL   || DEFAULT_MODEL; }
 function getTimeout(): number { return parseInt(process.env.DEEPSEEK_TIMEOUT || '0') || DEFAULT_TIMEOUT; }

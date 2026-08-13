@@ -15,9 +15,9 @@ monetização via créditos (anúncios + indicação de amigos) com upgrade PRO.
 
 - **Flashcards + SRS (SM-2):** criação manual ou por IA, revisão com
   repetição espaçada real (`src/services/srsEngine.ts`).
-- **6 tarefas de IA com fallback automático entre 5 provedores gratuitos**
-  (Gemini, Groq, OpenRouter, Hugging Face, Cohere) + 1 pago opcional +
-  gerador local de última instância — nunca fica sem resposta. Veja
+- **Geração por IA com fallback automático:** Gemini é o provedor principal,
+  DeepSeek é o fallback e ChatGPT pode ser configurado como última opção.
+  Provedores sem chave são ignorados automaticamente. Veja
   [`docs/AI_PROVIDERS.md`](docs/AI_PROVIDERS.md).
 - **Cache inteligente de respostas de IA** (Firestore) — pedidos repetidos
   (ex: "flashcards sobre mitose") reaproveitam a resposta salva em vez de
@@ -47,13 +47,26 @@ monetização via créditos (anúncios + indicação de amigos) com upgrade PRO.
 ```bash
 npm install
 cp .env.example .env
-# edite o .env e adicione pelo menos 1 chave de IA gratuita — veja docs/AI_PROVIDERS.md
+# edite o .env e configure GEMINI_API_KEY (recomendado)
+# DEEPSEEK_API_KEY e OPENAI_API_KEY são fallbacks opcionais
 # (o arquivo de exemplo versionado é .env.example)
 npm run dev
 ```
 
-Abra `http://localhost:3000`. Sem nenhuma chave de IA configurada, o app
-ainda funciona (usa o gerador local de fallback em vez de IA real).
+Abra `http://localhost:3000`.
+
+### Gerar os primeiros flashcards
+
+1. Inicie o app com `npm run dev` e mantenha esse terminal aberto.
+2. Abra o **Estúdio**, informe a matéria e escolha **5 cards — Teste**.
+3. A conta gratuita recebe 5 créditos diários, suficientes para essa primeira
+   geração. Para lotes maiores, obtenha créditos pelo fluxo do aplicativo ou
+   use uma conta PRO.
+
+Se a geração falhar, confirme que o servidor foi reiniciado depois de editar o
+`.env` e acesse `http://localhost:3000/api/ai/status` para verificar quais
+provedores estão disponíveis. Nunca use chaves `VITE_*` para IA: elas seriam
+expostas ao navegador.
 
 ### Scripts disponíveis
 
@@ -73,7 +86,7 @@ ainda funciona (usa o gerador local de fallback em vez de IA real).
 npm run test
 ```
 
-55 testes cobrindo a lógica de negócio pura (sem mock de UI, sem rede real):
+Os testes cobrem a lógica de negócio pura (sem UI ou rede real), incluindo:
 
 - `srsEngine.test.ts` — algoritmo de repetição espaçada (SM-2): progressão de intervalos, piso do fator de facilidade, contagem de cartões vencidos.
 - `creditsEngine.test.ts` — limites diários de anúncio, streak de recompensa, frequency capping de intersticial, gasto de créditos.
@@ -119,8 +132,23 @@ flashmind-ai/
 ## 🔑 Configuração de IA (múltiplos provedores gratuitos)
 
 Nenhuma rota chama uma API de IA diretamente — tudo passa pelo
-`AIOrchestrator`, que tenta os provedores configurados em ordem e faz
-fallback automático quando um atinge o limite de uso ou fica indisponível.
+`AIOrchestrator`, que tenta os provedores configurados em ordem: **Gemini →
+DeepSeek → OpenAI**. Em caso de limite de uso, timeout ou indisponibilidade,
+ele avança para o próximo provedor; provedores sem chave são ignorados.
+
+Configuração mínima recomendada:
+
+```dotenv
+GEMINI_API_KEY=sua_chave
+GEMINI_MODEL=gemini-flash-latest
+
+# Fallbacks opcionais
+DEEPSEEK_API_KEY=
+OPENAI_API_KEY=
+```
+
+Após mudar o `.env`, reinicie `npm run dev`. As chaves devem permanecer
+somente no servidor e nunca devem ser enviadas ao Git.
 
 **Leia [`docs/AI_PROVIDERS.md`](docs/AI_PROVIDERS.md)** para:
 - links para criar cada chave gratuita (Gemini, Groq, OpenRouter, Hugging

@@ -232,7 +232,10 @@ export const StudioView: React.FC<StudioViewProps> = ({
   const [topicInput, setTopicInput] = useState('');
   const [topics, setTopics] = useState<string[]>([]);
   const [suggestedTopics, setSuggestedTopics] = useState<string[]>([]);
-  const [cardCount, setCardCount] = useState<number>(25);
+  // O usuário recebe 5 créditos diários. Começar com 25 deixava o botão
+  // bloqueado logo na primeira visita, parecendo que o gerador estava com
+  // defeito. Cinco cards permitem testar a geração imediatamente.
+  const [cardCount, setCardCount] = useState<number>(5);
   const [isLoading, setIsLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -884,8 +887,8 @@ export const StudioView: React.FC<StudioViewProps> = ({
               <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5">
                 Quantidade de Cards
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                {([25, 50, 100] as const).map(n => (
+              <div className="grid grid-cols-4 gap-2">
+                {([5, 25, 50, 100] as const).map(n => (
                   <button
                     key={n}
                     type="button"
@@ -898,7 +901,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
                   >
                     {n}
                     <span className="block text-[10px] opacity-70 mt-0.5">
-                      {n === 25 ? 'Rápido' : n === 50 ? 'Completo' : 'Intensivo'}
+                      {n === 5 ? 'Teste' : n === 25 ? 'Rápido' : n === 50 ? 'Completo' : 'Intensivo'}
                     </span>
                   </button>
                 ))}
