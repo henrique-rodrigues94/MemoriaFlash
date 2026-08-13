@@ -53,6 +53,23 @@ const SUBJECT_VARIANTS: Record<string, string[]> = {
   ],
 };
 
+/** Matérias canônicas para correção de erros comuns de digitação no Estúdio. */
+const COMMON_SUBJECTS = [
+  'Matemática', 'Português', 'Redação', 'Gramática', 'Literatura', 'Biologia',
+  'Física', 'Química', 'Ciências', 'História', 'Geografia', 'Filosofia',
+  'Sociologia', 'Inglês', 'Espanhol', 'Informática', 'Direito', 'Medicina',
+  'Engenharia', 'Administração', 'Enfermagem', 'Contabilidade',
+];
+
+/** Lista de referência para o corretor ortográfico, sem duplicatas. */
+export function getSubjectCorrectionCandidates(): string[] {
+  return Array.from(new Set([
+    ...COMMON_SUBJECTS,
+    ...Object.keys(SUBJECT_VARIANTS).map(value => value[0].toUpperCase() + value.slice(1)),
+    ...Object.values(SUBJECT_VARIANTS).flat(),
+  ]));
+}
+
 /**
  * Dado o texto digitado, retorna sugestões específicas quando o termo bate
  * (por prefixo ou substring) com uma das matérias amplas do mapa curado.

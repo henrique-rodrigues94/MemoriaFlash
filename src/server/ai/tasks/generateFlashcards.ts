@@ -80,6 +80,17 @@ function shuffle<T>(arr: T[]): T[] {
   return arr;
 }
 
+function sanitizeTopics(topics: string[]): string[] {
+  const seen = new Set<string>();
+  return topics.filter((topic) => {
+    const value = typeof topic === 'string' ? topic.trim() : '';
+    const key = normalizeForDedup(value);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).map(topic => topic.trim());
+}
+
 /**
  * Gera exatamente `count` flashcards via IA para UM subtópico específico
  * (ou para o assunto geral, quando `topicLabel` é o próprio assunto).
@@ -105,7 +116,7 @@ async function generateCardsForTopic(args: {
     "'hard' = exceção, pegadinha comum ou caso-limite; 'expert' = nível de banca de concurso/prova avançada.";
 
   const topicsInstruction = isSpecificTopic
-    ? `\nFoque EXCLUSIVAMENTE no subtópico: "${topicLabel}".`
+    ? `\nFoque EXCLUSIVAMENTE no subtópico: "${topicLabel}". Não gere cards de outros subtópicos da matéria. Em TODOS os objetos, preencha "topic" exatamente com "${topicLabel}".`
     : '';
 
   const systemPrompt = `Você é o MemoriaFlash, especialista em criar flashcards educativos de alta retenção para o método de repetição espaçada (SRS SM-2).
@@ -156,7 +167,9 @@ Gere exatamente ${count} flashcards distintos entre si, cobrindo os conceitos, d
     userPrompt,
     schemaHint,
     geminiSchema,
-    maxOutputTokens: Math.max(8192, count * 350),
+    // 280 tokens/card comportam frente, verso e explicação mantendo a saída
+    // dos lotes grandes dentro do tempo esperado pelos provedores de fallback.
+    maxOutputTokens: Math.max(8192, count * 280),
   });
 
   const rawCards = extractArrayField(data, ['cards', 'flashcards']) as Array<Record<string, unknown>>;
@@ -165,11 +178,17 @@ Gere exatamente ${count} flashcards distintos entre si, cobrindo os conceitos, d
   const seen = new Set<string>();
   const cards = rawCards.filter((card) => {
     const front = typeof card?.front === 'string' ? card.front : '';
+    const back = typeof card?.back === 'string' ? card.back : '';
     const key = normalizeForDedup(front);
-    if (!key || seen.has(key)) return false;
+    if (!key || !back.trim() || seen.has(key)) return false;
     seen.add(key);
     return true;
-  });
+  }).map(card => ({
+    ...card,
+    // O balde é definido pela escolha do usuário. Não usamos o tópico livre
+    // retornado pelo modelo, que poderia ser mais amplo ou outro subtópico.
+    topic: topicLabel,
+  }));
 
   const removedCount = rawCards.length - cards.length;
   if (removedCount > 0) {
@@ -249,8 +268,9 @@ export async function generateFlashcardsTask(args: {
   // próprio assunto geral, quando nenhum tópico foi selecionado).
   // IMPORTANTE: count por tópico é distribuído APENAS entre os tópicos que
   // realmente receberão cards (count > 0), para nunca zerar um slot.
-  const topicsWithCount = selectedTopics.length > 0
-    ? selectedTopics
+  const normalizedTopics = sanitizeTopics(selectedTopics);
+  const topicsWithCount = normalizedTopics.length > 0
+    ? normalizedTopics
         .map((topic, i) => ({
           topicLabel: topic,
           isSpecificTopic: true,
@@ -279,7 +299,10 @@ export async function generateFlashcardsTask(args: {
     const bId = bucketId(prompt, slot.topicLabel, educationLevel, cardContentType as CardContentType);
     const bankResult = prefetchedBuckets.get(bId) ?? { cards: [], stale: true };
 
-    const bankCards = bankResult.cards;
+    // Nunca devolva mais cards do que a quantidade solicitada. Quando o
+    // bucket está expirado, ele não entra na resposta: geramos um lote novo e
+    // o persistimos abaixo para renovar o banco.
+    const bankCards = bankResult.stale ? [] : bankResult.cards.slice(0, slot.count);
     const bankStale = bankResult.stale;
     const enoughFromBank = bankCards.length >= slot.count && !bankStale;
 

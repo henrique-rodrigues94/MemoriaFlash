@@ -38,7 +38,13 @@ function getMaxTokens(params: GenerateJSONParams): number {
 
 function classifyError(err: any): AIProviderError {
   const msg    = err?.message || String(err);
-  const status = err?.status ?? err?.response?.status ?? err?.httpStatus;
+  // O SDK pode encapsular o erro HTTP como texto JSON em `message`. Extrair
+  // esse código garante que 429 entre no cooldown imediatamente, em vez de
+  // gastar novas tentativas da cota já esgotada.
+  const messageStatus = typeof msg === 'string'
+    ? Number(msg.match(/(?:"code"|\bstatus\b)\s*[:=]\s*(\d{3})/)?.[1]) || undefined
+    : undefined;
+  const status = err?.status ?? err?.response?.status ?? err?.httpStatus ?? messageStatus;
   const isRate = status === 429 || /quota|rate.?limit|resource.?exhausted/i.test(msg);
   return new AIProviderError(
     isRate ? `Gemini: cota atingida (${msg.slice(0, 120)})` : `Gemini: ${msg.slice(0, 200)}`,

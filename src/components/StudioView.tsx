@@ -12,7 +12,7 @@ import { fetchAITopicSuggestions, generateAICards, EducationLevel } from '../lib
 import { EDUCATION_LEVEL_META, getAvailableEducationLevels, recommendEducationLevels } from '../lib/educationLevels';
 import { fetchCurriculum, CurriculumCategory } from '../services/curriculumService';
 import { identifySubjectLevels, loadAllLevelCurricula, LevelInfo, LevelCurriculum } from '../services/subjectLevelsService';
-import { getCuratedSubjectSuggestions } from '../lib/subjectAutocomplete';
+import { getCuratedSubjectSuggestions, getSubjectCorrectionCandidates } from '../lib/subjectAutocomplete';
 import { findClosestMatch } from '../lib/spellCheck';
 import { hasEnoughCredits } from '../services/economy/creditsEngine';
 import { ECONOMY } from '../services/economy/economyConstants';
@@ -232,10 +232,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
   const [topicInput, setTopicInput] = useState('');
   const [topics, setTopics] = useState<string[]>([]);
   const [suggestedTopics, setSuggestedTopics] = useState<string[]>([]);
-  // O usuário recebe 5 créditos diários. Começar com 25 deixava o botão
-  // bloqueado logo na primeira visita, parecendo que o gerador estava com
-  // defeito. Cinco cards permitem testar a geração imediatamente.
-  const [cardCount, setCardCount] = useState<number>(5);
+  const [cardCount, setCardCount] = useState<number>(25);
   const [isLoading, setIsLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -300,13 +297,27 @@ export const StudioView: React.FC<StudioViewProps> = ({
   const handleSubjectChange = (value: string) => {
     const upper = value.toUpperCase();
     setSubject(upper);
-    setSubjectSuggestion(findClosestMatch(upper, existingSubjects));
+    setSubjectSuggestion(findClosestMatch(
+      upper,
+      [...existingSubjects, ...getSubjectCorrectionCandidates()],
+    ));
     setEducationLevelLocked(false); // assunto novo → recalcula a recomendação de nível
     // Sincroniza nome do baralho enquanto o usuário não tiver editado manualmente
     if (!deckNameLocked) {
       setDeckName(upper.trim());
       setDeckNameSuggestion(findClosestMatch(upper, existingDeckTitles));
     }
+  };
+
+  // Corrige automaticamente apenas erros de digitação bem próximos quando o
+  // usuário conclui o campo. Enquanto ele digita, a sugestão continua visível
+  // e não interfere em assuntos novos ou mais específicos.
+  const handleSubjectBlur = () => {
+    const correction = findClosestMatch(
+      subject,
+      [...existingSubjects, ...getSubjectCorrectionCandidates()],
+    );
+    if (correction) handleSubjectChange(correction);
   };
 
   const handleDeckNameChange = (value: string) => {
@@ -620,6 +631,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
                   placeholder="Ex: DIREITO PENAL, BIOLOGIA, MATEMÁTICA…"
                   value={subject}
                   onChange={e => handleSubjectChange(e.target.value)}
+                  onBlur={handleSubjectBlur}
                   className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm uppercase"
                 />
                 {subject.trim().length >= 2 && (
@@ -887,8 +899,8 @@ export const StudioView: React.FC<StudioViewProps> = ({
               <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5">
                 Quantidade de Cards
               </label>
-              <div className="grid grid-cols-4 gap-2">
-                {([5, 25, 50, 100] as const).map(n => (
+              <div className="grid grid-cols-3 gap-2">
+                {([25, 50, 100] as const).map(n => (
                   <button
                     key={n}
                     type="button"
@@ -901,7 +913,7 @@ export const StudioView: React.FC<StudioViewProps> = ({
                   >
                     {n}
                     <span className="block text-[10px] opacity-70 mt-0.5">
-                      {n === 5 ? 'Teste' : n === 25 ? 'Rápido' : n === 50 ? 'Completo' : 'Intensivo'}
+                      {n === 25 ? 'Rápido' : n === 50 ? 'Completo' : 'Intensivo'}
                     </span>
                   </button>
                 ))}
