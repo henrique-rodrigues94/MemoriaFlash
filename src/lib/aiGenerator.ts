@@ -1,12 +1,9 @@
 import { Flashcard } from '../types';
 import { EducationLevel } from './educationLevels';
+import { auth, ensureAuthenticated } from './firebase';
 
 export type { EducationLevel };
 
-/**
- * Busca sugestões de tópicos reais via IA no backend.
- * Lança erro amigável se nenhum provedor de IA estiver disponível.
- */
 export const fetchAITopicSuggestions = async (
   subject: string,
   educationLevel: EducationLevel = 'medio',
@@ -25,8 +22,8 @@ export const fetchAITopicSuggestions = async (
 };
 
 /**
- * Gera flashcards via backend (Gemini principal → ChatGPT fallback).
- * Nenhuma chave de API fica exposta no frontend.
+ * Gera flashcards via backend. O ID token do Firebase identifica o usuário
+ * para que o servidor aplique o limite de 200 cards para contas gratuitas.
  */
 export const generateAICards = async (
   subject: string,
@@ -35,9 +32,15 @@ export const generateAICards = async (
   educationLevel: EducationLevel = 'medio',
   existingFronts: string[] = [],
 ): Promise<Flashcard[]> => {
+  const user = auth.currentUser || await ensureAuthenticated();
+  const idToken = await user.getIdToken();
+
   const res = await fetch('/api/gemini/generate-flashcards', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
     body: JSON.stringify({
       prompt: subject,
       count,
@@ -49,12 +52,13 @@ export const generateAICards = async (
     }),
   });
 
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error || `Erro ao gerar flashcards (${res.status})`);
+    const limitMessage = data?.code === 'GENERATION_LIMIT_REACHED'
+      ? `Limite gratuito de 200 cards atingido. ${data?.remaining ?? 0} cards restantes. Assine o PRO para gerar ilimitadamente.`
+      : data?.error;
+    throw new Error(limitMessage || `Erro ao gerar flashcards (${res.status})`);
   }
-
-  const data = await res.json();
 
   const raw: any[] = Array.isArray(data)
     ? data
@@ -64,7 +68,7 @@ export const generateAICards = async (
         ? data.flashcards
         : [];
 
-  if (!Array.isArray(raw) || raw.length === 0) {
+  if (!raw.length) {
     throw new Error('Nenhum flashcard foi gerado. Tente novamente.');
   }
 
