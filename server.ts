@@ -1,7 +1,5 @@
 // Carrega o .env ANTES de qualquer outro import: os providers de IA leem
-// process.env.* no momento em que o módulo é avaliado (const MODEL, etc.).
-// Sem isto, dotenv.config() rodaria depois dos imports e o .env nunca
-// chegaria aos providers (bug: modelo do OpenRouter sempre era o padrão).
+// process.env.* no momento em que o módulo é avaliado.
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
@@ -26,6 +24,7 @@ import { billingRouter } from './src/server/routes/billing';
 import { getCacheStats } from './src/server/ai/cache/aiCache';
 import { startCronJobs } from './src/server/cron';
 import { injectReferralMeta, readIndexHtmlTemplate } from './src/server/ogPreview';
+import { authorizeGeneration, recordGeneratedCards } from './src/server/generationLimit';
 import { getAdminFirestore } from './src/server/firebaseAdmin';
 
 const app = express();
@@ -33,42 +32,19 @@ const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
-// Rate limit básico por IP nas rotas de IA (evita abuso/custo descontrolado
-// mesmo com provedores gratuitos — respeita os limites de cada API).
 app.use('/api/gemini', simpleRateLimit({ windowMs: 60_000, max: 30 }));
 app.use('/api/referral', simpleRateLimit({ windowMs: 60_000, max: 20 }));
 app.use('/api/notifications', simpleRateLimit({ windowMs: 60_000, max: 10 }));
 app.use('/api/billing', simpleRateLimit({ windowMs: 60_000, max: 60 }));
-// BUG CORRIGIDO: /api/log não tinha nenhum limite de requisições — como é o
-// mesmo endpoint usado pelo formulário de feedback da aba Ajuda, isso abria
-// brecha para spam (um script podia mandar milhares de "feedbacks" por
-// minuto). Aplica o mesmo padrão de limite básico já usado nas outras rotas.
 app.use('/api/log', simpleRateLimit({ windowMs: 60_000, max: 20 }));
 app.use('/api/referral', referralRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/billing', billingRouter);
 
-// Health Check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Endpoint: captura de erros do frontend E feedback dos usuários (aba Ajuda).
-// ----------------------------------------------------------------------------
-// BUGS CORRIGIDOS nesta rota:
-// 1) O feedback enviado pelos usuários (HelpView.tsx) só era impresso com
-//    `console.error` — nunca era salvo em lugar nenhum. Na prática, qualquer
-//    feedback enviado se perdia para sempre assim que o terminal rolava ou o
-//    servidor reiniciava, apesar do texto na UI prometer que "chega
-//    diretamente aos desenvolvedores". Agora, quando o Firebase Admin SDK
-//    está configurado, o feedback é persistido na coleção `feedback` do
-//    Firestore (mesmo padrão de persistência já usado em referral.ts). Sem
-//    credenciais configuradas, cai no comportamento antigo (apenas log) para
-//    não derrubar o servidor.
-// 2) Não havia NENHUMA validação de tamanho/tipo — um cliente malicioso podia
-//    mandar um `message` de vários MB (dentro do limite de 10mb do body
-//    parser) ou um `type`/`feedbackType` arbitrário. Agora o payload é
-//    validado e truncado antes de ser processado ou persistido.
 app.post('/api/log', async (req, res) => {
   try {
     const data = req.body || {};
@@ -78,10 +54,7 @@ app.post('/api/log', async (req, res) => {
 
     if (type === 'feedback') {
       const message = typeof data.message === 'string' ? data.message.trim().slice(0, 4000) : '';
-      if (!message) {
-        return res.status(400).json({ ok: false, error: 'Mensagem de feedback vazia.' });
-      }
-
+      if (!message) return res.status(400).json({ ok: false, error: 'Mensagem de feedback vazia.' });
       const db = getAdminFirestore();
       if (db) {
         await db.collection('feedback').add({
@@ -91,9 +64,7 @@ app.post('/api/log', async (req, res) => {
           resolved: false,
         });
       } else {
-        // Sem Admin SDK configurado: mantém o comportamento antigo (log local)
-        // como fallback, para não perder o feedback silenciosamente sem avisar.
-        console.warn('[api/log] Firebase Admin não configurado — feedback apenas logado, NÃO persistido:');
+        console.warn('[api/log] Firebase Admin não configurado — feedback apenas logado.');
         console.error(`[frontend:feedback] ${ts}`, message, url ? `@ ${url}` : '');
       }
     } else if (type === 'frontend-batch') {
@@ -106,22 +77,11 @@ app.post('/api/log', async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    console.error('[api/log] erro ao processar log do frontend:', err);
+    console.error('[api/log] erro ao processar log/feedback:', err);
     res.status(500).json({ ok: false, error: 'Falha ao processar o log/feedback.' });
   }
 });
 
-// Status dos provedores de IA (útil para depuração e para um painel admin futuro).
-// Não expõe as chaves, apenas quais estão configuradas/disponíveis/em cooldown.
-// ── Currículo por matéria + nível ──────────────────────────────────────────
-// GET /api/curriculum?subject=Biologia&level=medio
-// 1. Checa Firestore (coleção `curricula`, doc `{subject_normalizado}_{level}`)
-// 2. Se não existir: gera via IA → salva no Firestore → devolve
-// 3. Cache de resposta longo (24h) porque currículo é estável
-// ── Identificação de níveis de ensino por matéria (via IA) ────────────────
-// GET /api/subject-levels?subject=Perito+Criminal
-// Retorna quais níveis fazem sentido para aquele assunto + breve justificativa.
-// Resultado cacheado no servidor — IA chamada apenas na 1ª vez por assunto.
 app.get('/api/subject-levels', async (req, res) => {
   const { subject } = req.query as { subject?: string };
   if (!subject?.trim() || subject.trim().length < 2) {
@@ -129,7 +89,7 @@ app.get('/api/subject-levels', async (req, res) => {
   }
   try {
     const result = await identifySubjectLevelsTask(subject.trim());
-    res.setHeader('Cache-Control', 'public, max-age=86400'); // 24h — muda muito raramente
+    res.setHeader('Cache-Control', 'public, max-age=86400');
     return res.json(result);
   } catch (err: any) {
     console.error('[/api/subject-levels] error:', err);
@@ -142,21 +102,9 @@ app.get('/api/curriculum', async (req, res) => {
   if (!subject?.trim() || !level?.trim()) {
     return res.status(400).json({ error: 'subject e level são obrigatórios' });
   }
-
   try {
-    // generateCurriculumTask já usa db.ts internamente:
-    //  1. Lê de curricula/{id} — 1 read
-    //  2. Se não tiver ou expirado → gera via IA → salva no banco
-    const result = await generateCurriculumTask({
-      subject: subject.trim(),
-      educationLevel: level as any,
-      language: 'pt',
-    });
-
-    if (!result?.categories?.length) {
-      return res.status(502).json({ error: 'IA não gerou currículo válido' });
-    }
-
+    const result = await generateCurriculumTask({ subject: subject.trim(), educationLevel: level as any, language: 'pt' });
+    if (!result?.categories?.length) return res.status(502).json({ error: 'IA não gerou currículo válido' });
     res.setHeader('Cache-Control', 'public, max-age=86400');
     return res.json({ categories: result.categories, fromFirestore: result.cacheHit ?? false });
   } catch (err: any) {
@@ -165,37 +113,13 @@ app.get('/api/curriculum', async (req, res) => {
   }
 });
 
-// ── Banco de Cards Compartilhado ───────────────────────────────────────────
-//
-// GET  /api/card-bank/stats  → disponibilidade de cards no banco por tópico
-// POST /api/card-bank/save   → contribuir cards gerados de volta ao banco
-//
-// O fluxo de geração via /api/gemini/generate-flashcards JÁ usa o banco
-// automaticamente (lê antes de gerar, salva depois). Estas rotas extras
-// permitem ao frontend consultar disponibilidade antes de gerar e contribuir
-// cards criados manualmente ou importados de outras fontes.
-
 app.use('/api/card-bank', simpleRateLimit({ windowMs: 60_000, max: 60 }));
 
-/**
- * GET /api/card-bank/stats
- * Consulta quantos cards existem no banco para cada tópico de uma matéria.
- * Útil para mostrar ao usuário "já temos X cards prontos para este tópico".
- *
- * Query params:
- *   subject        string   matéria (ex: "Biologia")
- *   topics         string   tópicos separados por vírgula (ex: "Mitose,Meiose")
- *   educationLevel string   "medio", "faculdade", etc.
- *   difficulty     string   "medium" (default)
- */
 app.get('/api/card-bank/stats', async (req, res) => {
   const { subject, topics, educationLevel = 'medio', difficulty = 'medium' } = req.query as Record<string, string>;
-  if (!subject?.trim() || !topics?.trim()) {
-    return res.status(400).json({ error: 'subject e topics são obrigatórios' });
-  }
+  if (!subject?.trim() || !topics?.trim()) return res.status(400).json({ error: 'subject e topics são obrigatórios' });
   const topicList = topics.split(',').map(t => t.trim()).filter(Boolean);
   if (topicList.length === 0) return res.json({ stats: [] });
-
   try {
     const stats = await getBucketStats(subject.trim(), topicList, educationLevel as any, difficulty as CardContentType);
     return res.json({ stats });
@@ -205,43 +129,15 @@ app.get('/api/card-bank/stats', async (req, res) => {
   }
 });
 
-/**
- * POST /api/card-bank/save
- * Salva cards no banco compartilhado.
- * Chamado quando o usuário cria cards manualmente ou quando os cards
- * gerados pela IA precisam ser persistidos fora do fluxo normal de geração.
- *
- * Body:
- *   subject        string     matéria
- *   topic          string     tópico/subtópico
- *   educationLevel string     nível de ensino
- *   difficulty     string     dificuldade
- *   cards          BankCard[] cards a salvar
- *   providerUsed   string?    qual IA gerou (opcional, "manual" se criado pelo usuário)
- */
 app.post('/api/card-bank/save', async (req, res) => {
   const { subject, topic, educationLevel, difficulty, cards, providerUsed } = req.body as {
-    subject: string;
-    topic: string;
-    educationLevel: string;
-    difficulty: string;
-    cards: BankCard[];
-    providerUsed?: string;
+    subject: string; topic: string; educationLevel: string; difficulty: string; cards: BankCard[]; providerUsed?: string;
   };
-
   if (!subject?.trim() || !topic?.trim() || !Array.isArray(cards) || cards.length === 0) {
     return res.status(400).json({ error: 'subject, topic e cards são obrigatórios' });
   }
-
   try {
-    await saveCardBucket(
-      subject.trim(),
-      topic.trim(),
-      (educationLevel ?? 'medio') as any,
-      (difficulty ?? 'definition') as CardContentType,
-      cards,
-      providerUsed ?? 'manual',
-    );
+    await saveCardBucket(subject.trim(), topic.trim(), (educationLevel ?? 'medio') as any, (difficulty ?? 'definition') as CardContentType, cards, providerUsed ?? 'manual');
     return res.json({ saved: cards.length });
   } catch (err: any) {
     console.error('[/api/card-bank/save] error:', err);
@@ -249,53 +145,49 @@ app.post('/api/card-bank/save', async (req, res) => {
   }
 });
 
-// ── Status dos providers de OCR ──────────────────────────────────────────────
 app.get('/api/ocr/status', (_req, res) => {
   const status = getOCRStatus();
-  res.json({
-    ...status,
-    primaryProvider:  status.gemini   ? 'gemini'   : status.ocrspace ? 'ocrspace' : 'none',
-    fallbackProvider: status.gemini && status.ocrspace ? 'ocrspace' : 'none',
-  });
+  res.json({ ...status, primaryProvider: status.gemini ? 'gemini' : status.ocrspace ? 'ocrspace' : 'none', fallbackProvider: status.gemini && status.ocrspace ? 'ocrspace' : 'none' });
 });
 
 app.get('/api/ai/status', (_req, res) => {
   const providers = aiOrchestrator.getStatus();
   const activeCount = providers.filter(p => p.available).length;
-  const totalCount  = providers.length;
-  res.json({
-    ok: activeCount > 0,
-    summary: `${activeCount}/${totalCount} provedores disponíveis`,
-    providers,
-    cache: getCacheStats(),
-  });
+  res.json({ ok: activeCount > 0, summary: `${activeCount}/${providers.length} provedores disponíveis`, providers, cache: getCacheStats() });
 });
 
-// Endpoint: Generate Flashcards from Topic or Content
+// Geração de flashcards: autenticação + limite acumulado de 200 cards para
+// contas gratuitas. O PRO não possui limite. O backend contabiliza apenas
+// os cards realmente devolvidos pela IA.
 app.post('/api/gemini/generate-flashcards', async (req, res) => {
   try {
-    const { prompt, existingFronts } = req.body;
-    if (!prompt) return res.status(400).json({ error: 'Prompt or content is required' });
-
-    // Garante que existingFronts é um array de strings (pode vir undefined do cliente antigo)
-    const safeExistingFronts: string[] = Array.isArray(existingFronts)
-      ? existingFronts.filter((f: unknown) => typeof f === 'string')
+    const requestedCount = Math.min(Math.max(Number(req.body?.count) || 0, 1), 100);
+    const authorization = await authorizeGeneration(req, requestedCount);
+    const safeExistingFronts: string[] = Array.isArray(req.body?.existingFronts)
+      ? req.body.existingFronts.filter((f: unknown) => typeof f === 'string')
       : [];
 
-    const result = await generateFlashcardsTask({ ...req.body, existingFronts: safeExistingFronts });
-    return res.json(result);
+    const result = await generateFlashcardsTask({ ...req.body, count: requestedCount, existingFronts: safeExistingFronts });
+    const cards = Array.isArray(result) ? result : Array.isArray((result as any)?.cards) ? (result as any).cards : [];
+    const usage = await recordGeneratedCards(authorization.uid, cards.length);
+
+    return res.json({ cards, usage });
   } catch (error: any) {
     console.error('Error generating flashcards:', error);
-    return res.status(500).json({ error: error.message || 'Failed to generate flashcards' });
+    return res.status(error?.httpStatus || 500).json({
+      error: error?.message || 'Failed to generate flashcards',
+      code: error?.code,
+      remaining: error?.remaining,
+      generated: error?.generated,
+      limit: error?.limit,
+    });
   }
 });
 
-// Endpoint: Suggest Study Topics for a Deck Title
 app.post('/api/gemini/suggest-topics', async (req, res) => {
   try {
     const { title } = req.body;
     if (!title) return res.status(400).json({ error: 'Title is required' });
-
     const result = await suggestTopicsTask(req.body);
     return res.json(result);
   } catch (error: any) {
@@ -304,99 +196,45 @@ app.post('/api/gemini/suggest-topics', async (req, res) => {
   }
 });
 
-// Gerenciamento de provedores de IA: limpa cooldowns (após aguardar o reset
-// do rate limit, ex.: reset diário do OpenRouter free ou janela do Groq).
-// Protegido por token admin (header `x-admin-token` == ADMIN_TOKEN do .env).
-// Se ADMIN_TOKEN não estiver configurado, o endpoint fica desativado (503).
 app.post('/api/ai/reset-cooldowns', (req, res) => {
   const adminToken = process.env.ADMIN_TOKEN;
-  if (!adminToken) {
-    return res.status(503).json({ error: 'ADMIN_TOKEN não configurado no servidor.' });
-  }
+  if (!adminToken) return res.status(503).json({ error: 'ADMIN_TOKEN não configurado no servidor.' });
   const provided = req.headers['x-admin-token'];
-  if (typeof provided !== 'string' || provided !== adminToken) {
-    return res.status(401).json({ error: 'Não autorizado.' });
-  }
+  if (typeof provided !== 'string' || provided !== adminToken) return res.status(401).json({ error: 'Não autorizado.' });
   aiOrchestrator.getProviders().forEach((p) => aiOrchestrator.resetCooldown(p.id));
   res.json({ ok: true, status: aiOrchestrator.getStatus() });
 });
 
-// Endpoint: AI Diagnostic Quiz Analysis & Targeted Flashcard Generator
 app.post('/api/gemini/quiz-diagnostic', async (req, res) => {
-  try {
-    const { topic } = req.body;
-    if (!topic) return res.status(400).json({ error: 'Topic is required' });
-
-    const result = await quizDiagnosticTask(req.body);
-    return res.json(result);
-  } catch (error: any) {
-    console.error('Error in quiz diagnostic:', error);
-    return res.status(500).json({ error: error.message || 'Quiz diagnostic failed' });
-  }
+  try { const { topic } = req.body; if (!topic) return res.status(400).json({ error: 'Topic is required' }); return res.json(await quizDiagnosticTask(req.body)); }
+  catch (error: any) { console.error('Error in quiz diagnostic:', error); return res.status(500).json({ error: error.message || 'Quiz diagnostic failed' }); }
 });
 
-// Endpoint: Voice Tutor AI Chat & Card Synthesis
 app.post('/api/gemini/voice-tutor', async (req, res) => {
-  try {
-    const { question } = req.body;
-    if (!question) return res.status(400).json({ error: 'Question is required' });
-
-    const result = await voiceTutorTask(req.body);
-    return res.json(result);
-  } catch (error: any) {
-    console.error('Error in voice-tutor:', error);
-    return res.status(500).json({ error: error.message || 'Voice tutor failed' });
-  }
+  try { const { question } = req.body; if (!question) return res.status(400).json({ error: 'Question is required' }); return res.json(await voiceTutorTask(req.body)); }
+  catch (error: any) { console.error('Error in voice-tutor:', error); return res.status(500).json({ error: error.message || 'Voice tutor failed' }); }
 });
 
-// Endpoint: Generate Quiz for Duel Arena
 app.post('/api/gemini/generate-quiz', async (req, res) => {
-  try {
-    const result = await generateQuizTask(req.body);
-    return res.json(result);
-  } catch (error: any) {
-    console.error('Error generating quiz:', error);
-    return res.status(500).json({ error: error.message || 'Quiz generation failed' });
-  }
+  try { return res.json(await generateQuizTask(req.body)); }
+  catch (error: any) { console.error('Error generating quiz:', error); return res.status(500).json({ error: error.message || 'Quiz generation failed' }); }
 });
 
-// Endpoint: Scanner — processa imagens (visão) e texto extraído de documentos
-// Body: { images?: string[], texts?: string[], subject?: string, count?: number }
-// Endpoint: Scanner — Análise do documento (identifica matéria + tópicos)
 app.post('/api/gemini/scanner-analyze', async (req, res) => {
   try {
     const { images = [], texts = [], subjectHint = '', language = 'pt' } = req.body;
-
-    if (!images.length && !texts.length) {
-      return res.status(400).json({ error: 'Nenhuma imagem ou texto fornecido.' });
-    }
-
-    // OCR via ocrService (Gemini Vision → OCR.space)
+    if (!images.length && !texts.length) return res.status(400).json({ error: 'Nenhuma imagem ou texto fornecido.' });
     let extractedFromImages = '';
     let ocrWarnings: string[] = [];
     if (images.length > 0) {
       const ocrResult = await extractTextFromImages(images as string[]);
       extractedFromImages = ocrResult.text;
       ocrWarnings = ocrResult.warnings;
-      if (ocrResult.provider !== 'none') {
-        console.info(`[Scanner Analyze] OCR: ${ocrResult.provider} — ${ocrResult.totalChars} chars`);
-      }
     }
-
     const allContent = [...(texts as string[]), extractedFromImages].filter(Boolean).join('\n\n');
-    if (!allContent.trim()) {
-      return res.status(400).json({
-        error: 'Não foi possível extrair conteúdo dos arquivos.',
-        warnings: ocrWarnings,
-      });
-    }
-
+    if (!allContent.trim()) return res.status(400).json({ error: 'Não foi possível extrair conteúdo dos arquivos.', warnings: ocrWarnings });
     const result = await scannerAnalyzeTask({ content: allContent, subjectHint, language });
-    return res.json({
-      ...result,
-      extractedContent: allContent.slice(0, 20000),
-      ocrWarnings: ocrWarnings.length > 0 ? ocrWarnings : undefined,
-    });
+    return res.json({ ...result, extractedContent: allContent.slice(0, 20000), ocrWarnings: ocrWarnings.length > 0 ? ocrWarnings : undefined });
   } catch (error: any) {
     console.error('[Scanner Analyze] Erro:', error);
     return res.status(500).json({ error: error.message || 'Falha ao analisar o documento.' });
@@ -405,104 +243,59 @@ app.post('/api/gemini/scanner-analyze', async (req, res) => {
 
 app.post('/api/gemini/scanner-process', async (req, res) => {
   try {
-    const {
-      images = [],
-      texts = [],
-      subject = '',
-      count = 25,
-      selectedTopics = [] as string[],
-      extractedContent = '',   // conteúdo já extraído pelo scanner-analyze (evita re-OCR)
-    } = req.body;
-
-    if (!images.length && !texts.length) {
-      return res.status(400).json({ error: 'Nenhuma imagem ou texto fornecido.' });
-    }
-
+    const { images = [], texts = [], subject = '', count = 25, selectedTopics = [] as string[], extractedContent = '' } = req.body;
+    if (!images.length && !texts.length && !extractedContent.trim()) return res.status(400).json({ error: 'Nenhuma imagem ou texto fornecido.' });
     const cardCount = Math.min(Math.max(Number(count) || 25, 1), 100);
+    const authorization = await authorizeGeneration(req, cardCount);
     const subjectLabel = subject.trim() || 'Conteúdo do Documento';
 
-    // ── Passo 1: extrair texto via ocrService (Gemini Vision → OCR.space) ─────
     let extractedFromImages = '';
     let ocrWarnings: string[] = [];
     if (images.length > 0) {
-      console.info(`[Scanner] OCR de ${images.length} imagem(ns)…`);
       const ocrResult = await extractTextFromImages(images as string[]);
       extractedFromImages = ocrResult.text;
       ocrWarnings = ocrResult.warnings;
-      if (ocrResult.provider !== 'none') {
-        console.info(`[Scanner] OCR: ${ocrResult.provider} — ${ocrResult.totalChars} chars extraídos`);
-      }
     }
 
-    // ── Passo 2: combinar todo o conteúdo ─────────────────────────────────────
-    const allContent = [
-      ...texts,
-      extractedFromImages ? `=== Conteúdo extraído das imagens ===\n${extractedFromImages}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n\n');
+    const allContent = [...texts, extractedFromImages ? `=== Conteúdo extraído das imagens ===\n${extractedFromImages}` : ''].filter(Boolean).join('\n\n');
+    const sourceContent = allContent.trim() || extractedContent;
+    if (!sourceContent.trim()) return res.status(400).json({ error: 'Não foi possível extrair conteúdo dos arquivos fornecidos.' });
 
-    if (!allContent.trim()) {
-      return res.status(400).json({ error: 'Não foi possível extrair conteúdo dos arquivos fornecidos.' });
-    }
-
-    // ── Passo 3: gerar flashcards a partir do conteúdo ────────────────────────
-    const { generateFlashcardsTask } = await import('./src/server/ai/tasks/generateFlashcards');
-    const topicsFilter = (selectedTopics as string[]).length > 0
-      ? `\n\nFoque EXCLUSIVAMENTE nos seguintes tópicos selecionados pelo usuário: ${(selectedTopics as string[]).join(', ')}`
-      : '';
-    const prompt =
-      `Matéria/Assunto: ${subjectLabel}\n\n` +
-      `CONTEÚDO FONTE (extraído do documento/imagens do usuário):\n` +
-      `${allContent.slice(0, 15000)}\n\n` +
-      `Com base EXCLUSIVAMENTE no conteúdo acima, gere ${cardCount} flashcards educativos abrangendo os principais conceitos, definições, fórmulas e tópicos presentes no material.${topicsFilter}`;
+    const topicsFilter = (selectedTopics as string[]).length > 0 ? `\n\nFoque EXCLUSIVAMENTE nos seguintes tópicos selecionados pelo usuário: ${(selectedTopics as string[]).join(', ')}` : '';
+    const prompt = `Matéria/Assunto: ${subjectLabel}\n\nCONTEÚDO FONTE (extraído do documento/imagens do usuário):\n${sourceContent.slice(0, 15000)}\n\nCom base EXCLUSIVAMENTE no conteúdo acima, gere ${cardCount} flashcards educativos abrangendo os principais conceitos, definições, fórmulas e tópicos presentes no material.${topicsFilter}`;
 
     const result = await generateFlashcardsTask({
       prompt,
       count: cardCount,
       language: 'pt',
       difficulty: 'medium',
-      selectedTopics: (selectedTopics as string[]).length > 0 ? (selectedTopics as string[]) : (subject.trim() ? [subject.trim()] : []),
+      selectedTopics: (selectedTopics as string[]).length > 0 ? selectedTopics as string[] : (subject.trim() ? [subject.trim()] : []),
       sourceType: 'document',
     });
-
-    return res.json({ ...result, extractedText: allContent.slice(0, 500) + '...' });
+    const cards = Array.isArray(result) ? result : Array.isArray((result as any)?.cards) ? (result as any).cards : [];
+    const usage = await recordGeneratedCards(authorization.uid, cards.length);
+    return res.json({ cards, usage, extractedText: sourceContent.slice(0, 500) + '...' });
   } catch (error: any) {
     console.error('[Scanner] Error processing scanner:', error);
-    return res.status(500).json({ error: error.message || 'Falha ao processar o scanner.' });
+    return res.status(error?.httpStatus || 500).json({ error: error?.message || 'Falha ao processar o scanner.', code: error?.code, remaining: error?.remaining, generated: error?.generated, limit: error?.limit });
   }
 });
 
-// Endpoint: AI 7-Day Recovery Plan Generator based on Weakness Analysis
 app.post('/api/gemini/recovery-plan', async (req, res) => {
-  try {
-    const result = await recoveryPlanTask(req.body);
-    return res.json(result);
-  } catch (error: any) {
-    console.error('Error generating recovery plan:', error);
-    return res.status(500).json({ error: error.message || 'Recovery plan generation failed' });
-  }
+  try { return res.json(await recoveryPlanTask(req.body)); }
+  catch (error: any) { console.error('Error generating recovery plan:', error); return res.status(500).json({ error: error.message || 'Recovery plan generation failed' }); }
 });
 
-// Start Server with Vite Middleware or Static Production Serving
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
+    const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-
-    // Link de indicação (?ref=CODIGO): serve o mesmo index.html, mas com
-    // title/description reescritos para um preview convidativo em
-    // WhatsApp/Telegram/redes sociais antes de cair no SPA normal.
     app.get('/', (req, res, next) => {
       const ref = req.query.ref;
       if (typeof ref !== 'string' || !ref) return next();
-
       try {
         const template = readIndexHtmlTemplate(path.join(distPath, 'index.html'));
         res.set('Content-Type', 'text/html');
@@ -512,27 +305,12 @@ async function startServer() {
         return next();
       }
     });
-
     app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`MemoriaFlash full-stack server running on http://0.0.0.0:${PORT}`);
-    // Log de provedores já feito em src/server/ai/index.ts
-    startCronJobs();
-  });
+  startCronJobs();
+  app.listen(PORT, '0.0.0.0', () => console.log(`MemoriaFlash full-stack server running on http://0.0.0.0:${PORT}`));
 }
-
-// ── Log global de erros não tratados (processo) ─────────────────────────────
-// Só aparece no terminal — nunca expõe nada ao usuário.
-process.on('uncaughtException', (err) => {
-  console.error('[uncaughtException]', err?.stack || err);
-});
-process.on('unhandledRejection', (reason) => {
-  console.error('[unhandledRejection]', reason instanceof Error ? reason.stack || reason.message : reason);
-});
 
 startServer();
