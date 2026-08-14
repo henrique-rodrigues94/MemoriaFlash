@@ -58,6 +58,8 @@ export interface UserStats {
   billingLastVerifiedAt?: string;
   lastStudyDateKey?: string;
   activityLog?: DailyActivity[];
+  /** Histórico local de anúncios intersticiais para controle de frequência. */
+  interstitialTimestamps?: number[];
 
   // Programa de indicação (mantido separado da geração de cards).
   referralCode?: string;
