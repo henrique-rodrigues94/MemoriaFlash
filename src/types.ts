@@ -5,15 +5,15 @@ export interface Flashcard {
   front: string;
   back: string;
   topic?: string;
-  subject?: string;       // Matéria/assunto principal do deck
+  subject?: string;
   difficulty?: 'easy' | 'medium' | 'hard' | 'expert';
-  explanation?: string;   // Detailed explanation with practical example
-  curiosity?: string;     // Interesting curiosity/fun fact about the topic
-  reps: number;           // Repetition count in SM-2
-  interval: number;       // Days until next review
-  efactor: number;        // Easiness factor (default 2.5)
-  dueDate: string;        // ISO Date string
-  lastReviewed?: string;  // ISO Date string
+  explanation?: string;
+  curiosity?: string;
+  reps: number;
+  interval: number;
+  efactor: number;
+  dueDate: string;
+  lastReviewed?: string;
 }
 
 export interface Deck {
@@ -22,22 +22,17 @@ export interface Deck {
   category: string;
   description: string;
   cards: Flashcard[];
-  color: string; // TailWind color key or hex accent
+  color: string;
   accentBorder: string;
   iconName?: string;
   isPublic?: boolean;
-  createdAt?: string;     // ISO Date string
+  createdAt?: string;
 }
 
-/** Registro de atividade de um único dia — usado no heatmap e estatísticas semanais. */
 export interface DailyActivity {
-  /** Chave do dia no formato YYYY-MM-DD (fuso local). */
   dateKey: string;
-  /** Quantidade de cartões revisados naquele dia. */
   cardsReviewed: number;
-  /** XP ganho naquele dia. */
   xpEarned: number;
-  /** Minutos de estudo naquele dia (arredondado). */
   minutesStudied: number;
 }
 
@@ -45,7 +40,6 @@ export interface UserStats {
   name: string;
   avatar: string;
   streakDays: number;
-  /** Maior streak já alcançado — persiste mesmo após quebrar a ofensiva. */
   bestStreakDays?: number;
   dailyGoalTotal: number;
   dailyGoalCompleted: number;
@@ -54,24 +48,18 @@ export interface UserStats {
   retentionRate: number;
   xp: number;
   globalRank: number;
-  aiCredits: number;
+  /** Quantidade total de cards gerados por IA. O backend controla este campo. */
+  aiCardsGenerated?: number;
   isPro?: boolean;
   proPlanType?: 'monthly' | 'annual';
-
-  /** Data (YYYY-MM-DD, fuso local) da última sessão de estudo concluída — usada para calcular streakDays corretamente. */
+  proExpiryDate?: string;
+  playPurchaseToken?: string;
+  playProductId?: string;
+  billingLastVerifiedAt?: string;
   lastStudyDateKey?: string;
-
-  /** Histórico de atividade diária (máx. 90 dias) — base para heatmap e XP semanal. */
   activityLog?: DailyActivity[];
 
-  // --- Economia de créditos por anúncio (AdMob rewarded) ---
-  adWatchTimestamps?: number[];
-  adWatchStreakDays?: number;
-  lastAdWatchDay?: string;
-  interstitialTimestamps?: number[];
-  lastDailyGrantDay?: string;
-
-  // --- Programa de indicação (referral) ---
+  // Programa de indicação (mantido separado da geração de cards).
   referralCode?: string;
   referredByCode?: string;
   referralCount?: number;
