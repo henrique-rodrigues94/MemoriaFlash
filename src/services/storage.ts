@@ -7,7 +7,6 @@ const STORAGE_KEYS = {
   DEMO_REMOVED: 'flashmind_demo_removed_v1',
 };
 
-// IDs dos decks de demonstração que devem ser removidos na migração
 const DEMO_DECK_IDS = new Set([
   'deck-law-basics',
   'deck-medical-terms',
@@ -15,7 +14,6 @@ const DEMO_DECK_IDS = new Set([
   'deck-organic-chem',
 ]);
 
-/** Remove os decks de demonstração do localStorage se ainda estiverem presentes. */
 function removeDemoDecksIfNeeded(): void {
   if (localStorage.getItem(STORAGE_KEYS.DEMO_REMOVED)) return;
   try {
@@ -31,7 +29,6 @@ function removeDemoDecksIfNeeded(): void {
   }
 }
 
-// Executa a migração uma vez ao carregar o módulo
 removeDemoDecksIfNeeded();
 
 const INITIAL_DECKS: Deck[] = [];
@@ -47,17 +44,17 @@ const INITIAL_STATS: UserStats = {
   retentionRate: 100,
   xp: 0,
   globalRank: 1,
-  aiCredits: 15,
+  aiCardsGenerated: 0,
   isPro: false,
 };
 
 export function getStoredDecks(): Deck[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.DECKS);
-    if (!raw) return [];
+    if (!raw) return INITIAL_DECKS;
     return JSON.parse(raw);
   } catch {
-    return [];
+    return INITIAL_DECKS;
   }
 }
 
@@ -73,10 +70,10 @@ export function getStoredStats(): UserStats {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.STATS);
     if (!raw) return INITIAL_STATS;
-    const parsed = JSON.parse(raw);
-    if (parsed.aiCredits === undefined) {
-      parsed.aiCredits = 15;
-    }
+    const parsed = JSON.parse(raw) as UserStats & { aiCredits?: number };
+    // Migração local: créditos antigos não fazem mais parte da estratégia.
+    delete parsed.aiCredits;
+    if (parsed.aiCardsGenerated === undefined) parsed.aiCardsGenerated = 0;
     return parsed;
   } catch {
     return INITIAL_STATS;
@@ -97,14 +94,4 @@ export function isOnboardingDone(): boolean {
 
 export function setOnboardingDone(done: boolean): void {
   localStorage.setItem(STORAGE_KEYS.ONBOARDING_DONE, done ? 'true' : 'false');
-}
-
-export function saveLastStudiedDeck(deckId: string): void {
-  try {
-    localStorage.setItem('flashmind_last_studied_deck', deckId);
-  } catch { /* ignore */ }
-}
-
-export function getLastStudiedDeck(): string | null {
-  return localStorage.getItem('flashmind_last_studied_deck');
 }
