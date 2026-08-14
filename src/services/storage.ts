@@ -5,6 +5,7 @@ const STORAGE_KEYS = {
   STATS: 'flashmind_stats_v2',
   ONBOARDING_DONE: 'flashmind_onboarding_completed',
   DEMO_REMOVED: 'flashmind_demo_removed_v1',
+  LAST_STUDIED_DECK: 'flashmind_last_studied_deck',
 };
 
 const DEMO_DECK_IDS = new Set([
@@ -71,7 +72,6 @@ export function getStoredStats(): UserStats {
     const raw = localStorage.getItem(STORAGE_KEYS.STATS);
     if (!raw) return INITIAL_STATS;
     const parsed = JSON.parse(raw) as UserStats & { aiCredits?: number };
-    // Migração local: créditos antigos não fazem mais parte da estratégia.
     delete parsed.aiCredits;
     if (parsed.aiCardsGenerated === undefined) parsed.aiCardsGenerated = 0;
     return parsed;
@@ -94,4 +94,20 @@ export function isOnboardingDone(): boolean {
 
 export function setOnboardingDone(done: boolean): void {
   localStorage.setItem(STORAGE_KEYS.ONBOARDING_DONE, done ? 'true' : 'false');
+}
+
+export function saveLastStudiedDeck(deckId: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.LAST_STUDIED_DECK, deckId);
+  } catch {
+    /* ignore storage errors */
+  }
+}
+
+export function getLastStudiedDeck(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.LAST_STUDIED_DECK);
+  } catch {
+    return null;
+  }
 }
