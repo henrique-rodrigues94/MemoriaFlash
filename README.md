@@ -1,262 +1,57 @@
 # 🧠 MemoriaFlash
 
-Plataforma de estudos com flashcards inteligentes, repetição espaçada (SM-2),
-tutor de voz, modo duelo (PvP) e modo professor — com geração de conteúdo por
-IA usando **múltiplos provedores gratuitos com fallback automático**, e
-monetização via créditos (anúncios + indicação de amigos) com upgrade PRO.
+Aplicativo de flashcards com IA, repetição espaçada e sincronização Firebase.
 
-> **Stack real deste projeto:** aplicação web full-stack — **React 19 +
-> Vite** no frontend e **Express (Node.js)** no backend, com **Firebase**
-> (Auth + Firestore) para sincronização na nuvem. Não é um app React Native —
-> veja a seção [Distribuição nativa](#-distribuição-nativa-google-play--app-store)
-> para o caminho de publicação em lojas de app.
+## Geração e monetização
 
-## ✨ O que tem aqui
+- **Usuário gratuito:** até **200 cards gerados por IA no total**.
+- **Usuário PRO:** **geração ilimitada**.
+- A geração de IA **não usa mais créditos**.
+- Usuários gratuitos recebem anúncios normais.
+- Usuários PRO não recebem anúncios.
+- O contador `userStats/{uid}.aiCardsGenerated` é controlado pelo backend.
 
-- **Flashcards + SRS (SM-2):** criação manual ou por IA, revisão com
-  repetição espaçada real (`src/services/srsEngine.ts`).
-- **Geração por IA com fallback automático:** Gemini é o provedor principal,
-  DeepSeek é o fallback e ChatGPT pode ser configurado como última opção.
-  Provedores sem chave são ignorados automaticamente. Veja
-  [`docs/AI_PROVIDERS.md`](docs/AI_PROVIDERS.md).
-- **Cache inteligente de respostas de IA** (Firestore) — pedidos repetidos
-  (ex: "flashcards sobre mitose") reaproveitam a resposta salva em vez de
-  gastar uma nova chamada de API. Ver seção "Cache" em
-  [`docs/AI_PROVIDERS.md`](docs/AI_PROVIDERS.md).
-- **Lembretes de revisão por notificação push** (Firebase Cloud Messaging,
-  gratuito) — avisa quando há cartões vencidos, com horário configurável e
-  aviso de sequência (streak). Veja
-  [`docs/PUSH_NOTIFICATIONS.md`](docs/PUSH_NOTIFICATIONS.md).
-- **Economia de créditos gratuita:** crédito diário automático, vídeos
-  recompensados com limite anti-banimento e bônus de streak, e assinatura
-  PRO. Veja [`docs/ADMOB_STRATEGY.md`](docs/ADMOB_STRATEGY.md).
-- **Programa de indicação (referral)** seguro via Firebase Admin SDK —
-  ninguém consegue se autocreditar créditos fraudulentamente.
-- **Modo Duelo (PvP)**, **Tutor de Voz**, **Modo Professor** (turmas,
-  dashboard, convites).
-- **LGPD/GDPR:** banner de consentimento, política de privacidade, termos de
-  uso e instruções de exclusão de dados prontos em `docs/`.
-- **Regras de segurança do Firestore corrigidas** (o scaffold original
-  permitia leitura/escrita pública total — corrigido, veja
-  `firestore.rules`).
+O limite é acumulado por conta, não diário. O backend valida o ID token do Firebase antes de gerar, bloqueia solicitações acima do saldo restante e registra somente os cards realmente devolvidos.
 
-## 🚀 Rodando localmente
+## IA
 
-**Pré-requisitos:** Node.js 20+
+Gemini e DeepSeek podem atuar como provedores de geração, com fallback automático conforme a configuração do servidor. As chaves de IA ficam somente no backend.
+
+## Segurança
+
+As regras do Firestore protegem os campos de assinatura e `aiCardsGenerated` contra alterações pelo cliente. A geração usa autenticação Firebase no backend.
+
+## Desenvolvimento
+
+**Pré-requisito:** Node.js 20+
 
 ```bash
 npm install
 cp .env.example .env
-# edite o .env e configure GEMINI_API_KEY (recomendado)
-# DEEPSEEK_API_KEY e OPENAI_API_KEY são fallbacks opcionais
-# (o arquivo de exemplo versionado é .env.example)
 npm run dev
 ```
 
-Abra `http://localhost:3000`.
+Build de produção:
 
-### Gerar os primeiros flashcards
+```bash
+npm run build
+npm run start
+```
 
-1. Inicie o app com `npm run dev` e mantenha esse terminal aberto.
-2. Abra o **Estúdio**, informe a matéria e escolha **5 cards — Teste**.
-3. A conta gratuita recebe 5 créditos diários, suficientes para essa primeira
-   geração. Para lotes maiores, obtenha créditos pelo fluxo do aplicativo ou
-   use uma conta PRO.
-
-Se a geração falhar, confirme que o servidor foi reiniciado depois de editar o
-`.env` e acesse `http://localhost:3000/api/ai/status` para verificar quais
-provedores estão disponíveis. Nunca use chaves `VITE_*` para IA: elas seriam
-expostas ao navegador.
-
-### Scripts disponíveis
-
-| Comando | O que faz |
-|---|---|
-| `npm run dev` | Servidor de desenvolvimento (Vite + Express + hot reload) |
-| `npm run build` | Build de produção (frontend + backend) |
-| `npm run start` | Roda o build de produção (`node dist/server.cjs`) |
-| `npm run test` | Roda a suíte de testes automatizados (Vitest) uma vez |
-| `npm run test:watch` | Roda os testes em modo watch (reexecuta ao salvar) |
-| `npm run typecheck` | Checagem de tipos TypeScript sem gerar arquivos |
-| `npm run clean` | Remove `dist/` |
-
-## 🧪 Testes automatizados
+Testes:
 
 ```bash
 npm run test
+npm run typecheck
 ```
 
-Os testes cobrem a lógica de negócio pura (sem UI ou rede real), incluindo:
+## Documentação
 
-- `srsEngine.test.ts` — algoritmo de repetição espaçada (SM-2): progressão de intervalos, piso do fator de facilidade, contagem de cartões vencidos.
-- `creditsEngine.test.ts` — limites diários de anúncio, streak de recompensa, frequency capping de intersticial, gasto de créditos.
-- `studyStreak.test.ts` — trava o bug corrigido do streak de estudo (veja changelog abaixo) com casos de mesmo dia / dias consecutivos / sequência quebrada.
-- `AIOrchestrator.test.ts` — fallback entre provedores, cooldown após rate limit, provedores não configurados são ignorados, `resetCooldown`.
-- `aiCache.test.ts` — normalização da chave de cache (mesma chave para variações triviais de texto) e comportamento sem Firebase Admin configurado.
-- `adTierStrategy.test.ts` — classificação de região e preços por tier.
+- `docs/ADMOB_STRATEGY.md` — monetização atual.
+- `docs/AI_PROVIDERS.md` — configuração dos provedores de IA.
+- `docs/FIREBASE_SETUP.md` — Firebase e regras de segurança.
+- `docs/DEPLOY.md` — publicação do backend/frontend.
 
-Todos rodam automaticamente no CI (`.github/workflows/ci.yml`) em todo push/PR.
+## Distribuição
 
-## 📁 Estrutura do projeto
-
-```
-flashmind-ai/
-├── server.ts                    ← entrada do backend Express
-├── src/
-│   ├── App.tsx                  ← componente raiz React
-│   ├── components/               ← telas e modais (Dashboard, Duelo, Voz, etc.)
-│   ├── services/
-│   │   ├── api.ts               ← chamadas do cliente para /api/gemini/*
-│   │   ├── srsEngine.ts         ← algoritmo SM-2
-│   │   ├── economy/             ← créditos, limites de anúncio, tiers por região
-│   │   └── referral/            ← utilitários de indicação (cliente)
-│   ├── server/
-│   │   ├── ai/                  ← ★ orquestrador multi-provedor de IA
-│   │   │   ├── AIOrchestrator.ts
-│   │   │   ├── cache/           ← cache de respostas (Firestore)
-│   │   │   ├── providers/       ← 1 arquivo por provedor (adapter pattern)
-│   │   │   └── tasks/           ← 1 arquivo por funcionalidade de IA
-│   │   ├── notifications/       ← job de lembretes + envio via FCM
-│   │   ├── routes/               ← referral.ts, notifications.ts
-│   │   ├── cron.ts              ← agendamento (node-cron)
-│   │   ├── firebaseAdmin.ts
-│   │   └── middleware/rateLimit.ts
-│   ├── shared/                  ← código isomórfico (cliente + servidor)
-│   ├── lib/                     ← firebase, i18n
-│   └── types.ts
-├── docs/                        ← toda a documentação legal e técnica
-├── firestore.rules              ← regras de segurança (corrigidas)
-└── .github/workflows/           ← CI/CD
-```
-
-## 🔑 Configuração de IA (múltiplos provedores gratuitos)
-
-Nenhuma rota chama uma API de IA diretamente — tudo passa pelo
-`AIOrchestrator`, que tenta os provedores configurados em ordem: **Gemini →
-DeepSeek → OpenAI**. Em caso de limite de uso, timeout ou indisponibilidade,
-ele avança para o próximo provedor; provedores sem chave são ignorados.
-
-Configuração mínima recomendada:
-
-```dotenv
-GEMINI_API_KEY=sua_chave
-GEMINI_MODEL=gemini-flash-latest
-
-# Fallbacks opcionais
-DEEPSEEK_API_KEY=
-OPENAI_API_KEY=
-```
-
-Após mudar o `.env`, reinicie `npm run dev`. As chaves devem permanecer
-somente no servidor e nunca devem ser enviadas ao Git.
-
-**Leia [`docs/AI_PROVIDERS.md`](docs/AI_PROVIDERS.md)** para:
-- links para criar cada chave gratuita (Gemini, Groq, OpenRouter, Hugging
-  Face, Cohere);
-- como checar o status dos provedores (`GET /api/ai/status`);
-- como adicionar um novo provedor (arquivo único, ~50 linhas);
-- como priorizar um provedor pago (`AI_PRIORITIZE_PAID=true`).
-
-## 💰 Monetização: créditos, anúncios e indicação
-
-Leia [`docs/ADMOB_STRATEGY.md`](docs/ADMOB_STRATEGY.md) para a estratégia
-completa. Resumo:
-
-- Toda a lógica de negócio vive em `src/services/economy/` — puramente
-  funções TypeScript, testáveis, sem dependência de UI.
-- Limites diários de anúncio seguem as recomendações anti-banimento do
-  Google AdMob (`MAX_REWARDED_ADS_PER_DAY`, `MAX_INTERSTITIALS_PER_DAY`,
-  `MIN_INTERSTITIAL_GAP_MS` em `economyConstants.ts`).
-- **Importante:** os componentes de anúncio atuais **simulam** a experiência
-  (é uma app web, o SDK nativo do AdMob não roda em navegador) — a lógica de
-  créditos já está pronta para plugar o SDK real quando o app for
-  distribuído nativamente (Capacitor/Expo) ou via Google Ad Manager na web.
-  Detalhes na seção 3 de `docs/ADMOB_STRATEGY.md`.
-- Programa de indicação: `src/server/routes/referral.ts` credita ambos os
-  usuários com segurança via Firebase Admin SDK (o cliente nunca escreve
-  créditos diretamente no banco).
-
-## 🔥 Firebase
-
-Leia [`docs/FIREBASE_SETUP.md`](docs/FIREBASE_SETUP.md) — inclui:
-1. Como habilitar Autenticação Anônima (necessária para sync + indicação).
-2. Como publicar as regras de segurança corrigidas do Firestore.
-3. Como configurar o Service Account do Admin SDK.
-
-## 🧑‍⚖️ Conformidade legal (LGPD/GDPR)
-
-- [`docs/PRIVACY_POLICY.md`](docs/PRIVACY_POLICY.md)
-- [`docs/TERMS_OF_USE.md`](docs/TERMS_OF_USE.md)
-- [`docs/DATA_DELETION.md`](docs/DATA_DELETION.md)
-
-> ⚠️ Esses documentos têm campos `[PREENCHER]` que precisam dos seus dados
-> reais (CNPJ/CPF, e-mail de contato, foro) antes de publicar — nunca use
-> dados fictícios em documentos legais. Recomenda-se revisão por um
-> advogado antes do lançamento comercial.
-
-O app já inclui um banner de consentimento de cookies
-(`src/components/ConsentBanner.tsx`) com opções granulares
-(essenciais/analytics/anúncios) e botão de rejeitar com o mesmo destaque do
-aceitar, conforme exigido pela LGPD.
-
-## 🐙 Git, GitHub e CI/CD
-
-Leia [`docs/DEPLOY.md`](docs/DEPLOY.md) para o passo a passo completo. Resumo:
-
-```bash
-git init && git add . && git commit -m "chore: initial commit"
-gh repo create flashmind-ai --private --source=. --remote=origin
-git push -u origin main
-```
-
-- **CI** (`.github/workflows/ci.yml`): typecheck + build em todo push/PR.
-- **CD** (`.github/workflows/deploy.yml`): deploy automático em `main`
-  (exemplo pronto para Render.com; troque por Railway/Fly.io/Cloud Run
-  conforme sua escolha — instruções em `docs/DEPLOY.md`).
-
-## 📱 Distribuição nativa (Google Play / App Store)
-
-Este projeto é uma aplicação web. Para publicar nas lojas com o SDK nativo
-do AdMob funcionando de verdade, empacote o build (`dist/`) com
-[Capacitor](https://capacitorjs.com/) (gratuito, open-source) — toda a
-lógica de negócio em `src/services/` e `src/server/` continua igual,
-troca-se apenas a camada de exibição de anúncios. Detalhes e checklist de
-publicação (Play Console, App Store Connect) em `docs/DEPLOY.md` e
-`docs/ADMOB_STRATEGY.md`.
-
-## 🛠️ O que foi corrigido/melhorado nesta revisão
-
-- 🐛 **Bug crítico:** o modelo `gemini-3.6-flash` usado no scaffold original
-  não existe — corrigido para `gemini-2.5-flash` (configurável).
-- 🔒 **Falha de segurança crítica:** as regras do Firestore permitiam
-  `allow read, write: if true` para todas as coleções (qualquer pessoa podia
-  ler/apagar dados de qualquer usuário) — corrigido para regras por dono.
-- ➕ Orquestrador multi-provedor de IA com fallback automático (antes: só
-  Gemini, ponto único de falha).
-- ➕ Programa de indicação (referral) completo e seguro (não existia).
-- ➕ Sistema de créditos com limites diários anti-banimento, streak de
-  recompensa e concessão diária gratuita (antes: recompensa fixa sem
-  limites).
-- ➕ Anúncio intersticial com frequency capping (não existia).
-- ➕ Banner de consentimento LGPD/GDPR (não existia).
-- ➕ Cache inteligente de respostas de IA no Firestore (não existia).
-- ➕ Notificações push de lembrete de revisão via Firebase Cloud Messaging,
-  com job agendado no servidor (não existia).
-- 🐛 **Bug corrigido:** `streakDays` (sequência de estudo) era inicializado
-  uma vez e nunca mais atualizado em lugar nenhum do app — sempre mostrava
-  o mesmo número. Corrigido em `src/services/studyStreak.ts`, junto com
-  `dailyGoalCompleted`, que antes acumulava para sempre em vez de resetar
-  por dia.
-- ⚡ **Code-splitting:** telas pesadas (Duelo, Tutor de Voz, Modo Professor)
-  e modais sob demanda agora carregam via `React.lazy`, reduzindo o bundle
-  inicial de 1,16MB para ~290KB (o resto carrega sob demanda por tela).
-- 💰 Preço da assinatura PRO agora se ajusta automaticamente por região
-  (`adTierStrategy.ts` conectado ao `SubscriptionModal`), em vez de preço
-  fixo único para todo o mundo.
-- 🔗 Preview de link de indicação (Open Graph) — compartilhar o link no
-  WhatsApp agora mostra uma mensagem convidativa em vez do preview
-  genérico do app.
-- ✅ 55 testes automatizados (Vitest) cobrindo SRS, economia de créditos,
-  fallback de IA e cache — rodam no CI a cada push.
-- ➕ Rate limiting básico nas rotas de API.
-- ➕ Documentação legal e técnica completa + CI/CD.
+O projeto atual usa React + Vite + Express e pode ser empacotado para distribuição móvel conforme a camada nativa escolhida. A integração de anúncios deve usar o SDK nativo correspondente na versão publicada na loja.
