@@ -32,6 +32,7 @@
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "node-cron": "^3.0.3",
+    "nanoid": "^3.3.18",
     "pino": "^10.3.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
@@ -47,14 +48,11 @@
     "@types/node": "^22.14.0",
     "@types/node-cron": "^3.0.11",
     "@types/pino": "^7.0.4",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3",
     "vitest": "^4.1.10"
   }
 }
