@@ -2,29 +2,20 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(uid) {
-      return isSignedIn() && request.auth.uid == uid;
-    }
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
 
     function protectedUserStatsFields() {
-      return [
-        'isPro',
-        'proPlanType',
-        'proExpiryDate',
-        'playPurchaseToken',
-        'playProductId',
-        'billingLastVerifiedAt',
-        'aiCardsGenerated'
-      ];
+      return ['isPro','proPlanType','proExpiryDate','playPurchaseToken','playProductId','billingLastVerifiedAt','aiCardsGenerated'];
     }
 
     function clientStatsWriteAllowed() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedUserStatsFields());
+    }
+
+    function clientStatsCreateAllowed() {
+      return (!request.resource.data.keys().hasAny(['proPlanType','proExpiryDate','playPurchaseToken','playProductId','billingLastVerifiedAt','aiCardsGenerated']))
+        && (!request.resource.data.keys().hasAny(['isPro']) || request.resource.data.isPro == false);
     }
 
     match /decks/{deckId} {
@@ -33,12 +24,9 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
-    // Campos de assinatura e consumo de geração são protegidos: somente o
-    // backend Admin SDK pode alterá-los. O cliente continua podendo atualizar
-    // as demais estatísticas normalmente.
     match /userStats/{statsId} {
       allow read: if isOwner(statsId);
-      allow create: if isOwner(statsId) && !request.resource.data.keys().hasAny(protectedUserStatsFields());
+      allow create: if isOwner(statsId) && clientStatsCreateAllowed();
       allow update: if isOwner(statsId) && clientStatsWriteAllowed();
     }
 
@@ -52,11 +40,7 @@ service cloud.firestore {
       allow read, write: if isOwner(uid);
     }
 
-    match /referralCodes/{code} {
-      allow read, write: if false;
-    }
-    match /referrals/{uid} {
-      allow read, write: if false;
-    }
+    match /referralCodes/{code} { allow read, write: if false; }
+    match /referrals/{uid} { allow read, write: if false; }
   }
 }
