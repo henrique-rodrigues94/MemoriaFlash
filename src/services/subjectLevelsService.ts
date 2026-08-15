@@ -1,12 +1,13 @@
-// 📁 flashmind-ai/src/services/subjectLevelsService.ts
+// Serviço que identifica os níveis de uma matéria e carrega suas grades.
 //
-// Serviço que identifica automaticamente quais níveis de ensino fazem sentido
-// para uma matéria e carrega as grades curriculares em paralelo.
-// O resultado final da grade é compartilhado com a tela de geração para que
-// níveis sem currículo válido possam ser desabilitados sem repetir chamadas de IA.
+// Estratégia de custo:
+// - primeiro Firestore público (1 read, sem servidor/IA);
+// - somente se a matéria for nova/expirada, chama /api/subject-levels;
+// - o servidor gera e persiste o resultado no Firestore para reutilização.
 
 import { EducationLevel } from '../lib/educationLevels';
 import { CurriculumCategory, fetchCurriculum } from './curriculumService';
+import { getCachedSubjectLevels } from './firestoreCurriculumCache';
 
 export interface LevelInfo {
   level: EducationLevel;
@@ -29,6 +30,7 @@ export interface LevelCurriculum {
 export interface SubjectLevelsResult {
   levels: LevelInfo[];
   subjectNormalized: string;
+  fromCache?: boolean;
 }
 
 const levelsCache = new Map<string, SubjectLevelsResult>();
@@ -56,8 +58,6 @@ function publishVerifiedCurriculumLevels(
     return Boolean(entry && !entry.loading);
   });
 
-  // Se nenhuma grade respondeu, tratamos como falha de verificação e não
-  // bloqueamos opções por causa de uma possível falha de rede/servidor.
   const verificationFailed = completedLevels.length > 0 && successfulLevels.length === 0;
 
   window.dispatchEvent(new CustomEvent('memoriaflash:curriculum-verified', {
@@ -69,18 +69,36 @@ function publishVerifiedCurriculumLevels(
   }));
 }
 
-/** Identifica via IA quais níveis de ensino fazem sentido para a matéria. */
+/**
+ * Identifica os níveis usando Firestore primeiro.
+ * A IA só entra no fluxo quando a matéria ainda não foi cadastrada.
+ */
 export async function identifySubjectLevels(subject: string): Promise<SubjectLevelsResult | null> {
   if (!subject.trim() || subject.trim().length < 2) return null;
 
-  const key = normalizeKey(subject);
+  const normalizedSubject = subject.trim();
+  const key = normalizeKey(normalizedSubject);
   const cached = levelsCache.get(key);
   const cachedAt = levelsCacheTime.get(key) ?? 0;
 
   if (cached && Date.now() - cachedAt < CACHE_MS) return cached;
 
+  // 1. Leitura direta do catálogo público do Firestore.
+  const firestoreLevels = await getCachedSubjectLevels(normalizedSubject);
+  if (firestoreLevels?.length) {
+    const result: SubjectLevelsResult = {
+      levels: firestoreLevels,
+      subjectNormalized: normalizedSubject,
+      fromCache: true,
+    };
+    levelsCache.set(key, result);
+    levelsCacheTime.set(key, Date.now());
+    return result;
+  }
+
+  // 2. Cache miss: somente agora o servidor pode consultar/usar IA.
   try {
-    const res = await fetch(`/api/subject-levels?subject=${encodeURIComponent(subject.trim())}`);
+    const res = await fetch(`/api/subject-levels?subject=${encodeURIComponent(normalizedSubject)}`);
     if (!res.ok) return null;
 
     const data = await res.json();
@@ -88,7 +106,8 @@ export async function identifySubjectLevels(subject: string): Promise<SubjectLev
 
     const result: SubjectLevelsResult = {
       levels: data.levels,
-      subjectNormalized: data.subjectNormalized || subject,
+      subjectNormalized: data.subjectNormalized || normalizedSubject,
+      fromCache: data.fromFirestore === true,
     };
     levelsCache.set(key, result);
     levelsCacheTime.set(key, Date.now());
@@ -98,12 +117,6 @@ export async function identifySubjectLevels(subject: string): Promise<SubjectLev
   }
 }
 
-/**
- * Carrega as grades dos níveis identificados em paralelo.
- * Ao terminar, publica no browser quais níveis possuem currículo realmente
- * disponível. A StudioView continua responsável por exibir a grade do nível
- * selecionado; este evento serve apenas para o seletor de nível.
- */
 export async function loadAllLevelCurricula(
   subject: string,
   levels: LevelInfo[],
@@ -131,6 +144,7 @@ export async function loadAllLevelCurricula(
   await Promise.all(
     levels.map(async levelInfo => {
       try {
+        // fetchCurriculum também consulta Firestore diretamente antes do API.
         const result = await fetchCurriculum(subject.trim(), levelInfo.level);
         const entry = state.get(levelInfo.level)!;
         entry.categories = result?.categories ?? [];
@@ -148,7 +162,6 @@ export async function loadAllLevelCurricula(
   publishVerifiedCurriculumLevels(subject, state, levels);
 }
 
-/** Invalida cache de níveis para uma matéria. */
 export function invalidateLevelsCache(subject: string): void {
   const key = normalizeKey(subject);
   levelsCache.delete(key);
