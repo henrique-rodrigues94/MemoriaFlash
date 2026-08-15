@@ -9,15 +9,12 @@ export const referralRouter = Router();
 async function verifyRequestUser(idToken: string) {
   const adminAuth = getAdminAuth();
   if (!adminAuth) {
-    throw Object.assign(new Error('Backend sem credenciais do Firebase Admin configuradas (veja FIREBASE_SETUP.md).'), {
-      httpStatus: 503,
-    });
+    throw Object.assign(new Error('Backend sem credenciais do Firebase Admin configuradas.'), { httpStatus: 503 });
   }
   return adminAuth.verifyIdToken(idToken);
 }
 
-// Garante que existe o mapeamento código -> uid deste usuário no Firestore,
-// para que amigos consigam resgatar o código dele. Idempotente.
+// Garante que existe o mapeamento código -> UID do indicador.
 referralRouter.post('/ensure-code', async (req, res) => {
   try {
     const { idToken } = req.body;
@@ -26,10 +23,10 @@ referralRouter.post('/ensure-code', async (req, res) => {
     const decoded = await verifyRequestUser(idToken);
     const uid = decoded.uid;
     const code = deriveReferralCode(uid);
+    const db = getAdminFirestore();
+    if (!db) throw Object.assign(new Error('Firebase Admin não configurado.'), { httpStatus: 503 });
 
-    const db = getAdminFirestore()!;
     await db.collection('referralCodes').doc(code).set({ uid, createdAt: Date.now() }, { merge: true });
-
     return res.json({ code });
   } catch (error: any) {
     console.error('Error ensuring referral code:', error);
@@ -37,10 +34,14 @@ referralRouter.post('/ensure-code', async (req, res) => {
   }
 });
 
-// Resgata um código de indicação: credita o indicado (welcome bonus) e o
-// indicador (referrer bonus), de forma atômica e à prova de fraude (o
-// próprio cliente NÃO consegue creditar diretamente o Firestore — apenas o
-// Admin SDK do servidor tem permissão de escrita nesses documentos).
+/**
+ * Ativa uma indicação.
+ *
+ * O prêmio não é uma moeda/crédito: o indicador recebe 3 dias de PRO quando
+ * o novo usuário realmente entra no aplicativo com um código válido.
+ * A operação é atômica e idempotente: a mesma conta indicada nunca gera dois
+ * prêmios para o mesmo indicador.
+ */
 referralRouter.post('/claim', async (req, res) => {
   try {
     const { idToken, referralCode } = req.body;
@@ -51,61 +52,69 @@ referralRouter.post('/claim', async (req, res) => {
     const decoded = await verifyRequestUser(idToken);
     const referredUid = decoded.uid;
     const code = String(referralCode).toUpperCase().trim();
-
-    const db = getAdminFirestore()!;
+    const db = getAdminFirestore();
+    if (!db) throw Object.assign(new Error('Firebase Admin não configurado.'), { httpStatus: 503 });
 
     const result = await db.runTransaction(async (tx) => {
       const codeDoc = await tx.get(db.collection('referralCodes').doc(code));
       if (!codeDoc.exists) {
         throw Object.assign(new Error('Código de indicação inválido ou não encontrado.'), { httpStatus: 404 });
       }
-      const referrerUid = codeDoc.data()!.uid as string;
 
-      if (referrerUid === referredUid) {
-        throw Object.assign(new Error('Você não pode usar seu próprio código de indicação.'), { httpStatus: 400 });
+      const referrerUid = codeDoc.data()?.uid as string;
+      if (!referrerUid || referrerUid === referredUid) {
+        throw Object.assign(new Error('Código de indicação inválido.'), { httpStatus: 400 });
       }
 
       const claimRef = db.collection('referrals').doc(referredUid);
       const claimDoc = await tx.get(claimRef);
       if (claimDoc.exists) {
-        throw Object.assign(new Error('Este usuário já resgatou um código de indicação anteriormente.'), {
-          httpStatus: 409,
-        });
+        const existing = claimDoc.data() || {};
+        if (existing.referrerUid === referrerUid && existing.rewardedAt) {
+          return { alreadyRewarded: true, referrerUid, proExpiryDate: existing.proExpiryDate || null };
+        }
+        throw Object.assign(new Error('Este usuário já utilizou uma indicação anteriormente.'), { httpStatus: 409 });
       }
 
-      const referredStatsRef = db.collection('userStats').doc(referredUid);
       const referrerStatsRef = db.collection('userStats').doc(referrerUid);
+      const referrerStatsDoc = await tx.get(referrerStatsRef);
+      const current = referrerStatsDoc.exists ? referrerStatsDoc.data() || {} : {};
+      const now = Date.now();
+      const currentExpiry = typeof current.proExpiryDate === 'string' ? Date.parse(current.proExpiryDate) : NaN;
+      const base = Number.isFinite(currentExpiry) && currentExpiry > now ? currentExpiry : now;
+      const rewardExpiry = new Date(base + ECONOMY.REFERRAL_PRO_REWARD_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-      tx.set(
-        claimRef,
-        { referrerUid, code, createdAt: Date.now() },
-        { merge: false }
-      );
-      tx.set(
-        referredStatsRef,
-        { aiCredits: admin.firestore.FieldValue.increment(ECONOMY.REFERRAL_WELCOME_BONUS), referredByCode: code },
-        { merge: true }
-      );
-      tx.set(
-        referrerStatsRef,
-        {
-          aiCredits: admin.firestore.FieldValue.increment(ECONOMY.REFERRAL_REFERRER_BONUS),
-          referralCount: admin.firestore.FieldValue.increment(1),
-          referralCreditsEarned: admin.firestore.FieldValue.increment(ECONOMY.REFERRAL_REFERRER_BONUS),
-        },
-        { merge: true }
-      );
+      tx.set(claimRef, {
+        referrerUid,
+        code,
+        claimedAt: now,
+        rewardedAt: now,
+        rewardType: 'pro_days',
+        rewardDays: ECONOMY.REFERRAL_PRO_REWARD_DAYS,
+        proExpiryDate: rewardExpiry,
+      });
 
-      return { welcomeBonus: ECONOMY.REFERRAL_WELCOME_BONUS };
+      tx.set(referrerStatsRef, {
+        isPro: true,
+        proPlanType: 'referral',
+        proExpiryDate: rewardExpiry,
+        referralCount: admin.firestore.FieldValue.increment(1),
+        referralProDaysEarned: admin.firestore.FieldValue.increment(ECONOMY.REFERRAL_PRO_REWARD_DAYS),
+      }, { merge: true });
+
+      return { alreadyRewarded: false, referrerUid, proExpiryDate: rewardExpiry };
     });
 
     return res.json({
       success: true,
-      message: `Código aplicado! Você ganhou +${result.welcomeBonus} créditos de IA.`,
-      welcomeBonus: result.welcomeBonus,
+      alreadyRewarded: result.alreadyRewarded,
+      message: result.alreadyRewarded
+        ? 'Esta indicação já foi registrada.'
+        : `Indicação confirmada! O indicador recebeu ${ECONOMY.REFERRAL_PRO_REWARD_DAYS} dias de plano Pro.`,
+      rewardDays: ECONOMY.REFERRAL_PRO_REWARD_DAYS,
     });
   } catch (error: any) {
     console.error('Error claiming referral:', error);
-    return res.status(error.httpStatus || 500).json({ error: error.message || 'Falha ao resgatar indicação' });
+    return res.status(error.httpStatus || 500).json({ error: error.message || 'Falha ao registrar indicação' });
   }
 });
