@@ -74,6 +74,8 @@ export function getStoredStats(): UserStats {
     const parsed = JSON.parse(raw) as UserStats & { aiCredits?: number };
     delete parsed.aiCredits;
     if (parsed.aiCardsGenerated === undefined) parsed.aiCardsGenerated = 0;
+    // O aplicativo está em modo gratuito; estados PRO antigos não são mais válidos.
+    parsed.isPro = false;
     return parsed;
   } catch {
     return INITIAL_STATS;
