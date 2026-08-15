@@ -1,13 +1,41 @@
-import { addDoc, collection, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
 export type DocumentMimeType = 'application/pdf' | 'text/plain';
 
 const MAX_CHUNK_CHARS = 12000;
 const MAX_CHUNKS = 80;
+const MAX_SOURCE_CHARS = MAX_CHUNK_CHARS * MAX_CHUNKS;
 
 function normalizeSource(text: string): string {
-  return String(text || '').replace(/\u0000/g, '').replace(/\r\n/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{4,}/g, '\n\n').trim();
+  return String(text || '')
+    .replace(/\u0000/g, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{4,}/g, '\n\n')
+    .trim();
+}
+
+function normalizeSubject(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function toSubjectId(value: string, fallback: string): string {
+  return normalizeSubject(value)
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .slice(0, 100) || fallback;
+}
+
+async function sha256(text: string): Promise<string> {
+  if (!globalThis.crypto?.subtle) throw new Error('O navegador não oferece SHA-256 para este ambiente.');
+  const bytes = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 export async function enqueueDocumentContent(args: {
@@ -16,31 +44,35 @@ export async function enqueueDocumentContent(args: {
   fileName: string;
   mimeType: DocumentMimeType;
   sourceText: string;
-}): Promise<{ requestId: string; totalChars: number; chunkCount: number }> {
+  shareWithMemoriaFlash: boolean;
+}): Promise<{ requestId: string; totalChars: number; chunkCount: number; sourceHash: string }> {
   const user = auth.currentUser;
   if (!user) throw new Error('É necessário estar autenticado para enviar um documento.');
+  if (!args.shareWithMemoriaFlash) throw new Error('É necessário autorizar o uso do material para alimentar o conteúdo do MemoriaFlash.');
+  if (args.mimeType !== 'application/pdf' && args.mimeType !== 'text/plain') throw new Error('Formato não suportado. Nesta versão, use apenas PDF ou TXT.');
 
   const subject = args.subject.trim();
   const sourceText = normalizeSource(args.sourceText);
   if (subject.length < 2) throw new Error('Informe a matéria ou assunto do documento.');
   if (!sourceText) throw new Error('Não foi possível extrair texto do documento.');
+  if (sourceText.length > MAX_SOURCE_CHARS) throw new Error('Este documento é grande demais para a versão atual. Divida o PDF/TXT em partes menores.');
 
+  const sourceHash = await sha256(sourceText);
   const chunks: string[] = [];
-  for (let start = 0; start < sourceText.length && chunks.length < MAX_CHUNKS; start += MAX_CHUNK_CHARS) {
-    chunks.push(sourceText.slice(start, start + MAX_CHUNK_CHARS));
-  }
-  if (sourceText.length > MAX_CHUNK_CHARS * MAX_CHUNKS) {
-    throw new Error('Este documento é grande demais para a versão atual. Divida o PDF/TXT em partes menores.');
-  }
+  for (let start = 0; start < sourceText.length; start += MAX_CHUNK_CHARS) chunks.push(sourceText.slice(start, start + MAX_CHUNK_CHARS));
 
   const requestRef = doc(collection(db, 'contentRequests'));
   const now = new Date().toISOString();
-  await setDoc(requestRef, {
+  const normalized = normalizeSubject(subject);
+  const subjectId = toSubjectId(subject, requestRef.id);
+  const batch = writeBatch(db);
+
+  batch.set(requestRef, {
     subject,
     requestedSubject: subject,
-    normalizedSubject: subject.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(),
-    subjectId: subject.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').slice(0, 100) || requestRef.id,
-    educationLevel: args.educationLevel || undefined,
+    normalizedSubject: normalized,
+    subjectId,
+    educationLevel: args.educationLevel?.trim() || null,
     status: 'pending',
     priority: 5,
     requestCount: 1,
@@ -49,25 +81,29 @@ export async function enqueueDocumentContent(args: {
     requestedAt: now,
     createdAt: now,
     updatedAt: now,
+    shareWithMemoriaFlash: true,
     source: {
       fileName: args.fileName.trim().slice(0, 180),
       mimeType: args.mimeType,
       totalChars: sourceText.length,
       chunkCount: chunks.length,
+      sourceHash,
       createdAt: now,
     },
   });
 
-  for (let index = 0; index < chunks.length; index += 1) {
-    await setDoc(doc(requestRef, 'sourceChunks', String(index + 1).padStart(4, '0')), {
+  chunks.forEach((text, index) => {
+    batch.set(doc(requestRef, 'sourceChunks', String(index + 1).padStart(4, '0')), {
       index,
-      text: chunks[index],
-      chars: chunks[index].length,
-      createdAt: serverTimestamp(),
+      text,
+      chars: text.length,
+      sourceHash,
+      createdAt: now,
     });
-  }
+  });
 
-  return { requestId: requestRef.id, totalChars: sourceText.length, chunkCount: chunks.length };
+  await batch.commit();
+  return { requestId: requestRef.id, totalChars: sourceText.length, chunkCount: chunks.length, sourceHash };
 }
 
 export async function getContentRequestStatus(requestId: string) {
