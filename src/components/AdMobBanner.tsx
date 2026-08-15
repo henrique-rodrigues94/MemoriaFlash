@@ -12,8 +12,7 @@ interface AdMobBannerProps {
   sticky?: boolean;
 }
 
-/** Banner real do Google AdMob no Android. A antiga faixa visual foi removida:
- * ela não era um anúncio e não deve ser confundida com inventário AdMob. */
+/** Banner nativo real do Google AdMob no Android. */
 export const AdMobBanner: React.FC<AdMobBannerProps> = ({ isPro }) => {
   useEffect(() => {
     if (isPro) {
@@ -21,18 +20,37 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({ isPro }) => {
       return;
     }
 
-    void showFreeUserBanner().catch((error) => {
-      console.warn('[AdMob] Banner indisponível:', error);
-    });
+    let disposed = false;
+
+    const refreshBanner = () => {
+      if (!disposed) {
+        void showFreeUserBanner().catch((error) => {
+          console.warn('[AdMob] Banner indisponível:', error);
+        });
+      }
+    };
+
+    // Primeira tentativa imediatamente.
+    refreshBanner();
+
+    // O SDK pode remover/recriar a View nativa após rotação, background,
+    // retorno ao app ou mudança de inventário. Revalida periodicamente sem
+    // criar nenhum banner HTML falso.
+    const interval = window.setInterval(refreshBanner, 60_000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') refreshBanner();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
+      disposed = true;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
       if (Capacitor.isNativePlatform()) {
         void hideAdMobBanner().catch(() => undefined);
       }
     };
   }, [isPro]);
 
-  // O banner é renderizado nativamente pelo SDK. Não criamos um anúncio falso
-  // no DOM quando o app está sendo executado na web.
   return null;
 };
