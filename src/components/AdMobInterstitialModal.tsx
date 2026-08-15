@@ -1,61 +1,39 @@
-// 📁 memoriaflash/src/components/AdMobInterstitialModal.tsx
 import React, { useEffect, useState } from 'react';
-import { X, Sparkles } from 'lucide-react';
-import { SupportedLanguage, translations } from '../lib/i18n';
+import { X, ShieldCheck } from 'lucide-react';
+import { showInterstitialIfReady } from '../services/ads/adMobNative';
 
 interface AdMobInterstitialModalProps {
   onClose: () => void;
-  currentLanguage?: SupportedLanguage;
 }
 
-// Anúncio intersticial: skippable após 3s, seguindo a regra "nunca force o clique"
-// e os limites de frequência definidos em src/services/economy/creditsEngine.ts.
-export const AdMobInterstitialModal: React.FC<AdMobInterstitialModalProps> = ({
-  onClose,
-  currentLanguage = 'pt',
-}) => {
-  const [canSkip, setCanSkip] = useState(false);
-  const [countdown, setCountdown] = useState(3);
-
-  const t = translations[currentLanguage] || translations.pt;
+/** Ponte entre o estado de frequência do app e o interstitial nativo do AdMob.
+ * Não existe timer ou anúncio simulado no DOM. */
+export const AdMobInterstitialModal: React.FC<AdMobInterstitialModalProps> = ({ onClose }) => {
+  const [status, setStatus] = useState<'loading' | 'unavailable'>('loading');
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          clearInterval(timer);
-          setCanSkip(true);
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+    let active = true;
+    void showInterstitialIfReady().then((shown) => {
+      if (!active) return;
+      if (!shown) setStatus('unavailable');
+      else onClose();
+    });
+    return () => {
+      active = false;
+    };
+  }, [onClose]);
+
+  if (status !== 'unavailable') return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-sm bg-gradient-to-br from-[#0b1a2a] to-[#122131] border border-[#adc6ff]/20 rounded-3xl p-8 text-white shadow-2xl text-center space-y-4">
-        {canSkip ? (
-          <button
-            onClick={onClose}
-            className="absolute top-3 right-3 p-1.5 rounded-full bg-slate-800/70 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
-            title={t.adClose}
-          >
-            <X className="w-4 h-4" />
-          </button>
-        ) : (
-          <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-slate-800/70 text-slate-300 text-[11px] font-mono font-bold flex items-center justify-center">
-            {countdown}
-          </div>
-        )}
-
-        <div className="w-14 h-14 rounded-2xl bg-blue-500/20 border border-blue-400/30 mx-auto flex items-center justify-center">
-          <Sparkles className="w-7 h-7 text-blue-300" />
-        </div>
-        <h3 className="text-base font-extrabold">{t.adInterstitialTitle}</h3>
-        <p className="text-xs text-[#8c91a0]">{t.adInterstitialBody}</p>
-        <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500">{t.adLabel}</div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+      <div className="relative w-full max-w-sm rounded-3xl p-7 bg-[#0b1a2a] border border-[#adc6ff]/20 text-white shadow-2xl text-center">
+        <button onClick={onClose} className="absolute top-3 right-3 p-1.5 rounded-full bg-slate-800/70 text-slate-300 hover:text-white" aria-label="Fechar">
+          <X className="w-4 h-4" />
+        </button>
+        <ShieldCheck className="w-10 h-10 mx-auto text-emerald-400" />
+        <h3 className="mt-4 text-base font-extrabold">Anúncio indisponível</h3>
+        <p className="mt-2 text-xs text-slate-400">O estudo continua normalmente. Tente novamente mais tarde.</p>
       </div>
     </div>
   );
