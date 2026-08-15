@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, BookOpen, Camera, Check, CheckCircle2, ChevronDown, ChevronUp, FileText, FlipHorizontal, Layers, Loader2, Lock, RotateCcw, Search, Sparkles, Tag, Upload, X } from 'lucide-react';
 import { Deck, UserStats } from '../types';
 import { ECONOMY } from '../services/economy/economyConstants';
+import { auth, ensureAuthenticated } from '../lib/firebase';
 
 interface Item { id: string; type: 'image' | 'document'; name: string; file: File; previewUrl?: string; base64?: string; }
 interface Topic { id: string; title: string; description: string; cardEstimate: number; }
@@ -142,7 +143,7 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
         else texts.push(`=== ${item.name} ===\n${await extractText(item.file)}`);
       }
       setProcessing('IA identificando matéria e tópicos…');
-      const res = await fetch('/api/gemini/scanner-analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ images, texts, subjectHint: subject.trim(), language: 'pt-BR' }) });
+      const res = await fetch('/api/gemini/scanner-analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ images, texts, subjectHint: subject.trim(), language: 'pt' }) });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || `Erro do servidor (${res.status}).`);
       if (!data?.subject || !Array.isArray(data.topics) || !data.topics.length) throw new Error('A IA não encontrou tópicos suficientes. Envie conteúdo mais legível ou uma foto melhor.');
@@ -157,7 +158,9 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
     setStep('generating'); setProcessing('Gerando flashcards com IA…');
     try {
       const topicsWithCounts = analysis.topics.filter(t => selected.has(t.id)).map(t => ({ title: t.title, count: counts[t.id] || defaultCount(t.cardEstimate) }));
-      const res = await fetch('/api/gemini/scanner-process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ images: [], texts: [], subject: subject.trim() || analysis.subject, count: totalCards, selectedTopics: topicsWithCounts.map(t => t.title), topicsWithCounts, extractedContent: analysis.extractedContent }) });
+      const user = auth.currentUser || await ensureAuthenticated();
+      const idToken = await user.getIdToken();
+      const res = await fetch('/api/gemini/scanner-process', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ images: [], texts: [], subject: subject.trim() || analysis.subject, count: totalCards, selectedTopics: topicsWithCounts.map(t => t.title), topicsWithCounts, extractedContent: analysis.extractedContent }) });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || `Erro do servidor (${res.status}).`);
       const raw = Array.isArray(data) ? data : Array.isArray(data?.cards) ? data.cards : Array.isArray(data?.flashcards) ? data.flashcards : [];
