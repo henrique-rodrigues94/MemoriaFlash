@@ -40,6 +40,15 @@ service cloud.firestore {
       allow read, write: if isOwner(uid);
     }
 
+    // Conteúdo compartilhado é escrito exclusivamente pelo Admin SDK.
+    // O cliente nunca pode alterar currículo, catálogo ou banco global.
+    match /subjects/{id} { allow read: if true; allow write: if false; }
+    match /curricula/{id} { allow read: if true; allow write: if false; }
+    match /cardBuckets/{id} { allow read: if true; allow write: if false; }
+    match /contentCatalog/{id} { allow read: if true; allow write: if false; }
+    match /aiCache/{id} { allow read, write: if false; }
+
+    match /feedback/{feedbackId} { allow read, write: if false; }
     match /referralCodes/{code} { allow read, write: if false; }
     match /referrals/{uid} { allow read, write: if false; }
   }
