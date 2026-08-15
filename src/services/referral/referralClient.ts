@@ -52,7 +52,6 @@ export async function ensureOwnReferralCodeRegistered(): Promise<string | null> 
   }
 }
 
-/** Resgata explicitamente um código digitado pelo usuário. */
 export async function claimReferralCode(referralCode: string): Promise<ClaimReferralResult> {
   const code = referralCode.trim().toUpperCase();
   if (!code) return { success: false, message: 'Digite um código de indicação.' };
@@ -86,10 +85,6 @@ export async function claimReferralCode(referralCode: string): Promise<ClaimRefe
   }
 }
 
-/**
- * Resgata automaticamente a indicação recebida por link.
- * Erros transitórios preservam o código para a próxima abertura/login.
- */
 export async function tryClaimPendingReferral(): Promise<ClaimReferralResult | null> {
   const code = getPendingReferralCode();
   if (!code) return null;
