@@ -119,7 +119,7 @@ export async function syncStatsFromFirestore(
       docRef,
       (docSnap) => {
         if (docSnap.exists()) {
-          onUpdate(docSnap.data() as UserStats);
+          onUpdate({ ...(docSnap.data() as UserStats), isPro: false });
         }
       },
       (err) => console.warn('Firestore snapshot error (stats):', err)
@@ -137,7 +137,7 @@ export async function saveStatsToFirestore(stats: UserStats): Promise<void> {
     const userId = await getAuthenticatedUserId();
     if (!userId) return;
     const docRef = doc(db, 'userStats', userId);
-    const cleanData = cleanForFirestore({ ...stats, userId });
+    const cleanData = cleanForFirestore({ ...stats, isPro: false, proPlanType: null, proExpiryDate: null });
     await setDoc(docRef, cleanData, { merge: true });
   } catch (e) {
     console.error('Error saving stats to Firestore:', e);
