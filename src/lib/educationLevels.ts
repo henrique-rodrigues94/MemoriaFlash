@@ -23,7 +23,6 @@ export const EDUCATION_LEVEL_META: { value: EducationLevel; label: string; icon:
 const ALL_LEVELS: EducationLevel[] = EDUCATION_LEVEL_META.map(level => level.value);
 const VERIFIED_CACHE_MS = 10 * 60 * 1000;
 
-// Resultado confirmado pela IA + grade curricular.
 const verifiedLevelsCache = new Map<string, { levels: EducationLevel[]; at: number }>();
 const pendingChecks = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -86,11 +85,7 @@ const TECNICO_SIGNALS = [
   'desenvolvimento de sistemas', 'nr-10', 'nr-35', 'nr10', 'nr35',
 ];
 
-/**
- * O StudioView usa esta função para construir o <select>. Todos os níveis
- * permanecem presentes no DOM para que o bridge consiga exibir os níveis
- * incompatíveis como desabilitados, em vez de simplesmente escondê-los.
- */
+/** Todos os níveis continuam no DOM para que os incompatíveis possam ficar disabled. */
 export function getAvailableEducationLevels(_subject: string): EducationLevel[] {
   return ALL_LEVELS;
 }
@@ -161,7 +156,8 @@ async function verifySubjectLevels(subject: string): Promise<EducationLevel[] | 
         const response = await fetch(
           `/api/curriculum?subject=${encodeURIComponent(subject.trim())}&level=${encodeURIComponent(level)}`,
         );
-        if (!response.ok) return { level, valid: false };
+        if (!response.ok) throw new Error(`curriculum-${level}-${response.status}`);
+
         const data = await response.json();
         const valid = Array.isArray(data?.categories)
           && data.categories.some((category: any) => Array.isArray(category?.topics) && category.topics.length > 0);
@@ -173,8 +169,9 @@ async function verifySubjectLevels(subject: string): Promise<EducationLevel[] | 
       result => result.status === 'fulfilled',
     ) as PromiseFulfilledResult<{ level: EducationLevel; valid: boolean }>[];
 
-    // Falha total de rede não deve bloquear o usuário. Quando pelo menos uma
-    // consulta de currículo respondeu, usamos exclusivamente as confirmações.
+    // Só bloqueamos com base na grade quando pelo menos uma consulta de grade
+    // respondeu. Se todas falharam, preservamos a classificação da IA para que
+    // uma falha transitória de rede não impeça a geração de cards.
     const levels = successfulChecks.length > 0
       ? successfulChecks.filter(result => result.value.valid).map(result => result.value.level)
       : identified;
@@ -223,8 +220,6 @@ function applyEducationLevelOptions(): void {
     option.title = enabled ? '' : 'Nível sem grade curricular válida para este assunto.';
   });
 
-  // Se a IA mudou o universo válido, nunca deixamos o estado controlado pelo
-  // React apontar para uma opção que acabou de ser bloqueada.
   if (select.value && !available.has(select.value as EducationLevel) && cached.levels.length > 0) {
     select.value = cached.levels[0];
     select.dispatchEvent(new Event('change', { bubbles: true }));
@@ -252,9 +247,8 @@ function scheduleVerification(subject: string): void {
 /**
  * Bridge de compatibilidade da StudioView atual.
  *
- * Ele mantém a tela existente intacta, mas transforma a classificação da IA +
- * grade em disabled no seletor e remove o antigo bloco redundante de
- * "Níveis identificados pela IA".
+ * Mantém a tela existente, mas transforma a classificação da IA + grade em
+ * disabled no seletor e remove o antigo bloco redundante de níveis.
  */
 function installEducationLevelUIBridge(): void {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
