@@ -13,6 +13,7 @@ let initialized = false;
 let listenersInstalled = false;
 let bannerVisible = false;
 let interstitialPrepared = false;
+let consentRequested = false;
 
 function isNativeAndroid(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
@@ -39,20 +40,19 @@ export async function initializeAdMob(): Promise<boolean> {
 }
 
 export async function requestAdMobConsent(): Promise<void> {
-  if (!isNativeAndroid()) return;
+  if (!isNativeAndroid() || consentRequested) return;
 
   await initializeAdMob();
-  const isDev = import.meta.env.DEV;
-  await AdMob.requestConsentInfo({
-    ...(isDev
-      ? {
-          debugGeography: AdMobConsentDebugGeography.EEA,
-          testDeviceIdentifiers: [],
-        }
-      : {}),
-  });
+  const options = import.meta.env.DEV
+    ? {
+        debugGeography: AdMobConsentDebugGeography.EEA,
+        testDeviceIdentifiers: [],
+      }
+    : undefined;
 
-  const status = await AdMob.requestConsentInfo();
+  const status = await AdMob.requestConsentInfo(options);
+  consentRequested = true;
+
   if (status.isConsentFormAvailable && !status.canRequestAds) {
     await AdMob.showConsentForm();
   }
@@ -99,7 +99,7 @@ export async function showInterstitialIfReady(): Promise<boolean> {
     interstitialPrepared = false;
     void prepareInterstitial().catch(() => undefined);
     return true;
-  } catch (error) {
+  } catch {
     interstitialPrepared = false;
     return false;
   }
