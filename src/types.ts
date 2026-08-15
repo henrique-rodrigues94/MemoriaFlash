@@ -18,20 +18,21 @@ export interface UserStats {
   dailyGoalTotal: number; dailyGoalCompleted: number; totalCardsMastered: number;
   timeStudiedHours: number; retentionRate: number; xp: number; globalRank: number;
   aiCardsGenerated?: number;
-  isPro?: boolean; proPlanType?: 'monthly' | 'annual'; proExpiryDate?: string;
+  isPro?: boolean; proPlanType?: 'monthly' | 'annual' | 'referral'; proExpiryDate?: string;
   playPurchaseToken?: string; playProductId?: string; billingLastVerifiedAt?: string;
   lastStudyDateKey?: string; activityLog?: DailyActivity[];
   interstitialTimestamps?: number[];
 
-  // Campos legados de créditos: mantidos somente para leitura/migração de dados antigos.
-  // A estratégia atual não concede, cobra ou exibe créditos.
+  // Campos legados de dados antigos. A interface atual não exibe nem utiliza
+  // créditos como moeda do aplicativo.
   aiCredits?: number;
   adWatchTimestamps?: number[];
   adWatchStreakDays?: number;
   lastAdWatchDay?: string;
   lastDailyGrantDay?: string;
 
-  referralCode?: string; referredByCode?: string; referralCount?: number; referralCreditsEarned?: number;
+  referralCode?: string; referredByCode?: string; referralCount?: number;
+  referralProDaysEarned?: number;
 }
 
 export interface QuizQuestion { question: string; options: string[]; correctIndex: number; explanation: string; }
