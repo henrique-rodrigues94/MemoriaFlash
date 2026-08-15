@@ -1,7 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import {
   AdMob,
-  AdMobConsentDebugGeography,
   BannerAdPosition,
   BannerAdSize,
   InterstitialAdPluginEvents,
@@ -43,14 +42,10 @@ export async function requestAdMobConsent(): Promise<void> {
   if (!isNativeAndroid() || consentRequested) return;
 
   await initializeAdMob();
-  const options = import.meta.env.DEV
-    ? {
-        debugGeography: AdMobConsentDebugGeography.EEA,
-        testDeviceIdentifiers: [],
-      }
-    : undefined;
 
-  const status = await AdMob.requestConsentInfo(options);
+  // A versão 8.1.0 do plugin não exporta AdMobConsentDebugGeography.
+  // Mantemos o fluxo de consentimento compatível com a API pública da versão instalada.
+  const status = await AdMob.requestConsentInfo();
   consentRequested = true;
 
   if (status.isConsentFormAvailable && !status.canRequestAds) {
