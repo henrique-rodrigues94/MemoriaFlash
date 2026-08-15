@@ -6,7 +6,11 @@ service cloud.firestore {
     function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
 
     function protectedUserStatsFields() {
-      return ['isPro','proPlanType','proExpiryDate','playPurchaseToken','playProductId','billingLastVerifiedAt','aiCardsGenerated'];
+      return [
+        'isPro', 'proPlanType', 'proExpiryDate',
+        'playPurchaseToken', 'playProductId', 'billingLastVerifiedAt',
+        'aiCardsGenerated', 'referralCount', 'referralProDaysEarned', 'referredByCode'
+      ];
     }
 
     function clientStatsWriteAllowed() {
@@ -14,8 +18,12 @@ service cloud.firestore {
     }
 
     function clientStatsCreateAllowed() {
-      return (!request.resource.data.keys().hasAny(['proPlanType','proExpiryDate','playPurchaseToken','playProductId','billingLastVerifiedAt','aiCardsGenerated']))
-        && (!request.resource.data.keys().hasAny(['isPro']) || request.resource.data.isPro == false);
+      return !request.resource.data.keys().hasAny([
+        'proPlanType', 'proExpiryDate', 'playPurchaseToken', 'playProductId',
+        'billingLastVerifiedAt', 'aiCardsGenerated', 'referralCount',
+        'referralProDaysEarned', 'referredByCode'
+      ])
+      && (!request.resource.data.keys().hasAny(['isPro']) || request.resource.data.isPro == false);
     }
 
     match /decks/{deckId} {
@@ -41,7 +49,6 @@ service cloud.firestore {
     }
 
     // Conteúdo compartilhado é escrito exclusivamente pelo Admin SDK.
-    // O cliente nunca pode alterar currículo, catálogo ou banco global.
     match /subjects/{id} { allow read: if true; allow write: if false; }
     match /curricula/{id} { allow read: if true; allow write: if false; }
     match /cardBuckets/{id} { allow read: if true; allow write: if false; }
