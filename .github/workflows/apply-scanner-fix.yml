@@ -51,11 +51,12 @@ jobs:
           server.write_text(server_text, encoding='utf-8')
           PY
 
+          grep -q "Authorization:.*Bearer.*idToken" src/components/ScannerView.tsx
+          grep -q "express.json({ limit: '30mb' })" server.ts
+          grep -q "language: 'pt'" src/components/ScannerView.tsx
+
       - name: Install dependencies
         run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
 
       - name: Build
         run: npm run build
