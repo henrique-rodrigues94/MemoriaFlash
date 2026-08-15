@@ -1,13 +1,9 @@
 // 📁 flashmind-ai/src/services/subjectLevelsService.ts
 //
 // Serviço que identifica automaticamente quais níveis de ensino fazem sentido
-// para uma matéria digitada pelo usuário e carrega os currículos em paralelo.
-//
-// FLUXO:
-//  1. Usuário digita matéria (debounce 700ms)
-//  2. GET /api/subject-levels?subject=X  →  IA retorna ex: ['concurso','faculdade']
-//  3. Carrega currículos de TODOS os níveis em paralelo via /api/curriculum
-//  4. Resultado fica em memória (sessionCache) para não re-consultar
+// para uma matéria e carrega as grades curriculares em paralelo.
+// O resultado final da grade é compartilhado com a tela de geração para que
+// níveis sem currículo válido possam ser desabilitados sem repetir chamadas de IA.
 
 import { EducationLevel } from '../lib/educationLevels';
 import { CurriculumCategory, fetchCurriculum } from './curriculumService';
@@ -35,22 +31,45 @@ export interface SubjectLevelsResult {
   subjectNormalized: string;
 }
 
-// ─── Caches de sessão ─────────────────────────────────────────────────────────
-
 const levelsCache = new Map<string, SubjectLevelsResult>();
-const CACHE_MS = 10 * 60 * 1000; // 10 min
+const CACHE_MS = 10 * 60 * 1000;
 const levelsCacheTime = new Map<string, number>();
 
 function normalizeKey(subject: string): string {
   return subject.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 }
 
-// ─── API ──────────────────────────────────────────────────────────────────────
+function publishVerifiedCurriculumLevels(
+  subject: string,
+  state: Map<EducationLevel, LevelCurriculum>,
+  allLevels: LevelInfo[],
+): void {
+  if (typeof window === 'undefined') return;
 
-/**
- * Identifica via IA quais níveis de ensino fazem sentido para a matéria.
- * Cacheia por 10 minutos em memória.
- */
+  const successfulLevels = allLevels.filter(levelInfo => {
+    const entry = state.get(levelInfo.level);
+    return Boolean(entry && !entry.error && entry.categories.length > 0);
+  });
+
+  const completedLevels = allLevels.filter(levelInfo => {
+    const entry = state.get(levelInfo.level);
+    return Boolean(entry && !entry.loading);
+  });
+
+  // Se nenhuma grade respondeu, tratamos como falha de verificação e não
+  // bloqueamos opções por causa de uma possível falha de rede/servidor.
+  const verificationFailed = completedLevels.length > 0 && successfulLevels.length === 0;
+
+  window.dispatchEvent(new CustomEvent('memoriaflash:curriculum-verified', {
+    detail: {
+      subject: subject.trim(),
+      availableLevels: successfulLevels.map(level => level.level),
+      verificationFailed,
+    },
+  }));
+}
+
+/** Identifica via IA quais níveis de ensino fazem sentido para a matéria. */
 export async function identifySubjectLevels(subject: string): Promise<SubjectLevelsResult | null> {
   if (!subject.trim() || subject.trim().length < 2) return null;
 
@@ -63,6 +82,7 @@ export async function identifySubjectLevels(subject: string): Promise<SubjectLev
   try {
     const res = await fetch(`/api/subject-levels?subject=${encodeURIComponent(subject.trim())}`);
     if (!res.ok) return null;
+
     const data = await res.json();
     if (!Array.isArray(data?.levels) || data.levels.length === 0) return null;
 
@@ -79,11 +99,10 @@ export async function identifySubjectLevels(subject: string): Promise<SubjectLev
 }
 
 /**
- * Carrega os currículos de todos os níveis identificados em PARALELO.
- * Retorna um objeto por nível — cada um pode estar carregando ou ter erro.
- *
- * Uso: chame isso e use o callback `onUpdate` para atualizar o estado do React
- * conforme cada currículo chega (os mais rápidos do cache chegam primeiro).
+ * Carrega as grades dos níveis identificados em paralelo.
+ * Ao terminar, publica no browser quais níveis possuem currículo realmente
+ * disponível. A StudioView continua responsável por exibir a grade do nível
+ * selecionado; este evento serve apenas para o seletor de nível.
  */
 export async function loadAllLevelCurricula(
   subject: string,
@@ -92,16 +111,23 @@ export async function loadAllLevelCurricula(
 ): Promise<void> {
   if (!subject.trim() || levels.length === 0) return;
 
-  // Estado inicial: todos carregando
   const state = new Map<EducationLevel, LevelCurriculum>(
     levels.map(l => [
       l.level,
-      { level: l.level, label: l.label, icon: l.icon, reason: l.reason, categories: [], loading: true, error: false },
+      {
+        level: l.level,
+        label: l.label,
+        icon: l.icon,
+        reason: l.reason,
+        categories: [],
+        loading: true,
+        error: false,
+      },
     ]),
   );
+
   onUpdate(new Map(state));
 
-  // Carrega em paralelo
   await Promise.all(
     levels.map(async levelInfo => {
       try {
@@ -118,9 +144,11 @@ export async function loadAllLevelCurricula(
       onUpdate(new Map(state));
     }),
   );
+
+  publishVerifiedCurriculumLevels(subject, state, levels);
 }
 
-/** Invalida cache de níveis para uma matéria (ex: após mudança de nome). */
+/** Invalida cache de níveis para uma matéria. */
 export function invalidateLevelsCache(subject: string): void {
   const key = normalizeKey(subject);
   levelsCache.delete(key);
