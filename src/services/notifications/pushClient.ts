@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { getMessaging, getToken, isSupported, type Messaging } from 'firebase/messaging';
 import { app, auth, db, doc, getDoc, setDoc, ensureAuthenticated } from '../../lib/firebase';
 
@@ -16,13 +18,20 @@ const DEFAULT_PREFS: NotificationPrefs = {
   tokens: [],
   dailyReminderEnabled: false,
   streakReminderEnabled: true,
-  reminderHourLocal: 19, // 19h — horário comum de estudo à noite
+  reminderHourLocal: 19,
   reminderHourUTC: 22,
   updatedAt: 0,
 };
 
+const NATIVE_DAILY_REMINDER_ID = 42001;
+const NATIVE_TEST_NOTIFICATION_ID = 42002;
+
 function prefsDocRef(uid: string) {
   return doc(db, 'notificationPrefs', uid);
+}
+
+function isNativeApp(): boolean {
+  return Capacitor.isNativePlatform();
 }
 
 export async function getNotificationPrefs(): Promise<NotificationPrefs> {
@@ -37,11 +46,12 @@ export async function getNotificationPrefs(): Promise<NotificationPrefs> {
 }
 
 function localHourToUTCHour(localHour: number): number {
-  const offsetMinutes = new Date().getTimezoneOffset(); // minutos a SOMAR ao horário local para chegar em UTC
+  const offsetMinutes = new Date().getTimezoneOffset();
   return ((localHour + Math.round(offsetMinutes / 60)) % 24 + 24) % 24;
 }
 
 export async function isPushSupported(): Promise<boolean> {
+  if (isNativeApp()) return true;
   try {
     return await isSupported();
   } catch {
@@ -51,9 +61,45 @@ export async function isPushSupported(): Promise<boolean> {
 
 let messagingInstance: Messaging | null = null;
 async function getMessagingSafe(): Promise<Messaging | null> {
-  if (!(await isPushSupported())) return null;
+  if (isNativeApp() || !(await isPushSupported())) return null;
   if (!messagingInstance) messagingInstance = getMessaging(app);
   return messagingInstance;
+}
+
+async function ensureNativeNotificationPermission(): Promise<boolean> {
+  const current = await LocalNotifications.checkPermissions();
+  if (current.display === 'granted') return true;
+
+  const requested = await LocalNotifications.requestPermissions();
+  return requested.display === 'granted';
+}
+
+async function scheduleNativeDailyReminder(reminderHourLocal: number): Promise<EnablePushResult> {
+  const granted = await ensureNativeNotificationPermission();
+  if (!granted) {
+    return { success: false, message: 'Permissão de notificações negada. Ative as notificações do MemoriaFlash nas configurações do Android.' };
+  }
+
+  await LocalNotifications.cancel({ notifications: [{ id: NATIVE_DAILY_REMINDER_ID }] });
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: NATIVE_DAILY_REMINDER_ID,
+        title: 'Lembretes de Revisão',
+        body: 'Você tem cartões para revisar. Não deixe seus estudos acumularem.',
+        schedule: {
+          on: { hour: reminderHourLocal, minute: 0 },
+        },
+        extra: { type: 'daily-review' },
+      },
+    ],
+  });
+
+  return { success: true, message: 'Lembretes diários ativados neste celular!' };
+}
+
+async function disableNativeDailyReminder(): Promise<void> {
+  await LocalNotifications.cancel({ notifications: [{ id: NATIVE_DAILY_REMINDER_ID }] });
 }
 
 export interface EnablePushResult {
@@ -62,12 +108,32 @@ export interface EnablePushResult {
 }
 
 /**
- * Pede permissão do navegador, obtém o token FCM deste dispositivo e salva
- * as preferências diretamente no Firestore (documento do próprio usuário —
- * seguro, sem precisar de backend, pois cada um só escreve o seu próprio
- * `notificationPrefs/{uid}`).
+ * Android/iOS Capacitor: usa notificações locais nativas.
+ * Navegador: mantém Firebase Cloud Messaging/Web Push.
  */
 export async function enableDailyReminders(reminderHourLocal: number): Promise<EnablePushResult> {
+  if (isNativeApp()) {
+    try {
+      const result = await scheduleNativeDailyReminder(reminderHourLocal);
+      if (!result.success) return result;
+
+      const user = await ensureAuthenticated();
+      const existing = await getNotificationPrefs();
+      const prefs: NotificationPrefs = {
+        ...existing,
+        dailyReminderEnabled: true,
+        reminderHourLocal,
+        reminderHourUTC: localHourToUTCHour(reminderHourLocal),
+        updatedAt: Date.now(),
+      };
+      await setDoc(prefsDocRef(user.uid), prefs, { merge: true });
+      return result;
+    } catch (err: any) {
+      console.error('Erro ao ativar notificações nativas:', err);
+      return { success: false, message: err?.message || 'Erro ao ativar notificações nativas.' };
+    }
+  }
+
   const messaging = await getMessagingSafe();
   if (!messaging) {
     return { success: false, message: 'Notificações push não são suportadas neste navegador.' };
@@ -96,7 +162,6 @@ export async function enableDailyReminders(reminderHourLocal: number): Promise<E
     const user = await ensureAuthenticated();
     const existing = await getNotificationPrefs();
     const tokens = Array.from(new Set([...existing.tokens, token]));
-
     const prefs: NotificationPrefs = {
       ...existing,
       tokens,
@@ -115,6 +180,8 @@ export async function enableDailyReminders(reminderHourLocal: number): Promise<E
 }
 
 export async function disableDailyReminders(): Promise<void> {
+  if (isNativeApp()) await disableNativeDailyReminder();
+
   const user = await ensureAuthenticated();
   const existing = await getNotificationPrefs();
   await setDoc(
@@ -134,8 +201,33 @@ export async function updateStreakReminderPref(enabled: boolean): Promise<void> 
   );
 }
 
-/** Envia uma notificação de teste imediata para o próprio usuário, via backend (precisa de login real). */
+/** Envia uma notificação de teste imediata no dispositivo ou via backend no navegador. */
 export async function sendTestNotification(): Promise<EnablePushResult> {
+  if (isNativeApp()) {
+    try {
+      const granted = await ensureNativeNotificationPermission();
+      if (!granted) {
+        return { success: false, message: 'Permissão de notificações negada. Ative as notificações do MemoriaFlash nas configurações do Android.' };
+      }
+
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: NATIVE_TEST_NOTIFICATION_ID,
+            title: 'MemoriaFlash',
+            body: 'Notificação funcionando! Seus lembretes de revisão estão configurados.',
+            schedule: { at: new Date(Date.now() + 3000) },
+            extra: { type: 'notification-test' },
+          },
+        ],
+      });
+      return { success: true, message: 'Notificação de teste agendada para este celular.' };
+    } catch (err: any) {
+      console.error('Erro ao enviar notificação nativa de teste:', err);
+      return { success: false, message: err?.message || 'Falha ao enviar notificação de teste.' };
+    }
+  }
+
   const user = auth.currentUser;
   if (!user || typeof (user as any).getIdToken !== 'function') {
     return { success: false, message: 'Faça login para testar as notificações.' };
