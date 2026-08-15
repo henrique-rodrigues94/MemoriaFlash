@@ -87,14 +87,70 @@ adb install -r ".\app\build\outputs\apk\debug\app-debug.apk"
 > [`docs/ANDROID_MONETIZATION_SETUP.md`](docs/ANDROID_MONETIZATION_SETUP.md)
 > para o App ID do AdMob e o Play Billing.
 
-## ☁️ Backend em produção
+## ☁️ Backend em produção (Render)
 
 Para o app Android funcionar fora da rede local, o backend Express precisa
-estar hospedado em uma URL HTTPS pública. O repositório inclui um
-[`render.yaml`](render.yaml) (Blueprint) para deploy em **uma etapa** no
-[Render](https://render.com) (free tier) — veja o passo a passo em
-[`docs/DEPLOY.md`](docs/DEPLOY.md).
+estar hospedado em uma **URL HTTPS pública**. O repositório inclui um
+[`render.yaml`](render.yaml) (Blueprint) que automatiza o deploy no
+[Render](https://render.com) (plano free).
 
-Depois do deploy, use a URL HTTPS do Render (ex. `https://memoriaflash.onrender.com`)
-como `VITE_API_BASE_URL` no build do APK, junto com o `VITE_GOOGLE_WEB_CLIENT_ID`
-(configurado no `.env`).
+### 1. Criar conta no Render
+
+Acesse [render.com](https://render.com) e clique em **Sign Up** →
+**Continue with GitHub** (mais rápido e seguro — usa a mesma conta do GitHub).
+
+### 2. Deploy em uma etapa (Blueprint)
+
+1. No dashboard do Render, clique em **New** → **Blueprint**.
+2. Conecte o repositório `MemoriaFlash` (autorize o acesso do Render ao GitHub
+   se pedir).
+3. O Render detecta o [`render.yaml`](render.yaml) e monta o serviço
+   automaticamente (nome `memoriaflash`, build `npm ci && npm run build`,
+   start `node dist/server.cjs`, health check `/api/health`).
+4. Preencha as variáveis de ambiente que o Render pedir (as marcadas como
+   secret). Copie os mesmos valores do seu `.env`:
+
+   | Variável | Valor sugerido |
+   |---|---|
+   | `GEMINI_API_KEY` | sua chave do Gemini (obrigatória) |
+   | `DEEPSEEK_API_KEY` | sua chave (fallback, opcional) |
+   | `OPENAI_API_KEY` | sua chave (fallback, opcional) |
+   | `FIREBASE_PROJECT_ID` | `flashcardsia-a2f43` |
+   | `FIREBASE_CLIENT_EMAIL` | o mesmo do `.env` |
+   | `FIREBASE_PRIVATE_KEY` | a chave privada do `.env` |
+   | `APP_URL` | `https://memoriaflash.onrender.com` |
+   | `CORS_ORIGIN` | `https://memoriaflash.onrender.com` |
+   | `GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_FILE` | só se usar Play Billing |
+   | `ADMIN_TOKEN` | opcional (endpoint de manutenção) |
+
+5. Clique em **Apply** e aguarde o build (2–3 min). Ao concluir, o Render
+   entrega uma URL HTTPS pública, por exemplo:
+   `https://memoriaflash.onrender.com`.
+
+### 3. Confirmar que está no ar
+
+Abra no navegador (ou `curl`):
+
+```bash
+curl https://memoriaflash.onrender.com/api/health
+# → {"status":"ok","timestamp":"..."}
+```
+
+Se responder `{"status":"ok"}`, o backend está funcionando.
+
+### 4. Usar a URL no APK Android
+
+Depois do deploy, use a URL HTTPS do Render como `VITE_API_BASE_URL` no
+`.env` e recompile o APK:
+
+```dotenv
+VITE_API_BASE_URL=https://memoriaflash.onrender.com
+VITE_GOOGLE_WEB_CLIENT_ID=773874565537-...apps.googleusercontent.com
+```
+
+Depois é só rodar `npm run build` → `npx cap sync android` →
+`gradlew assembleDebug` e instalar o APK.
+
+> ⚠️ **Plano free:** o serviço "dorme" após ~15 min sem uso e leva alguns
+> segundos para "acordar" no primeiro acesso (cold start). Para um plano pago
+> ou maior estabilidade, consulte o [`docs/DEPLOY.md`](docs/DEPLOY.md).
