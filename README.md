@@ -86,3 +86,15 @@ adb install -r ".\app\build\outputs\apk\debug\app-debug.apk"
 > Google e a configuração de rede, e
 > [`docs/ANDROID_MONETIZATION_SETUP.md`](docs/ANDROID_MONETIZATION_SETUP.md)
 > para o App ID do AdMob e o Play Billing.
+
+## ☁️ Backend em produção
+
+Para o app Android funcionar fora da rede local, o backend Express precisa
+estar hospedado em uma URL HTTPS pública. O repositório inclui um
+[`render.yaml`](render.yaml) (Blueprint) para deploy em **uma etapa** no
+[Render](https://render.com) (free tier) — veja o passo a passo em
+[`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+Depois do deploy, use a URL HTTPS do Render (ex. `https://memoriaflash.onrender.com`)
+como `VITE_API_BASE_URL` no build do APK, junto com o `VITE_GOOGLE_WEB_CLIENT_ID`
+(configurado no `.env`).

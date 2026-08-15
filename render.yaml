@@ -1,0 +1,44 @@
+# Render.com Blueprint — deploy automático do MemoriaFlash
+# Documentação: https://render.com/docs/blueprint-spec
+# Após conectar o repo no Render, ele detecta este arquivo e cria o serviço.
+# O deploy automático via GitHub Actions usa o deploy hook (docs/DEPLOY.md).
+
+services:
+  - type: web
+    name: memoriaflash
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: node dist/server.cjs
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_URL
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      # IA — provedores
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      # Firebase Admin SDK (service account)
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      # Google Play Billing (validação de compras)
+      - key: ANDROID_PACKAGE_NAME
+        value: com.memoriaflash.app
+      - key: GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_FILE
+        sync: false
+      # Admin token (endpoint de manutenção) — opcional
+      - key: ADMIN_TOKEN
+        sync: false

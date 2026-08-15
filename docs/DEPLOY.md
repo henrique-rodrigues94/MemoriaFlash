@@ -55,6 +55,30 @@ gratuita:
 | Google Cloud Run | Sim (grátis até certo volume) | Mesma stack usada pelo AI Studio original deste projeto |
 | Firebase Hosting + Cloud Functions | Sim | Requer adaptar o Express para uma Cloud Function (não incluso neste scaffold) |
 
+### Deploy no Render (recomendado, free tier)
+
+O repositório já inclui um `render.yaml` (Blueprint) com a configuração
+completa. Para fazer o deploy:
+
+1. Acesse [render.com](https://render.com) e crie uma conta (pode usar o
+   login do GitHub).
+2. Clique em **New → Blueprint** e selecione o repositório `MemoriaFlash`.
+   O Render detecta o `render.yaml` automaticamente.
+3. Quando o serviço perguntar pelas variáveis marcadas com `sync: false`,
+   preencha os mesmos valores do seu `.env`:
+   - `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`
+   - `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
+   - `GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_FILE` (se usar Play Billing)
+   - `APP_URL`, `CORS_ORIGIN`, `ADMIN_TOKEN`
+4. O Render roda `npm ci && npm run build` e `node dist/server.cjs`
+   automaticamente. O health check usa `/api/health`.
+5. Ao terminar, o Render entrega uma URL HTTPS pública, ex.:
+   `https://memoriaflash.onrender.com`. **Essa URL é o `VITE_API_BASE_URL`
+   para o build do APK Android.**
+
+> ⚠️ No plano free o serviço "dorme" após ~15 min de inatividade e demora
+> alguns segundos para "acordar" no primeiro acesso (cold start).
+
 ### Deploy manual (exemplo genérico via Docker, qualquer host compatível)
 
 ```bash
