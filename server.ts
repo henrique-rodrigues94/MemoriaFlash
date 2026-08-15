@@ -30,7 +30,7 @@ import { getAdminFirestore } from './src/server/firebaseAdmin';
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '30mb' }));
 
 app.use('/api/gemini', simpleRateLimit({ windowMs: 60_000, max: 30 }));
 app.use('/api/referral', simpleRateLimit({ windowMs: 60_000, max: 20 }));
