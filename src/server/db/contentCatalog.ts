@@ -52,7 +52,6 @@ export async function getContentCatalog(subject: string, level: EducationLevel):
   }
 }
 
-/** Inicializa/atualiza o catálogo a partir da grade curricular. */
 export async function initializeContentCatalog(
   subject: string,
   level: EducationLevel,
@@ -79,24 +78,12 @@ export async function initializeContentCatalog(
         stale: old?.stale ?? true,
       };
     });
-    await ref.set({
-      subject: subject.trim(),
-      level,
-      curriculumId: curriculumId(subject, level),
-      curriculumUpdatedAt,
-      updatedAt: new Date().toISOString(),
-      ttlAt: makeTtl(TTL_DAYS.CURRICULUM),
-      topics,
-    } satisfies ContentCatalogDoc, { merge: true });
+    await ref.set({ subject: subject.trim(), level, curriculumId: curriculumId(subject, level), curriculumUpdatedAt, updatedAt: new Date().toISOString(), ttlAt: makeTtl(TTL_DAYS.CURRICULUM), topics } satisfies ContentCatalogDoc, { merge: true });
   } catch (err: any) {
     console.warn('[contentCatalog] initialize error:', err?.message);
   }
 }
 
-/**
- * Atualiza o catálogo lendo o bucket real. Assim o número exibido nunca
- * depende de quantos cards a IA acabou de retornar: ele representa o banco.
- */
 export async function updateContentCatalogFromBucket(args: {
   subject: string;
   topic: string;
@@ -109,12 +96,17 @@ export async function updateContentCatalogFromBucket(args: {
   if (!db) return;
   try {
     const { subject, topic, level, cardType } = args;
-    const bucketRef = db.collection('cardBuckets').doc(bucketId(subject, topic, level, cardType));
-    const bucketSnap = await bucketRef.get();
+    const bucketSnap = await db.collection('cardBuckets').doc(bucketId(subject, topic, level, cardType)).get();
     if (!bucketSnap.exists) return;
     const bucket = bucketSnap.data() as { cardCount?: number; updatedAt?: string; ttlAt?: number };
     const actualCount = Number(bucket.cardCount || 0);
     const actualUpdatedAt = bucket.updatedAt || args.updatedAt || new Date().toISOString();
+
+    const curriculumSnap = await db.collection('curricula').doc(curriculumId(subject, level)).get();
+    const curriculum = curriculumSnap.exists ? curriculumSnap.data() as { categories?: Array<{ category: string; topics?: string[] }>; updatedAt?: string } : null;
+    const curriculumCategory = (curriculum?.categories || []).find(c => normalizeText(c.category) === normalizeText(topic));
+    const curriculumSubtopics = Array.from(new Set((curriculumCategory?.topics || []).map(t => t.trim()).filter(Boolean)));
+
     const ref = db.collection('contentCatalog').doc(catalogDocId(subject, level));
     const snap = await ref.get();
     const current = snap.exists ? snap.data() as ContentCatalogDoc : null;
@@ -122,27 +114,21 @@ export async function updateContentCatalogFromBucket(args: {
     let index = topics.findIndex(t => normalizeText(t.topic) === normalizeText(topic));
 
     if (index < 0) {
-      topics.push({ id: topicId(topic), topic: topic.trim(), subtopics: [], cardCount: 0, cardsByType: {}, updatedAt: null, lastGeneratedAt: null, stale: false });
+      topics.push({ id: topicId(topic), topic: topic.trim(), subtopics: curriculumSubtopics, cardCount: 0, cardsByType: {}, updatedAt: null, lastGeneratedAt: null, stale: false });
       index = topics.length - 1;
     }
 
     const previous = topics[index];
+    const subtopics = previous.subtopics?.length ? previous.subtopics : curriculumSubtopics;
     const cardsByType = { ...(previous.cardsByType || {}), [cardType]: actualCount };
     const aggregate = Object.values(cardsByType).reduce((sum, value) => sum + Number(value || 0), 0);
-    topics[index] = {
-      ...previous,
-      cardCount: aggregate,
-      cardsByType,
-      updatedAt: actualUpdatedAt,
-      lastGeneratedAt: actualUpdatedAt,
-      stale: isExpired(bucket.ttlAt),
-    };
+    topics[index] = { ...previous, subtopics, cardCount: aggregate, cardsByType, updatedAt: actualUpdatedAt, lastGeneratedAt: actualUpdatedAt, stale: isExpired(bucket.ttlAt) };
 
     await ref.set({
       subject: subject.trim(),
       level,
       curriculumId: curriculumId(subject, level),
-      curriculumUpdatedAt: current?.curriculumUpdatedAt || null,
+      curriculumUpdatedAt: current?.curriculumUpdatedAt || curriculum?.updatedAt || null,
       updatedAt: new Date().toISOString(),
       ttlAt: current?.ttlAt || makeTtl(TTL_DAYS.CURRICULUM),
       topics,
