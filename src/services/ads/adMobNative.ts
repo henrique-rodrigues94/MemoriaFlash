@@ -42,9 +42,6 @@ export async function requestAdMobConsent(): Promise<void> {
   if (!isNativeAndroid() || consentRequested) return;
 
   await initializeAdMob();
-
-  // A versão 8.1.0 do plugin não exporta AdMobConsentDebugGeography.
-  // Mantemos o fluxo de consentimento compatível com a API pública da versão instalada.
   const status = await AdMob.requestConsentInfo();
   consentRequested = true;
 
@@ -53,8 +50,14 @@ export async function requestAdMobConsent(): Promise<void> {
   }
 }
 
+/**
+ * Mostra/revalida o banner. Não usa um flag como condição de retorno: o SDK
+ * pode remover o banner nativo por falta de inventário, mudança de atividade
+ * ou retorno do app, mesmo que a aplicação ainda considere o banner visível.
+ * Por isso a camada de UI pode chamar esta função novamente com segurança.
+ */
 export async function showFreeUserBanner(): Promise<void> {
-  if (!isNativeAndroid() || bannerVisible) return;
+  if (!isNativeAndroid()) return;
   const config = assertConfigured();
   await initializeAdMob();
 
@@ -69,8 +72,11 @@ export async function showFreeUserBanner(): Promise<void> {
 
 export async function hideAdMobBanner(): Promise<void> {
   if (!isNativeAndroid() || !bannerVisible) return;
-  await AdMob.hideBanner();
-  bannerVisible = false;
+  try {
+    await AdMob.hideBanner();
+  } finally {
+    bannerVisible = false;
+  }
 }
 
 export async function prepareInterstitial(): Promise<boolean> {
@@ -85,9 +91,7 @@ export async function prepareInterstitial(): Promise<boolean> {
 
 export async function showInterstitialIfReady(): Promise<boolean> {
   if (!isNativeAndroid()) return false;
-  if (!interstitialPrepared) {
-    await prepareInterstitial();
-  }
+  if (!interstitialPrepared) await prepareInterstitial();
 
   try {
     await AdMob.showInterstitial();
@@ -100,11 +104,7 @@ export async function showInterstitialIfReady(): Promise<boolean> {
   }
 }
 
-/**
- * Exibe um Rewarded Ad real. O callback onRewarded só é executado quando o
- * SDK do Google informa que a recompensa foi efetivamente concedida.
- * Nenhum timer local pode liberar créditos.
- */
+/** Mantido para compatibilidade do plugin; não concede créditos ao usuário. */
 export async function showRewardedAd(
   onRewarded: (reward: { amount: number; type: string }) => void,
 ): Promise<boolean> {
@@ -117,10 +117,7 @@ export async function showRewardedAd(
     RewardAdPluginEvents.Rewarded,
     (rewardItem) => {
       rewarded = true;
-      onRewarded({
-        amount: Number(rewardItem.amount || 0),
-        type: rewardItem.type || 'reward',
-      });
+      onRewarded({ amount: Number(rewardItem.amount || 0), type: rewardItem.type || 'reward' });
     },
   );
 
