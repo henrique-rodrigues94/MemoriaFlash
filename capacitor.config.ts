@@ -5,6 +5,9 @@ const config: CapacitorConfig = {
   appName: 'MemoriaFlash',
   webDir: 'dist',
   plugins: {
+    CapacitorHttp: {
+      enabled: true,
+    },
     SocialLogin: {
       providers: {
         google: true,
