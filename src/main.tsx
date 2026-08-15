@@ -1,5 +1,6 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import App from './App.tsx';
 import './index.css';
 import { initErrorLogger } from './lib/errorLogger';
@@ -13,25 +14,65 @@ const API_BASE_URL = (
 ).replace(/\/+$/, '');
 
 // Todas as chamadas internas para /api passam pelo backend configurado.
-// Isso evita que o APK tente resolver /api no origin do Capacitor (capacitor://localhost).
+// No Android/iOS usamos CapacitorHttp para evitar as restrições de CORS do WebView.
 if (API_BASE_URL && typeof window !== 'undefined') {
-  const nativeFetch = window.fetch.bind(window);
-  window.fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const browserFetch = window.fetch.bind(window);
+  const isNative = Capacitor.isNativePlatform();
+
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const rawUrl = typeof input === 'string'
       ? input
       : input instanceof URL
         ? input.toString()
         : input.url;
 
-    if (rawUrl.startsWith('/api/')) {
-      const targetUrl = `${API_BASE_URL}${rawUrl}`;
-      if (typeof input === 'string' || input instanceof URL) {
-        return nativeFetch(targetUrl, init);
-      }
-      return nativeFetch(new Request(targetUrl, input), init);
+    if (!rawUrl.startsWith('/api/')) {
+      return browserFetch(input, init);
     }
 
-    return nativeFetch(input, init);
+    const targetUrl = `${API_BASE_URL}${rawUrl}`;
+
+    if (!isNative) {
+      if (typeof input === 'string' || input instanceof URL) {
+        return browserFetch(targetUrl, init);
+      }
+      return browserFetch(new Request(targetUrl, input), init);
+    }
+
+    // CapacitorHttp recebe o corpo JSON como objeto. As chamadas /api do
+    // frontend usam JSON; corpos binários/FormData continuam no fetch normal.
+    const body = init?.body;
+    if (body instanceof FormData || body instanceof Blob || body instanceof ArrayBuffer) {
+      return browserFetch(targetUrl, init);
+    }
+
+    const headers = new Headers(init?.headers);
+    let data: unknown = undefined;
+    if (typeof body === 'string' && body.length > 0) {
+      try {
+        data = JSON.parse(body);
+      } catch {
+        data = body;
+      }
+    }
+
+    const nativeResponse = await CapacitorHttp.request({
+      url: targetUrl,
+      method: init?.method || 'GET',
+      headers: Object.fromEntries(headers.entries()),
+      data,
+      connectTimeout: 30000,
+      readTimeout: 120000,
+    });
+
+    const responseBody = typeof nativeResponse.data === 'string'
+      ? nativeResponse.data
+      : JSON.stringify(nativeResponse.data ?? null);
+
+    return new Response(responseBody, {
+      status: nativeResponse.status,
+      headers: nativeResponse.headers,
+    });
   };
 }
 
