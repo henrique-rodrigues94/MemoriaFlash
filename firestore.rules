@@ -9,6 +9,8 @@ service cloud.firestore {
     function validComment(){return !request.resource.data.keys().hasAny(['comment'])||(request.resource.data.comment is string&&request.resource.data.comment.size()<=500);}
     function validCardProblem(){return isSignedIn()&&request.resource.data.cardId is string&&request.resource.data.cardId.size()>0&&request.resource.data.userId is string&&request.resource.data.userId==request.auth.uid&&request.resource.data.reportType=='card_problem'&&(!request.resource.data.keys().hasAny(['reason'])||request.resource.data.reason in ['wrong_answer','bad_explanation','confusing_question','duplicate_content','outdated_content','other'])&&validComment();}
     function validRatingFeedback(){return isSignedIn()&&request.resource.data.cardId is string&&request.resource.data.rating in ['positive','negative']&&validComment();}
+    function validContentRequest(){return isSignedIn()&&request.resource.data.requestedBy==request.auth.uid&&request.resource.data.subject is string&&request.resource.data.subject.size()>=2&&request.resource.data.subject.size()<=180&&request.resource.data.status=='pending'&&request.resource.data.requestCount==1&&request.resource.data.attempts==0;}
+    function validSourceChunk(){return isSignedIn()&&request.resource.data.text is string&&request.resource.data.text.size()>0&&request.resource.data.text.size()<=12000&&request.resource.data.index is int&&request.resource.data.index>=0&&request.resource.data.index<80;}
 
     match /decks/{deckId}{
       allow read:if isSignedIn()&&resource.data.userId==request.auth.uid;
@@ -26,15 +28,27 @@ service cloud.firestore {
     match /contentIndex/{id}{allow read:if true;allow write:if false;}
     match /contentCatalog/{id}{allow read:if true;allow write:if false;}
 
-    // Fila e métricas do Agent nunca são acessíveis pelo cliente.
-    match /contentRequests/{id}{allow read,write:if false;}
+    // O usuário autenticado pode apenas ENFILEIRAR seu próprio pedido.
+    // O Agent/Admin SDK é o único responsável por alterar status, progresso e resultado.
+    match /contentRequests/{id}{
+      allow create:if validContentRequest();
+      allow read:if isSignedIn()&&resource.data.requestedBy==request.auth.uid;
+      allow update,delete:if false;
+
+      // Fonte do PDF/TXT em partes. O usuário só pode criar partes do próprio pedido;
+      // o Agent lê essas partes via Admin SDK e nunca as expõe a outros usuários.
+      match /sourceChunks/{chunkId}{
+        allow create:if get(/databases/$(database)/documents/contentRequests/$(id)).data.requestedBy==request.auth.uid&&validSourceChunk();
+        allow read:if get(/databases/$(database)/documents/contentRequests/$(id)).data.requestedBy==request.auth.uid;
+        allow update,delete:if false;
+      }
+    }
     match /agentRuns/{id}{allow read,write:if false;}
     match /agentMetrics/{id}{allow read,write:if false;}
     match /agentErrors/{id}{allow read,write:if false;}
     match /aiCache/{id}{allow read,write:if false;}
 
-    // Feedback: o usuário pode criar, mas nunca alterar/apagar. O relatório
-    // de problema exige que o UID enviado corresponda ao usuário autenticado.
+    // Feedback: o usuário pode criar, mas nunca alterar/apagar.
     match /cardFeedback/{id}{
       allow create:if validCardProblem()||validRatingFeedback();
       allow read,update,delete:if false;
