@@ -7,8 +7,8 @@
  * 2. Grade curricular (/api/curriculum) para confirmar que existe conteúdo
  *    utilizável naquele nível.
  *
- * Enquanto a verificação online não termina, mantemos uma heurística local
- * como fallback para não bloquear o usuário por uma falha momentânea da API.
+ * Enquanto a verificação online não termina, mantemos todos os níveis visíveis
+ * e o bridge abaixo aplica disabled nas opções que não foram validadas.
  */
 export type EducationLevel = 'fundamental' | 'medio' | 'faculdade' | 'concurso' | 'tecnico';
 
@@ -39,7 +39,6 @@ function matchesAny(s: string, terms: string[]): boolean {
   return terms.some(term => s === term || s.includes(term));
 }
 
-// Matérias clássicas da Educação Básica.
 const ESCOLA_SUBJECTS = [
   'matematica', 'portugues', 'lingua portuguesa', 'redacao', 'gramatica', 'literatura',
   'biologia', 'fisica', 'quimica', 'ciencias', 'ciencias naturais',
@@ -50,7 +49,6 @@ const ESCOLA_SUBJECTS = [
   'informatica', 'tecnologia', 'educacao financeira',
 ];
 
-// Assuntos que não pertencem normalmente ao currículo da Educação Básica.
 const NON_ESCOLA_SUBJECTS = [
   'direito', 'medicina', 'enfermagem', 'odontologia', 'farmacia', 'veterinaria',
   'engenharia', 'arquitetura', 'urbanismo', 'administracao', 'contabilidade',
@@ -67,7 +65,7 @@ const NON_ESCOLA_SUBJECTS = [
 
 const CONCURSO_SIGNALS = [
   'concurso', 'edital', 'banca examinadora', 'prova objetiva', 'questoes de concurso',
-  'cespe', 'cebraspe', 'fgv', 'fcc', 'vunesp', 'ibfc', 'instituto ao cp',
+  'cespe', 'cebraspe', 'fgv', 'fcc', 'vunesp', 'ibfc',
   'direito penal', 'direito civil', 'direito constitucional', 'direito administrativo',
   'direito tributario', 'direito trabalhista', 'direito previdenciario',
   'direito processual', 'direito eleitoral', 'direito ambiental', 'legislacao especial',
@@ -89,26 +87,11 @@ const TECNICO_SIGNALS = [
 ];
 
 /**
- * Heurística local usada somente como fallback enquanto a verificação da IA
- * ainda não respondeu.
+ * O StudioView usa esta função para construir o <select>. Todos os níveis
+ * permanecem presentes no DOM para que o bridge consiga exibir os níveis
+ * incompatíveis como desabilitados, em vez de simplesmente escondê-los.
  */
-export function getAvailableEducationLevels(subject: string): EducationLevel[] {
-  const s = normalize(subject);
-  if (s.length < 3) return ALL_LEVELS;
-
-  const verified = verifiedLevelsCache.get(s);
-  if (verified && Date.now() - verified.at < VERIFIED_CACHE_MS) {
-    // O select precisa manter TODOS os níveis no DOM para poder desabilitar os
-    // que não foram validados. A lista confirmada é aplicada pelo bridge visual.
-    return ALL_LEVELS;
-  }
-
-  // Fallback local: não remove níveis quando a classificação é incerta.
-  // Apenas evita Fundamental/Médio em matérias claramente superiores.
-  if (matchesAny(s, NON_ESCOLA_SUBJECTS)) {
-    return ALL_LEVELS.filter(level => level !== 'fundamental' && level !== 'medio');
-  }
-
+export function getAvailableEducationLevels(_subject: string): EducationLevel[] {
   return ALL_LEVELS;
 }
 
@@ -134,8 +117,7 @@ export function recommendEducationLevels(
     if (isEscola) {
       add('fundamental');
       add('medio');
-      // Muitas matérias escolares também aparecem no superior.
-      if (s === 'matematica' || s === 'fisica' || s === 'quimica' || s === 'biologia') add('faculdade');
+      if (['matematica', 'fisica', 'quimica', 'biologia'].includes(s)) add('faculdade');
     }
   }
 
@@ -150,10 +132,7 @@ export function recommendEducationLevel(
   return recommendEducationLevels(subject, available)[0];
 }
 
-/**
- * Consulta a IA e, em seguida, confirma a existência de uma grade curricular.
- * Só níveis identificados pela IA E com grade válida ficam habilitados.
- */
+/** Consulta a IA e confirma a existência de uma grade curricular válida. */
 async function verifySubjectLevels(subject: string): Promise<EducationLevel[] | null> {
   const key = normalize(subject);
   if (key.length < 2) return null;
@@ -164,6 +143,7 @@ async function verifySubjectLevels(subject: string): Promise<EducationLevel[] | 
   try {
     const levelResponse = await fetch(`/api/subject-levels?subject=${encodeURIComponent(subject.trim())}`);
     if (!levelResponse.ok) return null;
+
     const levelData = await levelResponse.json();
     const identified: EducationLevel[] = Array.isArray(levelData?.levels)
       ? levelData.levels
@@ -171,7 +151,10 @@ async function verifySubjectLevels(subject: string): Promise<EducationLevel[] | 
           .filter((level: EducationLevel) => ALL_LEVELS.includes(level))
       : [];
 
-    if (identified.length === 0) return [];
+    if (identified.length === 0) {
+      verifiedLevelsCache.set(key, { levels: [], at: Date.now() });
+      return [];
+    }
 
     const checks = await Promise.allSettled(
       identified.map(async level => {
@@ -186,11 +169,12 @@ async function verifySubjectLevels(subject: string): Promise<EducationLevel[] | 
       }),
     );
 
-    const successfulChecks = checks.filter(result => result.status === 'fulfilled') as PromiseFulfilledResult<{ level: EducationLevel; valid: boolean }>[];
+    const successfulChecks = checks.filter(
+      result => result.status === 'fulfilled',
+    ) as PromiseFulfilledResult<{ level: EducationLevel; valid: boolean }>[];
 
-    // Se a API de currículo falhou inteira, não transformamos uma falha de
-    // rede em bloqueio. Nesse caso a classificação da IA continua sendo o
-    // melhor fallback disponível.
+    // Falha total de rede não deve bloquear o usuário. Quando pelo menos uma
+    // consulta de currículo respondeu, usamos exclusivamente as confirmações.
     const levels = successfulChecks.length > 0
       ? successfulChecks.filter(result => result.value.valid).map(result => result.value.level)
       : identified;
@@ -204,6 +188,7 @@ async function verifySubjectLevels(subject: string): Promise<EducationLevel[] | 
 
 function hideLegacyDetectedLevelsBlock(): void {
   if (typeof document === 'undefined') return;
+
   const marker = Array.from(document.querySelectorAll('span')).find(
     node => node.textContent?.trim().toLowerCase().includes('níveis identificados pela ia'),
   );
@@ -213,6 +198,7 @@ function hideLegacyDetectedLevelsBlock(): void {
 
 function applyEducationLevelOptions(): void {
   if (typeof document === 'undefined') return;
+
   const subjectInput = document.querySelector<HTMLInputElement>('input[list="subject-suggestions"]');
   const select = document.querySelector<HTMLSelectElement>('#education-level');
   if (!select) return;
@@ -234,12 +220,13 @@ function applyEducationLevelOptions(): void {
     const value = option.value as EducationLevel;
     const enabled = available.has(value);
     option.disabled = !enabled;
-    option.title = enabled ? '' : 'Este nível não possui uma grade curricular válida para o assunto informado.';
+    option.title = enabled ? '' : 'Nível sem grade curricular válida para este assunto.';
   });
 
+  // Se a IA mudou o universo válido, nunca deixamos o estado controlado pelo
+  // React apontar para uma opção que acabou de ser bloqueada.
   if (select.value && !available.has(select.value as EducationLevel) && cached.levels.length > 0) {
-    const firstAvailable = cached.levels[0];
-    select.value = firstAvailable;
+    select.value = cached.levels[0];
     select.dispatchEvent(new Event('change', { bubbles: true }));
   }
 }
@@ -251,8 +238,8 @@ function scheduleVerification(subject: string): void {
     return;
   }
 
-  const oldTimer = pendingChecks.get(key);
-  if (oldTimer) clearTimeout(oldTimer);
+  const existingTimer = pendingChecks.get(key);
+  if (existingTimer) clearTimeout(existingTimer);
 
   const timer = setTimeout(async () => {
     pendingChecks.delete(key);
@@ -263,12 +250,11 @@ function scheduleVerification(subject: string): void {
 }
 
 /**
- * Bridge de compatibilidade da tela atual: mantém o processamento de IA e da
- * grade curricular existentes, mas transforma o resultado em opções realmente
- * habilitadas/desabilitadas no seletor e remove o antigo bloco redundante de
- * "Níveis identificados pela IA".
+ * Bridge de compatibilidade da StudioView atual.
  *
- * Isso permite melhorar a regra sem duplicar a tela StudioView inteira.
+ * Ele mantém a tela existente intacta, mas transforma a classificação da IA +
+ * grade em disabled no seletor e remove o antigo bloco redundante de
+ * "Níveis identificados pela IA".
  */
 function installEducationLevelUIBridge(): void {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
@@ -278,6 +264,7 @@ function installEducationLevelUIBridge(): void {
   const attachSubjectInput = () => {
     const input = document.querySelector<HTMLInputElement>('input[list="subject-suggestions"]');
     if (!input || input.dataset.levelVerificationAttached === '1') return;
+
     input.dataset.levelVerificationAttached = '1';
     input.addEventListener('input', () => {
       const subject = input.value.trim();
