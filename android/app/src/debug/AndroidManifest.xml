@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      Apenas o APK DEBUG pode acessar o backend HTTP da rede local durante os
+      testes com o celular. Builds de release continuam sem cleartext traffic
+      e devem usar VITE_API_BASE_URL com HTTPS.
+    -->
+    <application android:usesCleartextTraffic="true" />
+</manifest>
