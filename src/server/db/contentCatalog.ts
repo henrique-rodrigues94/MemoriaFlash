@@ -39,10 +39,7 @@ function topicId(topic: string): string {
   return normalizeText(topic).replace(/\s+/g, '-').slice(0, 120);
 }
 
-export async function getContentCatalog(
-  subject: string,
-  level: EducationLevel,
-): Promise<ContentCatalogDoc | null> {
+export async function getContentCatalog(subject: string, level: EducationLevel): Promise<ContentCatalogDoc | null> {
   const db = getAdminFirestore();
   if (!db) return null;
   try {
@@ -64,19 +61,14 @@ export async function initializeContentCatalog(
 ): Promise<void> {
   const db = getAdminFirestore();
   if (!db) return;
-
   try {
     const ref = db.collection('contentCatalog').doc(catalogDocId(subject, level));
     const existingSnap = await ref.get();
     const existing = existingSnap.exists ? existingSnap.data() as ContentCatalogDoc : null;
     const existingByTopic = new Map((existing?.topics || []).map(t => [normalizeText(t.topic), t]));
-
-    const topics: CatalogTopic[] = [];
-    for (const category of categories) {
-      // Na grade atual, category representa o tópico e topics representa os sub-tópicos.
-      const key = normalizeText(category.category);
-      const old = existingByTopic.get(key);
-      topics.push({
+    const topics: CatalogTopic[] = categories.map(category => {
+      const old = existingByTopic.get(normalizeText(category.category));
+      return {
         id: old?.id || topicId(category.category),
         topic: category.category.trim(),
         subtopics: Array.from(new Set((category.topics || []).map(t => t.trim()).filter(Boolean))),
@@ -85,10 +77,9 @@ export async function initializeContentCatalog(
         updatedAt: old?.updatedAt || null,
         lastGeneratedAt: old?.lastGeneratedAt || null,
         stale: old?.stale ?? true,
-      });
-    }
-
-    const doc: ContentCatalogDoc = {
+      };
+    });
+    await ref.set({
       subject: subject.trim(),
       level,
       curriculumId: curriculumId(subject, level),
@@ -96,62 +87,58 @@ export async function initializeContentCatalog(
       updatedAt: new Date().toISOString(),
       ttlAt: makeTtl(TTL_DAYS.CURRICULUM),
       topics,
-    };
-    await ref.set(doc, { merge: true });
+    } satisfies ContentCatalogDoc, { merge: true });
   } catch (err: any) {
     console.warn('[contentCatalog] initialize error:', err?.message);
   }
 }
 
-/** Atualiza somente o tópico afetado depois que um bucket recebe cards. */
+/**
+ * Atualiza o catálogo lendo o bucket real. Assim o número exibido nunca
+ * depende de quantos cards a IA acabou de retornar: ele representa o banco.
+ */
 export async function updateContentCatalogFromBucket(args: {
   subject: string;
   topic: string;
   level: EducationLevel;
   cardType: CardContentType;
-  cardCount: number;
-  updatedAt: string;
+  cardCount?: number;
+  updatedAt?: string;
 }): Promise<void> {
   const db = getAdminFirestore();
   if (!db) return;
-
   try {
-    const { subject, topic, level, cardType, cardCount, updatedAt } = args;
+    const { subject, topic, level, cardType } = args;
+    const bucketRef = db.collection('cardBuckets').doc(bucketId(subject, topic, level, cardType));
+    const bucketSnap = await bucketRef.get();
+    if (!bucketSnap.exists) return;
+    const bucket = bucketSnap.data() as { cardCount?: number; updatedAt?: string; ttlAt?: number };
+    const actualCount = Number(bucket.cardCount || 0);
+    const actualUpdatedAt = bucket.updatedAt || args.updatedAt || new Date().toISOString();
     const ref = db.collection('contentCatalog').doc(catalogDocId(subject, level));
     const snap = await ref.get();
     const current = snap.exists ? snap.data() as ContentCatalogDoc : null;
     const topics = Array.isArray(current?.topics) ? [...current!.topics] : [];
-    const key = normalizeText(topic);
-    let index = topics.findIndex(t => normalizeText(t.topic) === key);
+    let index = topics.findIndex(t => normalizeText(t.topic) === normalizeText(topic));
 
     if (index < 0) {
-      topics.push({
-        id: topicId(topic),
-        topic: topic.trim(),
-        subtopics: [],
-        cardCount: 0,
-        cardsByType: {},
-        updatedAt: null,
-        lastGeneratedAt: null,
-        stale: false,
-      });
+      topics.push({ id: topicId(topic), topic: topic.trim(), subtopics: [], cardCount: 0, cardsByType: {}, updatedAt: null, lastGeneratedAt: null, stale: false });
       index = topics.length - 1;
     }
 
     const previous = topics[index];
-    const cardsByType = { ...(previous.cardsByType || {}), [cardType]: cardCount };
+    const cardsByType = { ...(previous.cardsByType || {}), [cardType]: actualCount };
     const aggregate = Object.values(cardsByType).reduce((sum, value) => sum + Number(value || 0), 0);
-
     topics[index] = {
       ...previous,
       cardCount: aggregate,
       cardsByType,
-      updatedAt,
-      lastGeneratedAt: updatedAt,
-      stale: false,
+      updatedAt: actualUpdatedAt,
+      lastGeneratedAt: actualUpdatedAt,
+      stale: isExpired(bucket.ttlAt),
     };
 
-    const doc: ContentCatalogDoc = {
+    await ref.set({
       subject: subject.trim(),
       level,
       curriculumId: curriculumId(subject, level),
@@ -159,8 +146,7 @@ export async function updateContentCatalogFromBucket(args: {
       updatedAt: new Date().toISOString(),
       ttlAt: current?.ttlAt || makeTtl(TTL_DAYS.CURRICULUM),
       topics,
-    };
-    await ref.set(doc, { merge: true });
+    } satisfies ContentCatalogDoc, { merge: true });
   } catch (err: any) {
     console.warn('[contentCatalog] bucket update error:', err?.message);
   }
