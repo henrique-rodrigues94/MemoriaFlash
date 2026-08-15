@@ -15,11 +15,13 @@ function readBearerToken(req: any): string | null {
   return header.slice('Bearer '.length).trim() || null;
 }
 
-/**
- * Identifica o usuário pelo ID token do Firebase e lê o estado de assinatura
- * e consumo do documento userStats/{uid}. O limite gratuito é controlado no
- * backend para não depender de valores enviados pelo cliente.
- */
+function isProActive(data: Record<string, any>): boolean {
+  if (data.isPro !== true) return false;
+  if (!data.proExpiryDate) return true;
+  const expiry = Date.parse(String(data.proExpiryDate));
+  return Number.isFinite(expiry) && expiry > Date.now();
+}
+
 export async function authorizeGeneration(req: any, requestedCount: number): Promise<GenerationAuthorization> {
   const adminAuth = getAdminAuth();
   const db = getAdminFirestore();
@@ -36,7 +38,7 @@ export async function authorizeGeneration(req: any, requestedCount: number): Pro
   const uid = decoded.uid;
   const snapshot = await db.collection('userStats').doc(uid).get();
   const data = snapshot.exists ? snapshot.data() || {} : {};
-  const isPro = data.isPro === true;
+  const isPro = isProActive(data);
   const generated = Math.max(0, Number(data.aiCardsGenerated) || 0);
   const remaining = isPro ? Number.POSITIVE_INFINITY : Math.max(0, FREE_AI_CARD_LIMIT - generated);
 
@@ -50,11 +52,6 @@ export async function authorizeGeneration(req: any, requestedCount: number): Pro
   return { uid, isPro, generated, remaining };
 }
 
-/**
- * Registra apenas os cards realmente entregues pela IA. A operação é
- * transacional para impedir que duas requisições simultâneas ultrapassem o
- * limite gratuito.
- */
 export async function recordGeneratedCards(uid: string, actualCount: number): Promise<{ generated: number; remaining: number }> {
   const db = getAdminFirestore();
   if (!db) throw Object.assign(new Error('Firebase Admin indisponível.'), { httpStatus: 503 });
@@ -63,7 +60,7 @@ export async function recordGeneratedCards(uid: string, actualCount: number): Pr
   return db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(ref);
     const data = snapshot.exists ? snapshot.data() || {} : {};
-    const isPro = data.isPro === true;
+    const isPro = isProActive(data);
     const current = Math.max(0, Number(data.aiCardsGenerated) || 0);
     const next = current + Math.max(0, actualCount);
 
