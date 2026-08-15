@@ -1,6 +1,15 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import type { FeedbackReason } from '../server/db/firestoreSchema';
+
+export type FeedbackReason =
+  | 'confusing_question'
+  | 'wrong_answer'
+  | 'bad_explanation'
+  | 'too_easy'
+  | 'too_hard'
+  | 'duplicate_content'
+  | 'outdated_content'
+  | 'other';
 
 export interface CardProblemContext {
   cardId: string;
