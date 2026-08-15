@@ -4,11 +4,11 @@ import { auth, ensureAuthenticated } from './firebase';
 
 export type { EducationLevel };
 
-export interface GenerationUsage {
-  generated: number;
-  remaining: number;
-  limit?: number;
-  isPro?: boolean;
+export interface GenerationUsage { generated: number; remaining: number; limit?: number; isPro?: boolean; }
+
+function publishGenerationUsage(usage: GenerationUsage): void {
+  // Atualiza a UI imediatamente. O Firestore continua sendo a fonte de verdade.
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('memoriaflash:generation-usage', { detail: usage }));
 }
 
 export const fetchAITopicSuggestions = async (subject: string, educationLevel: EducationLevel = 'medio'): Promise<string[]> => {
@@ -19,11 +19,6 @@ export const fetchAITopicSuggestions = async (subject: string, educationLevel: E
   return Array.isArray(data.topics) ? data.topics : [];
 };
 
-/**
- * Gera flashcards e recebe do backend a contagem realmente debitada.
- * O callback é usado pela tela para atualizar o contador imediatamente,
- * sem esperar o listener do Firestore.
- */
 export const generateAICards = async (
   subject: string,
   topics: string[],
@@ -34,13 +29,11 @@ export const generateAICards = async (
 ): Promise<Flashcard[]> => {
   const user = auth.currentUser || await ensureAuthenticated();
   const idToken = await user.getIdToken();
-
   const res = await fetch('/api/gemini/generate-flashcards', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
     body: JSON.stringify({ prompt: subject, count, language: 'pt', difficulty: 'medium', selectedTopics: topics, educationLevel, existingFronts }),
   });
-
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const limitMessage = data?.code === 'GENERATION_LIMIT_REACHED'
@@ -55,7 +48,10 @@ export const generateAICards = async (
   const usage: GenerationUsage | null = data?.usage && typeof data.usage.generated === 'number'
     ? { generated: data.usage.generated, remaining: Number(data.usage.remaining), limit: data.usage.limit, isPro: data.usage.isPro }
     : null;
-  if (usage) onUsageCommitted?.(usage);
+  if (usage) {
+    publishGenerationUsage(usage);
+    onUsageCommitted?.(usage);
+  }
 
   return raw.map((item: any, idx: number) => ({
     id: `ai-card-${Date.now()}-${idx}`,
@@ -66,9 +62,6 @@ export const generateAICards = async (
     explanation: item.explanation || '',
     curiosity: item.curiosity || '',
     difficulty: (item.difficulty as Flashcard['difficulty']) || 'medium',
-    reps: 0,
-    interval: 0,
-    efactor: 2.5,
-    dueDate: new Date().toISOString(),
+    reps: 0, interval: 0, efactor: 2.5, dueDate: new Date().toISOString(),
   }));
 };
