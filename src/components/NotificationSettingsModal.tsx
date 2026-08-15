@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { X, Bell, BellOff, Flame, Send, Loader2 } from 'lucide-react';
+import { X, Bell, BellOff, Flame } from 'lucide-react';
 import {
   NotificationPrefs,
   getNotificationPrefs,
   enableDailyReminders,
   disableDailyReminders,
   updateStreakReminderPref,
-  sendTestNotification,
   isPushSupported,
 } from '../services/notifications/pushClient';
 
@@ -49,17 +48,13 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
           setPrefs(updated);
         }
       }
+    } catch (err: any) {
+      setStatusMessage(err?.message || 'Não foi possível atualizar os lembretes.');
     } finally {
       setLoading(false);
     }
   };
 
-  // CORREÇÃO: antes, o botão "Aplicar novo horário" chamava handleToggleDaily
-  // — mas como os lembretes JÁ ESTAVAM ativos nesse ponto (é a única situação
-  // em que esse botão aparece), isso caía no branch de DESATIVAR em vez de
-  // apenas atualizar o horário. Resultado: clicar para trocar o horário
-  // desligava os lembretes por completo. Agora há uma função dedicada que
-  // sempre reaplica com o novo horário, sem depender do estado atual.
   const handleApplyNewHour = async () => {
     if (!prefs) return;
     setLoading(true);
@@ -71,6 +66,8 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
         const updated = await getNotificationPrefs();
         setPrefs(updated);
       }
+    } catch (err: any) {
+      setStatusMessage(err?.message || 'Não foi possível atualizar o horário.');
     } finally {
       setLoading(false);
     }
@@ -80,15 +77,12 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
     if (!prefs) return;
     const next = !prefs.streakReminderEnabled;
     setPrefs({ ...prefs, streakReminderEnabled: next });
-    await updateStreakReminderPref(next);
-  };
-
-  const handleTest = async () => {
-    setLoading(true);
-    setStatusMessage(null);
-    const result = await sendTestNotification();
-    setStatusMessage(result.message);
-    setLoading(false);
+    try {
+      await updateStreakReminderPref(next);
+    } catch (err: any) {
+      setPrefs({ ...prefs, streakReminderEnabled: !next });
+      setStatusMessage(err?.message || 'Não foi possível atualizar a sequência.');
+    }
   };
 
   return (
@@ -114,13 +108,12 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
 
         {!supported && (
           <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
-            Notificações push não são suportadas neste navegador/dispositivo.
+            Notificações não estão disponíveis neste ambiente.
           </p>
         )}
 
         {supported && prefs && (
           <>
-            {/* Daily reminder toggle */}
             <div className="p-4 rounded-2xl bg-[#122131] border border-[#424754]/30 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
@@ -149,7 +142,8 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                     <button
                       key={h}
                       onClick={() => setSelectedHour(h)}
-                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                      disabled={loading}
+                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all disabled:opacity-50 ${
                         selectedHour === h
                           ? 'bg-blue-600 text-white'
                           : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
@@ -171,7 +165,6 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
               </div>
             </div>
 
-            {/* Streak reminder toggle */}
             <div className="flex items-center justify-between p-4 rounded-2xl bg-[#122131] border border-[#424754]/30">
               <div className="flex items-center gap-2.5">
                 <Flame className="w-4 h-4 text-orange-400" />
@@ -182,7 +175,8 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
               </div>
               <button
                 onClick={handleToggleStreak}
-                className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 cursor-pointer ${
+                disabled={loading}
+                className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 cursor-pointer disabled:opacity-50 ${
                   prefs.streakReminderEnabled ? 'bg-emerald-500' : 'bg-slate-700'
                 }`}
               >
@@ -193,17 +187,6 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                 />
               </button>
             </div>
-
-            {prefs.dailyReminderEnabled && (
-              <button
-                onClick={handleTest}
-                disabled={loading}
-                className="w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                Enviar notificação de teste
-              </button>
-            )}
           </>
         )}
 
