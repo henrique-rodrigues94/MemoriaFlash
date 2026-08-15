@@ -3,17 +3,12 @@ import { Deck, UserStats } from '../types';
 const STORAGE_KEYS = {
   DECKS: 'flashmind_decks_v2',
   STATS: 'flashmind_stats_v2',
-  ONBOARDING_DONE: 'flashmind_onboarding_completed',
+  ONBOARDING_DONE: 'flashmind_onboarding_v2_completed',
   DEMO_REMOVED: 'flashmind_demo_removed_v1',
   LAST_STUDIED_DECK: 'flashmind_last_studied_deck',
 };
 
-const DEMO_DECK_IDS = new Set([
-  'deck-law-basics',
-  'deck-medical-terms',
-  'deck-ux-design',
-  'deck-organic-chem',
-]);
+const DEMO_DECK_IDS = new Set(['deck-law-basics', 'deck-medical-terms', 'deck-ux-design', 'deck-organic-chem']);
 
 function removeDemoDecksIfNeeded(): void {
   if (localStorage.getItem(STORAGE_KEYS.DEMO_REMOVED)) return;
@@ -25,28 +20,17 @@ function removeDemoDecksIfNeeded(): void {
       localStorage.setItem(STORAGE_KEYS.DECKS, JSON.stringify(filtered));
     }
     localStorage.setItem(STORAGE_KEYS.DEMO_REMOVED, '1');
-  } catch {
-    /* silencia erros de parse */
-  }
+  } catch { /* silencia erros de parse */ }
 }
 
 removeDemoDecksIfNeeded();
-
 const INITIAL_DECKS: Deck[] = [];
 
 const INITIAL_STATS: UserStats = {
   name: 'Estudante MemoriaFlash',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
-  streakDays: 1,
-  dailyGoalTotal: 20,
-  dailyGoalCompleted: 0,
-  totalCardsMastered: 0,
-  timeStudiedHours: 0,
-  retentionRate: 100,
-  xp: 0,
-  globalRank: 1,
-  aiCardsGenerated: 0,
-  isPro: false,
+  streakDays: 1, dailyGoalTotal: 20, dailyGoalCompleted: 0, totalCardsMastered: 0,
+  timeStudiedHours: 0, retentionRate: 100, xp: 0, globalRank: 1, aiCardsGenerated: 0, isPro: false,
 };
 
 export function getStoredDecks(): Deck[] {
@@ -54,17 +38,12 @@ export function getStoredDecks(): Deck[] {
     const raw = localStorage.getItem(STORAGE_KEYS.DECKS);
     if (!raw) return INITIAL_DECKS;
     return JSON.parse(raw);
-  } catch {
-    return INITIAL_DECKS;
-  }
+  } catch { return INITIAL_DECKS; }
 }
 
 export function saveStoredDecks(decks: Deck[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.DECKS, JSON.stringify(decks));
-  } catch (e) {
-    console.error('Failed to save decks', e);
-  }
+  try { localStorage.setItem(STORAGE_KEYS.DECKS, JSON.stringify(decks)); }
+  catch (e) { console.error('Failed to save decks', e); }
 }
 
 export function getStoredStats(): UserStats {
@@ -74,20 +53,15 @@ export function getStoredStats(): UserStats {
     const parsed = JSON.parse(raw) as UserStats & { aiCredits?: number };
     delete parsed.aiCredits;
     if (parsed.aiCardsGenerated === undefined) parsed.aiCardsGenerated = 0;
-    // O aplicativo está em modo gratuito; estados PRO antigos não são mais válidos.
-    parsed.isPro = false;
+    // A assinatura não é decidida pelo localStorage. Firestore/backend é a
+    // fonte de verdade, inclusive para os 3 dias Pro de indicação.
     return parsed;
-  } catch {
-    return INITIAL_STATS;
-  }
+  } catch { return INITIAL_STATS; }
 }
 
 export function saveStoredStats(stats: UserStats): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(stats));
-  } catch (e) {
-    console.error('Failed to save stats', e);
-  }
+  try { localStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(stats)); }
+  catch (e) { console.error('Failed to save stats', e); }
 }
 
 export function isOnboardingDone(): boolean {
@@ -99,17 +73,11 @@ export function setOnboardingDone(done: boolean): void {
 }
 
 export function saveLastStudiedDeck(deckId: string): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.LAST_STUDIED_DECK, deckId);
-  } catch {
-    /* ignore storage errors */
-  }
+  try { localStorage.setItem(STORAGE_KEYS.LAST_STUDIED_DECK, deckId); }
+  catch { /* ignore storage errors */ }
 }
 
 export function getLastStudiedDeck(): string | null {
-  try {
-    return localStorage.getItem(STORAGE_KEYS.LAST_STUDIED_DECK);
-  } catch {
-    return null;
-  }
+  try { return localStorage.getItem(STORAGE_KEYS.LAST_STUDIED_DECK); }
+  catch { return null; }
 }
