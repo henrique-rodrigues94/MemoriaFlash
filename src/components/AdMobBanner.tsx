@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { showFreeUserBanner, hideAdMobBanner } from '../services/ads/adMobNative';
+import { UserStats } from '../types';
 
 interface AdMobBannerProps {
-  stats: any;
+  stats: UserStats;
   onOpenAdMob?: () => void;
   onOpenSubscription: () => void;
   onOpenReferral?: () => void;
@@ -12,16 +13,24 @@ interface AdMobBannerProps {
   sticky?: boolean;
 }
 
+function isProActive(stats: UserStats, isPro?: boolean): boolean {
+  if (isPro !== true) return false;
+  if (!stats.proExpiryDate) return true;
+  const expiry = Date.parse(stats.proExpiryDate);
+  return Number.isFinite(expiry) && expiry > Date.now();
+}
+
 /** Banner nativo real do Google AdMob no Android. */
-export const AdMobBanner: React.FC<AdMobBannerProps> = ({ isPro }) => {
+export const AdMobBanner: React.FC<AdMobBannerProps> = ({ stats, isPro }) => {
+  const activePro = isProActive(stats, isPro);
+
   useEffect(() => {
-    if (isPro) {
+    if (activePro) {
       void hideAdMobBanner().catch(() => undefined);
       return;
     }
 
     let disposed = false;
-
     const refreshBanner = () => {
       if (!disposed) {
         void showFreeUserBanner().catch((error) => {
@@ -30,12 +39,7 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({ isPro }) => {
       }
     };
 
-    // Primeira tentativa imediatamente.
     refreshBanner();
-
-    // O SDK pode remover/recriar a View nativa após rotação, background,
-    // retorno ao app ou mudança de inventário. Revalida periodicamente sem
-    // criar nenhum banner HTML falso.
     const interval = window.setInterval(refreshBanner, 60_000);
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') refreshBanner();
@@ -50,7 +54,7 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({ isPro }) => {
         void hideAdMobBanner().catch(() => undefined);
       }
     };
-  }, [isPro]);
+  }, [activePro]);
 
   return null;
 };
