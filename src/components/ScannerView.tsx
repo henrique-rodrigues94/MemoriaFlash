@@ -3,6 +3,7 @@ import { AlertCircle, BookOpen, Camera, Check, CheckCircle2, ChevronDown, Chevro
 import { Deck, UserStats } from '../types';
 import { ECONOMY } from '../services/economy/economyConstants';
 import { auth, ensureAuthenticated } from '../lib/firebase';
+import { enqueueDocumentContent } from '../services/contentRequestService';
 
 interface Item { id: string; type: 'image' | 'document'; name: string; file: File; previewUrl?: string; base64?: string; }
 interface Topic { id: string; title: string; description: string; cardEstimate: number; }
@@ -37,7 +38,7 @@ async function script(src: string, key: string) {
 
 async function extractText(file: File): Promise<string> {
   const ext = file.name.split('.').pop()?.toLowerCase() || '';
-  if (file.type.startsWith('text/') || ['txt', 'md', 'markdown', 'json'].includes(ext)) return file.text();
+  if (file.type === 'text/plain' || ext === 'txt') return file.text();
   if (ext === 'pdf' || file.type === 'application/pdf') {
     await script('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', 'pdfjsLib');
     const pdfjs = (window as any).pdfjsLib;
@@ -52,13 +53,7 @@ async function extractText(file: File): Promise<string> {
     if (!pages.length) throw new Error(`O PDF "${file.name}" não possui texto extraível. Para PDF escaneado, fotografe as páginas.`);
     return pages.join('\n\n');
   }
-  if (ext === 'docx' || file.type.includes('word') || file.type.includes('openxmlformats')) {
-    await script('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js', 'mammoth');
-    const result = await (window as any).mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
-    if (!result.value?.trim()) throw new Error(`O documento "${file.name}" não possui texto extraível.`);
-    return result.value;
-  }
-  throw new Error(`Formato não suportado: ${file.name}`);
+  throw new Error(`Formato não suportado: ${file.name}. Nesta versão, documentos aceitos são apenas PDF e TXT.`);
 }
 
 function CameraModal({ onCapture, onClose }: { onCapture: (file: File) => void; onClose: () => void }) {
@@ -107,6 +102,10 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
   const [processing, setProcessing] = useState('');
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraAvailable, setCameraAvailable] = useState(false);
+  const [shareWithMemoriaFlash, setShareWithMemoriaFlash] = useState(false);
+  const [documentSources, setDocumentSources] = useState<Record<string, string>>({});
+  const [shareMessage, setShareMessage] = useState('');
+  const queuedDocumentIds = useRef(new Set<string>());
 
   useEffect(() => setCameraAvailable(!!navigator.mediaDevices?.getUserMedia), []);
   useEffect(() => () => items.forEach(item => item.previewUrl && URL.revokeObjectURL(item.previewUrl)), []);
@@ -118,9 +117,13 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
   const addFile = useCallback(async (file: File) => {
     if (items.length >= MAX_FILES) throw new Error(`Limite de ${MAX_FILES} arquivos por análise.`);
     if (file.size > MAX_FILE_SIZE) throw new Error(`"${file.name}" ultrapassa o limite de 25 MB.`);
+    const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp)$/i.test(file.name);
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    if (!isImage && ext !== 'pdf' && ext !== 'txt' && file.type !== 'application/pdf' && file.type !== 'text/plain') {
+      throw new Error(`Formato não suportado: "${file.name}". Nesta versão, documentos aceitos são apenas PDF e TXT.`);
+    }
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const image = file.type.startsWith('image/') || /\.(jpe?g|png|webp)$/i.test(file.name);
-    if (image) {
+    if (isImage) {
       const previewUrl = URL.createObjectURL(file);
       const base64 = await toBase64(file);
       setItems(prev => [...prev, { id, type: 'image', name: file.name, file, previewUrl, base64 }]);
@@ -136,11 +139,15 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
     if (!items.length) return;
     setStep('analyzing'); setMessage('');
     try {
-      const images: string[] = []; const texts: string[] = [];
+      const images: string[] = []; const texts: string[] = []; const documentSourceMap: Record<string, string> = {};
       for (const item of items) {
         setProcessing(`Processando ${item.name}…`);
         if (item.type === 'image') images.push(item.base64 || await toBase64(item.file));
-        else texts.push(`=== ${item.name} ===\n${await extractText(item.file)}`);
+        else {
+          const extracted = await extractText(item.file);
+          documentSourceMap[item.id] = extracted;
+          texts.push(`=== ${item.name} ===\n${extracted}`);
+        }
       }
       setProcessing('IA identificando matéria e tópicos…');
       const res = await fetch('/api/gemini/scanner-analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ images, texts, subjectHint: subject.trim(), language: 'pt' }) });
@@ -148,6 +155,7 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
       if (!res.ok) throw new Error(data?.error || `Erro do servidor (${res.status}).`);
       if (!data?.subject || !Array.isArray(data.topics) || !data.topics.length) throw new Error('A IA não encontrou tópicos suficientes. Envie conteúdo mais legível ou uma foto melhor.');
       const normalized: Analysis = { subject: String(data.subject), subjectDescription: String(data.subjectDescription || ''), topics: data.topics.map((t: any, i: number) => ({ id: String(t.id || `topic-${i + 1}`), title: String(t.title || `Tópico ${i + 1}`), description: String(t.description || ''), cardEstimate: Math.max(1, Number(t.cardEstimate) || 5) })), totalEstimate: Number(data.totalEstimate) || 0, extractedContent: String(data.extractedContent || texts.join('\n\n')) };
+      setDocumentSources(documentSourceMap);
       setAnalysis(normalized); setSelected(new Set(normalized.topics.map(t => t.id))); setCounts(Object.fromEntries(normalized.topics.map(t => [t.id, defaultCount(t.cardEstimate)]))); if (!subject.trim()) setSubject(normalized.subject); setStep('review');
     } catch (e: any) { setMessage(e?.message || 'Ocorreu um erro ao analisar o conteúdo.'); setStep('error'); }
   };
@@ -160,6 +168,40 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
       const topicsWithCounts = analysis.topics.filter(t => selected.has(t.id)).map(t => ({ title: t.title, count: counts[t.id] || defaultCount(t.cardEstimate) }));
       const user = auth.currentUser || await ensureAuthenticated();
       const idToken = await user.getIdToken();
+
+      if (shareWithMemoriaFlash) {
+        const documentItems = items.filter(item => item.type === 'document');
+        let queuedCount = 0;
+        let failedCount = 0;
+
+        for (const item of documentItems) {
+          if (queuedDocumentIds.current.has(item.id)) continue;
+          try {
+            const sourceText = documentSources[item.id] || await extractText(item.file);
+            await enqueueDocumentContent({
+              subject: (subject.trim() || analysis.subject).trim(),
+              educationLevel: 'general',
+              fileName: item.name,
+              mimeType: item.file.type === 'text/plain' || item.name.toLowerCase().endsWith('.txt') ? 'text/plain' : 'application/pdf',
+              sourceText,
+              shareWithMemoriaFlash: true,
+            });
+            queuedDocumentIds.current.add(item.id);
+            queuedCount++;
+          } catch (queueError: any) {
+            failedCount++;
+            console.warn('[MemoriaFlash] Não foi possível enviar documento para a fila compartilhada:', queueError);
+          }
+        }
+
+        if (queuedCount > 0) {
+          setShareMessage(`${queuedCount} documento(s) enviado(s) para o conteúdo compartilhado. O MemoriaFlashAgent processará o material em lote.`);
+        }
+        if (failedCount > 0) {
+          setShareMessage(prev => `${prev}${prev ? ' ' : ''}${failedCount} documento(s) não puderam ser enviados para a fila; a geração do seu deck continuará normalmente.`);
+        }
+      }
+
       const res = await fetch('/api/gemini/scanner-process', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ images: [], texts: [], subject: subject.trim() || analysis.subject, count: totalCards, selectedTopics: topicsWithCounts.map(t => t.title), topicsWithCounts, extractedContent: analysis.extractedContent }) });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || `Erro do servidor (${res.status}).`);
@@ -172,7 +214,7 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
     } catch (e: any) { setMessage(e?.message || 'Ocorreu um erro ao gerar os flashcards.'); setStep('error'); }
   };
 
-  const reset = () => { items.forEach(i => i.previewUrl && URL.revokeObjectURL(i.previewUrl)); setItems([]); setAnalysis(null); setSelected(new Set()); setCounts({}); setCards([]); setExpanded(null); setSubject(''); setMessage(''); setStep('collect'); };
+  const reset = () => { queuedDocumentIds.current.clear(); items.forEach(i => i.previewUrl && URL.revokeObjectURL(i.previewUrl)); setItems([]); setAnalysis(null); setDocumentSources({}); setShareWithMemoriaFlash(false); setShareMessage(''); setSelected(new Set()); setCounts({}); setCards([]); setExpanded(null); setSubject(''); setMessage(''); setStep('collect'); };
 
   return <>
     {cameraOpen && <CameraModal onCapture={file => { setCameraOpen(false); void addFile(file); }} onClose={() => setCameraOpen(false)} />}
@@ -181,17 +223,17 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
       <div className="scanner-header rounded-2xl border border-purple-400/40 p-6 shadow-xl"><div className="flex items-center gap-4"><div className="p-3 rounded-2xl border border-purple-400/40"><Camera className="w-7 h-7" /></div><div><h3 className="text-xl font-bold">Scanner & Upload</h3><p className="text-sm text-slate-400 mt-1">Envie documentos — a IA identifica a matéria, lista os tópicos e gera flashcards</p></div></div></div>
       {stats && !stats.isPro && <div className={`rounded-xl p-3.5 flex items-center justify-between gap-3 border ${noCredits ? 'bg-amber-500/10 border-amber-500/30' : 'bg-blue-500/10 border-blue-500/30'}`}><div className="flex items-center gap-2"><Sparkles className={`w-4 h-4 ${noCredits ? 'text-amber-400' : 'text-blue-400'}`} /><div><b className={`text-xs ${noCredits ? 'text-amber-300' : 'text-blue-300'}`}>{noCredits ? 'Sem créditos disponíveis' : `${stats.aiCredits || 0} crédito${(stats.aiCredits || 0) !== 1 ? 's' : ''} disponível`}</b><p className="text-[11px] text-slate-400">{noCredits ? 'Obtenha mais créditos para continuar.' : `${ECONOMY.COST_GENERATE_DECK} crédito por card`}</p></div></div>{noCredits && onOpenAdMob && <button onClick={onOpenAdMob} className="px-3 py-2 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold">Ganhar créditos</button>}</div>}
 
-      {step === 'collect' && <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 space-y-5"><div onClick={() => inputRef.current?.click()} className="border-2 border-dashed border-slate-700 hover:border-purple-500 rounded-2xl p-7 text-center cursor-pointer"><Upload className="w-7 h-7 text-purple-400 mx-auto mb-3" /><b className="text-white">Clique para fazer upload</b><p className="text-xs text-slate-400 mt-1">PDF, Word (.docx), TXT, Markdown, JPG, PNG</p><input ref={inputRef} type="file" multiple accept=".txt,.md,.json,.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp" className="sr-only" onChange={e => { void addFiles(Array.from(e.target.files || [])); e.currentTarget.value = ''; }} /></div><button onClick={() => cameraAvailable ? setCameraOpen(true) : cameraInputRef.current?.click()} className="w-full py-3.5 rounded-xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 font-semibold flex justify-center gap-2"><Camera className="w-5 h-5" />Abrir Câmera — Fotografar Página</button>{items.length > 0 && <><div><p className="text-xs font-bold uppercase text-slate-400 mb-2">Arquivos selecionados ({items.length})</p><div className="grid grid-cols-3 sm:grid-cols-4 gap-2">{items.map(item => <div key={item.id} className="relative aspect-square">{item.previewUrl ? <img src={item.previewUrl} alt={item.name} className="w-full h-full object-cover rounded-xl" /> : <div className="w-full h-full rounded-xl bg-blue-500/10 border border-blue-500/20 flex flex-col items-center justify-center p-2"><FileText className="text-blue-400" /><span className="text-[9px] text-blue-300 text-center break-all line-clamp-2">{item.name}</span></div>}<button onClick={() => { item.previewUrl && URL.revokeObjectURL(item.previewUrl); setItems(prev => prev.filter(x => x.id !== item.id)); }} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center"><X className="w-3 h-3" /></button></div>)}</div></div><div><label className="text-xs font-bold text-slate-300">Matéria / Assunto (opcional — a IA identifica automaticamente)</label><input value={subject} onChange={e => setSubject(e.target.value.toUpperCase())} placeholder="EX: DIREITO CONSTITUCIONAL, ANATOMIA…" className="mt-2 w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm uppercase" /></div><button onClick={() => void analyze()} className="w-full py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold flex justify-center gap-2"><Search className="w-5 h-5" />Analisar Documento — Identificar Tópicos</button></>}</div>}
+      {step === 'collect' && <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 space-y-5"><div onClick={() => inputRef.current?.click()} className="border-2 border-dashed border-slate-700 hover:border-purple-500 rounded-2xl p-7 text-center cursor-pointer"><Upload className="w-7 h-7 text-purple-400 mx-auto mb-3" /><b className="text-white">Clique para fazer upload</b><p className="text-xs text-slate-400 mt-1">PDF, TXT, JPG, PNG</p><input ref={inputRef} type="file" multiple accept=".txt,.pdf,.jpg,.jpeg,.png,.webp" className="sr-only" onChange={e => { void addFiles(Array.from(e.target.files || [])); e.currentTarget.value = ''; }} /></div><button onClick={() => cameraAvailable ? setCameraOpen(true) : cameraInputRef.current?.click()} className="w-full py-3.5 rounded-xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 font-semibold flex justify-center gap-2"><Camera className="w-5 h-5" />Abrir Câmera — Fotografar Página</button>{items.length > 0 && <><div><p className="text-xs font-bold uppercase text-slate-400 mb-2">Arquivos selecionados ({items.length})</p><div className="grid grid-cols-3 sm:grid-cols-4 gap-2">{items.map(item => <div key={item.id} className="relative aspect-square">{item.previewUrl ? <img src={item.previewUrl} alt={item.name} className="w-full h-full object-cover rounded-xl" /> : <div className="w-full h-full rounded-xl bg-blue-500/10 border border-blue-500/20 flex flex-col items-center justify-center p-2"><FileText className="text-blue-400" /><span className="text-[9px] text-blue-300 text-center break-all line-clamp-2">{item.name}</span></div>}<button onClick={() => { item.previewUrl && URL.revokeObjectURL(item.previewUrl); setItems(prev => prev.filter(x => x.id !== item.id)); }} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center"><X className="w-3 h-3" /></button></div>)}</div></div><div><label className="text-xs font-bold text-slate-300">Matéria / Assunto (opcional — a IA identifica automaticamente)</label><input value={subject} onChange={e => setSubject(e.target.value.toUpperCase())} placeholder="EX: DIREITO CONSTITUCIONAL, ANATOMIA…" className="mt-2 w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm uppercase" /></div><button onClick={() => void analyze()} className="w-full py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold flex justify-center gap-2"><Search className="w-5 h-5" />Analisar Documento — Identificar Tópicos</button></>}</div>}
 
       {step === 'analyzing' && <div className="rounded-2xl bg-slate-900/80 p-10 text-center flex flex-col items-center gap-4"><Loader2 className="w-10 h-10 text-indigo-400 animate-spin" /><b className="text-white">Analisando documento…</b><p className="text-sm text-slate-400">{processing}</p></div>}
 
-      {step === 'review' && analysis && <div className="space-y-4"><div className="rounded-2xl bg-slate-900/80 border border-indigo-500/30 p-5"><p className="text-xs font-bold uppercase text-indigo-400">Matéria identificada</p><h4 className="text-xl font-bold text-white mt-1">{analysis.subject}</h4><p className="text-sm text-slate-400 mt-1">{analysis.subjectDescription}</p><input value={subject} onChange={e => setSubject(e.target.value.toUpperCase())} className="mt-3 w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-white text-sm uppercase" /></div><div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-5 space-y-3"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><Layers className="w-4 h-4 text-purple-400" /><b>Tópicos encontrados ({analysis.topics.length})</b></div><div className="flex gap-2"><button onClick={() => setSelected(new Set(analysis.topics.map(t => t.id)))} className="text-xs text-indigo-400">Todos</button><button onClick={() => setSelected(new Set())} className="text-xs text-slate-500">Nenhum</button></div></div>{analysis.topics.map(topic => <TopicRow key={topic.id} topic={topic} selected={selected.has(topic.id)} count={counts[topic.id] || defaultCount(topic.cardEstimate)} toggle={() => setSelected(prev => { const n = new Set(prev); n.has(topic.id) ? n.delete(topic.id) : n.add(topic.id); return n; })} changeCount={n => setCounts(prev => ({ ...prev, [topic.id]: n }))} />)}</div><div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-5 space-y-3"><p className="text-xs text-slate-400">{selected.size} tópico(s) selecionado(s) · <b className="text-purple-300">{totalCards} cards</b> · custo {cost} crédito(s)</p><button onClick={() => void generate()} disabled={selected.size === 0 || totalCards === 0} className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-violet-600 text-white font-bold flex justify-center gap-2 disabled:opacity-40">{noCredits ? <><Lock className="w-5 h-5" />Ganhar créditos</> : <><Sparkles className="w-5 h-5" />Gerar {totalCards} Flashcards</>}</button><button onClick={reset} className="w-full text-xs text-slate-500 py-1">Voltar e adicionar arquivos</button></div></div>}
+      {step === 'review' && analysis && <div className="space-y-4"><div className="rounded-2xl bg-slate-900/80 border border-indigo-500/30 p-5"><p className="text-xs font-bold uppercase text-indigo-400">Matéria identificada</p><h4 className="text-xl font-bold text-white mt-1">{analysis.subject}</h4><p className="text-sm text-slate-400 mt-1">{analysis.subjectDescription}</p><input value={subject} onChange={e => setSubject(e.target.value.toUpperCase())} className="mt-3 w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-white text-sm uppercase" /></div><div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-5 space-y-3"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><Layers className="w-4 h-4 text-purple-400" /><b>Tópicos encontrados ({analysis.topics.length})</b></div><div className="flex gap-2"><button onClick={() => setSelected(new Set(analysis.topics.map(t => t.id)))} className="text-xs text-indigo-400">Todos</button><button onClick={() => setSelected(new Set())} className="text-xs text-slate-500">Nenhum</button></div></div>{analysis.topics.map(topic => <TopicRow key={topic.id} topic={topic} selected={selected.has(topic.id)} count={counts[topic.id] || defaultCount(topic.cardEstimate)} toggle={() => setSelected(prev => { const n = new Set(prev); n.has(topic.id) ? n.delete(topic.id) : n.add(topic.id); return n; })} changeCount={n => setCounts(prev => ({ ...prev, [topic.id]: n }))} />)}</div>{items.some(item => item.type === 'document') && <div className="rounded-2xl bg-slate-900/80 border border-emerald-500/20 p-4"><label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={shareWithMemoriaFlash} onChange={e => setShareWithMemoriaFlash(e.target.checked)} className="mt-1 h-4 w-4 accent-emerald-500" /><span><b className="block text-sm text-emerald-300">Contribuir para o conteúdo do MemoriaFlash</b><span className="block text-xs text-slate-400 mt-1">Autorize o uso deste PDF/TXT para criar matéria, tópicos, subtópicos e flashcards compartilhados. Seu deck pessoal continua sendo gerado normalmente.</span></span></label></div>}<div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-5 space-y-3"><p className="text-xs text-slate-400">{selected.size} tópico(s) selecionado(s) · <b className="text-purple-300">{totalCards} cards</b> · custo {cost} crédito(s)</p><button onClick={() => void generate()} disabled={selected.size === 0 || totalCards === 0} className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-violet-600 text-white font-bold flex justify-center gap-2 disabled:opacity-40">{noCredits ? <><Lock className="w-5 h-5" />Ganhar créditos</> : <><Sparkles className="w-5 h-5" />Gerar {totalCards} Flashcards</>}</button><button onClick={reset} className="w-full text-xs text-slate-500 py-1">Voltar e adicionar arquivos</button></div></div>}
 
       {step === 'generating' && <div className="rounded-2xl bg-slate-900/80 p-10 text-center flex flex-col items-center gap-4"><Loader2 className="w-10 h-10 text-purple-400 animate-spin" /><b className="text-white">IA gerando flashcards…</b><p className="text-sm text-slate-400">{processing}</p></div>}
 
       {step === 'error' && <div className="rounded-2xl bg-slate-900/80 border border-rose-500/30 p-6 space-y-4"><div className="flex gap-3"><AlertCircle className="text-rose-400" /><div><b className="text-rose-300">Ocorreu um erro</b><p className="text-sm text-slate-400 mt-1">{message}</p></div></div><div className="flex gap-2"><button onClick={() => setStep(analysis ? 'review' : 'collect')} className="px-4 py-2.5 rounded-xl border border-slate-700 text-sm text-slate-300"><RotateCcw className="w-4 h-4 inline mr-2" />Tentar novamente</button><button onClick={reset} className="px-3 text-xs text-slate-500">Começar do zero</button></div></div>}
 
-      {step === 'done' && cards.length > 0 && <div className="space-y-4"><div className="rounded-2xl bg-emerald-950/40 border border-emerald-500/30 p-5 flex gap-3"><CheckCircle2 className="text-emerald-400 shrink-0" /><div className="flex-1"><b className="text-emerald-300">{cards.length} flashcards gerados e salvos!</b><p className="text-sm text-emerald-200/70">Seu deck está disponível na biblioteca.</p></div><button onClick={reset} className="text-xs text-slate-400">Novo scan</button></div>{cards.map((card, i) => { const open = expanded === card.id; return <div key={card.id || i} className="rounded-xl border border-slate-800 bg-slate-950/70 overflow-hidden"><button onClick={() => setExpanded(open ? null : card.id)} className="w-full p-4 text-left flex gap-3"><span className="text-xs text-purple-400">#{i + 1}</span><span className="flex-1"><span className="block text-[11px] text-slate-500">{card.topic || 'Tópico'}</span><span className="block text-sm text-white mt-1">{card.front || card.question || '—'}</span></span>{open ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}</button>{open && <div className="border-t border-slate-800 p-4 text-sm text-slate-300"><b className="text-emerald-400">Resposta: </b>{card.back || card.answer || '—'}{card.explanation && <p className="mt-2 text-xs text-slate-400">{card.explanation}</p>}</div>}</div>; })}</div>}
+      {step === 'done' && cards.length > 0 && <div className="space-y-4"><div className="rounded-2xl bg-emerald-950/40 border border-emerald-500/30 p-5 flex gap-3"><CheckCircle2 className="text-emerald-400 shrink-0" /><div className="flex-1"><b className="text-emerald-300">{cards.length} flashcards gerados e salvos!</b><p className="text-sm text-emerald-200/70">Seu deck está disponível na biblioteca.</p>{shareMessage && <p className="mt-2 text-xs text-emerald-300/80">{shareMessage}</p>}</div><button onClick={reset} className="text-xs text-slate-400">Novo scan</button></div>{cards.map((card, i) => { const open = expanded === card.id; return <div key={card.id || i} className="rounded-xl border border-slate-800 bg-slate-950/70 overflow-hidden"><button onClick={() => setExpanded(open ? null : card.id)} className="w-full p-4 text-left flex gap-3"><span className="text-xs text-purple-400">#{i + 1}</span><span className="flex-1"><span className="block text-[11px] text-slate-500">{card.topic || 'Tópico'}</span><span className="block text-sm text-white mt-1">{card.front || card.question || '—'}</span></span>{open ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}</button>{open && <div className="border-t border-slate-800 p-4 text-sm text-slate-300"><b className="text-emerald-400">Resposta: </b>{card.back || card.answer || '—'}{card.explanation && <p className="mt-2 text-xs text-slate-400">{card.explanation}</p>}</div>}</div>; })}</div>}
     </div>
   </>;
 }
