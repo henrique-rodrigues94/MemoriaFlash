@@ -137,7 +137,7 @@ export async function saveStatsToFirestore(stats: UserStats): Promise<void> {
     const userId = await getAuthenticatedUserId();
     if (!userId) return;
     const docRef = doc(db, 'userStats', userId);
-    const cleanData = cleanForFirestore({ ...stats, isPro: false, proPlanType: null, proExpiryDate: null });
+    const cleanData = cleanForFirestore(stats);
     await setDoc(docRef, cleanData, { merge: true });
   } catch (e) {
     console.error('Error saving stats to Firestore:', e);
