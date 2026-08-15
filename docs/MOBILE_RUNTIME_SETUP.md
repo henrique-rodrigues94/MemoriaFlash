@@ -56,6 +56,36 @@ cd android
 .\gradlew.bat assembleDebug
 ```
 
+## Pré-requisito: JDK 21
+
+O Capacitor 8 gera `android/app/capacitor.build.gradle` com
+`sourceCompatibility/targetCompatibility = JavaVersion.VERSION_21`. Por isso o
+build do Android **exige JDK 21** — com JDK 17 o Gradle falha com
+`invalid source release: 21`.
+
+O JDK 21 já vem embutido no Android Studio em
+`C:\Program Files\Android\Android Studio\jbr`. Para o Gradle usá-lo por linha
+de comando, crie/edite o `gradle.properties` do usuário (não versionado):
+
+```properties
+# C:\Users\<seu-usuario>\.gradle\gradle.properties
+org.gradle.java.home=C:\\Program Files\\Android\\Android Studio\\jbr
+```
+
+Confirme a JVM usada pelo daemon:
+
+```powershell
+cd android
+.\gradlew.bat --version
+# Daemon JVM: ...\Android Studio\jbr  (deve aparecer 21.x)
+```
+
+Opcional: defina também a variável de ambiente `JAVA_HOME` do usuário para o
+mesmo caminho (`C:\Program Files\Android\Android Studio\jbr`).
+
+> `android/local.properties` (`sdk.dir`) é ignorado pelo Git e específico de
+> cada máquina — não versionar.
+
 ## Teste no celular
 
 Depois que o ADB reconhecer o dispositivo:
@@ -82,7 +112,7 @@ Teste nesta ordem:
 
 Se aparecer `Servidor do MemoriaFlash não configurado`, falta `VITE_API_BASE_URL` no build.
 
-Se aparecer `Login Google nativo não configurado`, falta `VITE_GOOGLE_WEB_CLIENT_ID` no build.
+Se aparecer `Login Google nativo não configurado`, falta `VITE_GOOGLE_WEB_CLIENT_ID` no build. Obtenha o valor no Firebase Console → Authentication → Sign-in method → Google → **Web SDK configuration** → **Web client ID** (termina com `.apps.googleusercontent.com`).
 
 Se o Google retornar erro de configuração no Android, rode `signingReport` e confira package + SHA-1 no Firebase/Google Cloud.
 
