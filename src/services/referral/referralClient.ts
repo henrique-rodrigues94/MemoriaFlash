@@ -32,6 +32,9 @@ export interface ClaimReferralResult {
   message: string;
   rewardDays?: number;
   alreadyRewarded?: boolean;
+  // Campo legado somente para compatibilidade de tipos com uma versão antiga;
+  // o backend atual nunca retorna créditos.
+  welcomeBonus?: number;
 }
 
 export async function ensureOwnReferralCodeRegistered(): Promise<string | null> {
