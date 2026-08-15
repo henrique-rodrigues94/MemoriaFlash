@@ -4,83 +4,71 @@ Data: 2026-08-15
 
 ## Estado atual
 
-O aplicativo está temporariamente operando em **plano gratuito**. O PRO não deve ser liberado por alteração local de estado.
+O aplicativo opera em **plano gratuito**. O PRO permanece bloqueado na interface e não deve ser liberado por alteração local de estado.
 
-## AdMob — NÃO pronto para produção
+## AdMob
 
-### Encontrado no código
+### Implementado no código
 
-- `src/lib/adMobConfig.ts` continha IDs oficiais de teste do Google como fallback.
-- `src/components/AdMobBanner.tsx` é uma faixa de interface/promocional; ela não é uma integração real do Google Mobile Ads SDK.
-- `src/components/AdMobRewardedModal.tsx` simula um anúncio com um contador de 5 segundos e concede recompensa. Isso não é um Rewarded Ad real do AdMob.
-- `package.json` não possui uma biblioteca nativa de Google Mobile Ads.
+- SDK nativo `@capacitor-community/admob` 8.x adicionado ao projeto.
+- Inicialização nativa somente no Android.
+- Fluxo de consentimento UMP preparado.
+- Banner real do AdMob substituiu a antiga faixa visual.
+- Interstitial real substituiu a tela simulada.
+- Rewarded real substituiu o contador de 5 segundos.
+- A recompensa só é aplicada pelo callback `RewardAdPluginEvents.Rewarded`.
+- IDs de teste são usados somente em desenvolvimento; produção exige `VITE_ADMOB_*`.
 
-### Correção aplicada
+A versão 8.0.0 do plugin é a release compatível com Capacitor 8 e documenta banner, interstitial, rewarded e consentimento. citeturn3search0turn3search1
 
-Os IDs de demonstração agora só são usados durante desenvolvimento. Em produção, os IDs precisam vir das variáveis `VITE_ADMOB_*`; não existe mais fallback para IDs de teste.
+### Ainda necessário antes de produção
 
-### Pendências antes de monetizar
+1. `npm install` e `npx cap sync android` na máquina de build.
+2. Criar/gerar a pasta Android com `npx cap add android` se ainda não existir.
+3. Configurar o App ID real no `AndroidManifest.xml`/`strings.xml`.
+4. Criar os ad units reais no AdMob.
+5. Configurar Privacy & Messaging/consentimento no AdMob.
+6. Testar em dispositivo real com IDs de teste e Ad Inspector.
+7. Configurar e verificar `app-ads.txt`.
+8. Obter aprovação/prontidão do AdMob antes de depender da receita.
 
-1. Integrar um SDK/plugin nativo de Google Mobile Ads para Capacitor Android.
-2. Configurar o App ID e os ad unit IDs reais no AdMob.
-3. Implementar banner/interstitial/rewarded reais e callbacks de carregamento, falha, fechamento e recompensa.
-4. Não conceder recompensa por timer local; a recompensa deve ocorrer somente no callback de recompensa do SDK.
-5. Configurar dispositivo de teste/Ad Inspector durante homologação.
-6. Publicar e verificar `app-ads.txt` no domínio de desenvolvedor associado ao app.
-7. Passar pela revisão de prontidão do AdMob antes de depender da receita de anúncios.
+## Google Play Billing
 
-## Google Play Billing — NÃO pronto para produção
+### Implementado
 
-### Pontos positivos encontrados
+- Backend de validação no Google Play Developer API.
+- Verificação server-side do `purchaseToken`.
+- Acknowledge server-side.
+- Persistência do token, produto, estado PRO e expiração.
+- Cliente `src/services/billing/playBilling.ts` usando `@capgo/native-purchases` 8.x.
+- Compra Android exige produto + Base Plan configurados no Play Console.
+- O cliente envia o token para `/api/billing/verify-purchase` e só considera PRO após resposta validada do backend.
+- Função de restauração de assinatura e abertura do gerenciamento nativo também foram adicionadas.
 
-- Existe backend dedicado em `src/server/routes/billing.ts`.
-- O backend verifica o `purchaseToken` no Google Play antes de liberar o estado PRO.
-- Existe suporte inicial a RTDN via Pub/Sub.
-- Existe persistência de `playPurchaseToken`, `playProductId`, estado PRO e data de expiração.
-- Existe reconhecimento (`acknowledge`) no servidor.
+### Ainda necessário antes de produção
 
-### Bloqueadores encontrados
+1. Criar os produtos e Base Plans reais no Play Console.
+2. Definir `VITE_PLAY_MONTHLY_PRODUCT_ID`, `VITE_PLAY_MONTHLY_BASE_PLAN_ID`, `VITE_PLAY_ANNUAL_PRODUCT_ID` e `VITE_PLAY_ANNUAL_BASE_PLAN_ID`.
+3. Integrar o botão de assinatura real à UI somente depois dos testes internos.
+4. Configurar a service account e permissões do Play Console.
+5. Endurecer o RTDN com autenticação/verificação da mensagem Pub/Sub e idempotência por `messageId`.
+6. Testar compra, restauração, renovação, cancelamento, grace period, account hold, expiração e reembolso.
+7. Publicar primeiro em Internal testing.
 
-1. Não foi encontrada implementação cliente que abra o fluxo real do Google Play Billing e envie o `purchaseToken` ao endpoint `/api/billing/verify-purchase`.
-2. O `App.tsx` possuía um caminho de UI que marcava `isPro: true` diretamente ao clicar em assinar, sem compra real. O PRO foi desativado na interface até que o Billing seja integrado de verdade.
-3. O RTDN ainda precisa de autenticação/verificação da mensagem Pub/Sub e idempotência por `messageId` antes de ser considerado produção.
-4. A conta de serviço do Google Play e permissões do Play Console não podem ser verificadas somente pelo repositório; precisam ser configuradas no ambiente de produção.
-5. Os produtos/base plans reais do Play Console ainda precisam ser confirmados e testados em uma faixa de teste interna.
+## Proteção contra PRO falso
 
-## Plano de produção recomendado
+A tela `SubscriptionModalV2` não possui mais botão que altera `isPro`. O antigo callback de UI continua isolado no `App.tsx`, mas a interface atual não o chama. Antes de reativar qualquer CTA de assinatura, ele deverá chamar `purchasePlaySubscription()` e atualizar o estado somente após validação do backend.
 
-### Fase 1 — agora
+## Lockfile
 
-- Aplicativo 100% gratuito.
-- Limite gratuito de IA permanece em 200 cards.
-- Não liberar PRO por código local.
-- Manter o backend de Billing desligado/sem exposição ao usuário.
-
-### Fase 2 — AdMob
-
-- Criar app real no AdMob.
-- Criar ad units reais.
-- Integrar SDK nativo.
-- Testar com IDs de teste/dispositivo de teste.
-- Configurar app-ads.txt e aprovação de prontidão.
-- Só então habilitar anúncios de produção.
-
-### Fase 3 — Play Billing
-
-- Criar assinatura e base plans no Play Console.
-- Integrar cliente Android com Play Billing.
-- Enviar purchase token para o backend.
-- Validar token no Google Play Developer API.
-- Conceder entitlement somente após compra válida.
-- Acknowledge no servidor.
-- Configurar RTDN autenticado e idempotente.
-- Testar compra, renovação, cancelamento, expiração, grace period, hold e reembolso.
-- Só então habilitar o botão PRO.
+O `package.json` já inclui o SDK AdMob, porém o `package-lock.json` existente foi gerado antes dessa dependência. Antes de um build limpo/CI com `npm ci`, execute `npm install` para regenerar o lockfile e depois faça commit dele.
 
 ## Conclusão
 
 **Plano gratuito: OK.**
 
-**AdMob real: NÃO pronto.** O código atual contém componentes de demonstração, não uma integração real do SDK.
+**AdMob: 🟡 integração nativa implementada, ainda não pronto para produção.** Faltam configuração externa, projeto Android sincronizado, IDs reais, consentimento/configuração AdMob e homologação.
 
-**Play Billing real: NÃO pronto.** O backend possui uma base boa para validação, mas falta o fluxo de compra real no cliente Android e endurecimento do RTDN. O botão PRO foi desativado para evitar uma falsa assinatura.
+**Play Billing: 🟡 backend + cliente base implementados, ainda não pronto para produção.** Faltam produtos reais, ligação do CTA à compra, RTDN endurecido e testes completos no Play Console.
+
+**Publicação monetizada: ❌ ainda não liberar.**
