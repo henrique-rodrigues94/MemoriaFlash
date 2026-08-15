@@ -1,39 +1,68 @@
-// 📁 flashmind-ai/src/services/curriculumService.ts
+// Serviço de currículo com duas camadas de cache:
+// 1. memória da sessão — instantâneo;
+// 2. Firestore público — evita chamar o Express/IA quando o conteúdo já existe.
 //
-// Serviço de currículo: busca do banco de dados (Firestore, via servidor).
-// A IA gera automaticamente pra qualquer matéria quando não há dados salvos.
-// Resultado é cacheado em memória por sessão para evitar requisições repetidas.
-//
-// FLUXO:
-//  1. Checa cache em memória (instantâneo)
-//  2. GET /api/curriculum?subject=X&level=Y  →  servidor checa Firestore
-//  3. Se não existir no Firestore: servidor chama IA → salva no Firestore → devolve
-//  4. Frontend armazena em memória para a sessão
+// Somente quando não há currículo válido no Firestore o endpoint do servidor é
+// chamado. O servidor então consulta novamente seu Firestore/Admin SDK e, se
+// for realmente novo, gera via IA e persiste para os próximos usuários.
 
 import { EducationLevel } from '../lib/educationLevels';
+import { getCachedCurriculum } from './firestoreCurriculumCache';
 
 export interface CurriculumCategory {
   category: string;
   topics: string[];
 }
 
+/** Estrutura semântica usada pela UI: categoria = tópico e topics = subtópicos. */
+export interface CurriculumTopic {
+  topic: string;
+  subtopics: string[];
+}
+
 export interface CurriculumResult {
   categories: CurriculumCategory[];
+  topics: CurriculumTopic[];
   fromCache: boolean;
+  cacheSource: 'memory' | 'firestore' | 'server' | 'none';
   subject: string;
   educationLevel: EducationLevel;
 }
 
-// ─── In-memory session cache ──────────────────────────────────────────────────
 const sessionCache = new Map<string, CurriculumResult>();
 
 function cacheKey(subject: string, level: EducationLevel): string {
   return `${subject.toLowerCase().trim()}__${level}`;
 }
 
+function toTopics(categories: CurriculumCategory[]): CurriculumTopic[] {
+  return categories.map(category => ({
+    topic: category.category,
+    subtopics: [...category.topics],
+  }));
+}
+
+function buildResult(
+  categories: CurriculumCategory[],
+  subject: string,
+  educationLevel: EducationLevel,
+  source: CurriculumResult['cacheSource'],
+): CurriculumResult {
+  return {
+    categories,
+    topics: toTopics(categories),
+    fromCache: source === 'memory' || source === 'firestore',
+    cacheSource: source,
+    subject: subject.trim(),
+    educationLevel,
+  };
+}
+
 /**
- * Busca currículo do banco de dados.
- * Se não existir, o servidor gera via IA e persiste automaticamente.
+ * Busca a grade curricular sem consumir IA para conteúdo já conhecido.
+ *
+ * Ordem de resolução:
+ * memória → Firestore direto → servidor → IA (somente no servidor se novo).
  */
 export async function fetchCurriculum(
   subject: string,
@@ -41,15 +70,35 @@ export async function fetchCurriculum(
 ): Promise<CurriculumResult | null> {
   if (!subject.trim()) return null;
 
-  const key = cacheKey(subject, educationLevel);
+  const normalizedSubject = subject.trim();
+  const key = cacheKey(normalizedSubject, educationLevel);
 
-  // 1. Cache em memória da sessão
-  if (sessionCache.has(key)) {
-    return sessionCache.get(key)!;
+  const memory = sessionCache.get(key);
+  if (memory) {
+    return { ...memory, cacheSource: 'memory', fromCache: true };
   }
 
+  // Conteúdo educacional é público e pode ser lido diretamente do Firestore.
+  // Isso evita até mesmo uma requisição ao Express quando o banco já possui a grade.
+  const firestore = await getCachedCurriculum(normalizedSubject, educationLevel);
+  if (firestore) {
+    const result = buildResult(
+      firestore.categories,
+      firestore.subject || normalizedSubject,
+      educationLevel,
+      'firestore',
+    );
+    sessionCache.set(key, result);
+    return result;
+  }
+
+  // Cache miss: somente agora consultamos o servidor. Ele é a autoridade para
+  // gerar e persistir uma grade nova no Firestore usando IA.
   try {
-    const params = new URLSearchParams({ subject: subject.trim(), level: educationLevel });
+    const params = new URLSearchParams({
+      subject: normalizedSubject,
+      level: educationLevel,
+    });
     const res = await fetch(`/api/curriculum?${params}`, {
       headers: { 'Content-Type': 'application/json' },
     });
@@ -60,17 +109,15 @@ export async function fetchCurriculum(
     }
 
     const data = await res.json();
+    const categories = Array.isArray(data?.categories) ? data.categories : [];
+    if (categories.length === 0) return null;
 
-    if (!Array.isArray(data?.categories) || data.categories.length === 0) {
-      return null;
-    }
-
-    const result: CurriculumResult = {
-      categories: data.categories,
-      fromCache: data.fromFirestore === true,
-      subject: subject.trim(),
+    const result = buildResult(
+      categories,
+      data?.subject || normalizedSubject,
       educationLevel,
-    };
+      data?.fromFirestore === true ? 'firestore' : 'server',
+    );
 
     sessionCache.set(key, result);
     return result;
@@ -80,12 +127,10 @@ export async function fetchCurriculum(
   }
 }
 
-/** Remove um currículo do cache de sessão (força re-fetch). */
 export function invalidateCurriculumCache(subject: string, level: EducationLevel): void {
   sessionCache.delete(cacheKey(subject, level));
 }
 
-/** Limpa todo o cache de sessão. */
 export function clearCurriculumCache(): void {
   sessionCache.clear();
 }
