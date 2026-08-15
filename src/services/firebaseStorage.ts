@@ -23,17 +23,13 @@ export async function syncDecksFromFirestore(onUpdate: (decks: Deck[]) => void):
 
 function cleanForFirestore<T>(data: T): T { return JSON.parse(JSON.stringify(data)); }
 
-/** Salva com pequenas tentativas de retry para evitar perder um deck por uma falha transitória de rede. */
 export async function saveDeckToFirestore(deck: Deck): Promise<boolean> {
   const userId = await getAuthenticatedUserId();
   if (!userId) return false;
   const payload = cleanForFirestore({ ...deck, userId });
   for (let attempt = 1; attempt <= 3; attempt++) {
     try { await setDoc(doc(db, 'decks', deck.id), payload, { merge: true }); return true; }
-    catch (e) {
-      console.error(`[Firestore] Error saving deck (attempt ${attempt}/3):`, e);
-      if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 250 * attempt));
-    }
+    catch (e) { console.error(`[Firestore] Error saving deck (attempt ${attempt}/3):`, e); if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 250 * attempt)); }
   }
   return false;
 }
@@ -48,7 +44,11 @@ export async function syncStatsFromFirestore(onUpdate: (stats: UserStats) => voi
     const userId = await getAuthenticatedUserId();
     if (!userId) return () => {};
     return onSnapshot(doc(db, 'userStats', userId), (docSnap) => {
-      if (docSnap.exists()) onUpdate(docSnap.data() as UserStats);
+      if (docSnap.exists()) {
+        // Nunca force isPro=false aqui. O documento contém o estado do plano
+        // e o backend controla a validade por proExpiryDate.
+        onUpdate(docSnap.data() as UserStats);
+      }
     }, (err) => console.warn('Firestore snapshot error (stats):', err));
   } catch (e) { console.error('Failed to listen to Firestore stats:', e); return () => {}; }
 }
