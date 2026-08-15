@@ -21,12 +21,15 @@ coverage/
 *.p12
 *.pfx
 *.crt
+*.jks
+*.keystore
 secrets/
 credentials/
 service-account*.json
 
 # Firebase / Service Accounts
 *serviceAccount*.json
+google-services.json
 firebase-debug.log
 .firebase/
 
@@ -47,3 +50,16 @@ Desktop.ini
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Android / Capacitor
+# Os fontes nativos em android/ são versionados (recomendado pelo Capacitor),
+# mas os artefatos gerados e arquivos locais ficam fora do Git.
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/**/local.properties
+android/capacitor-cordova-android-plugins/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json

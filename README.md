@@ -51,7 +51,38 @@ npm run typecheck
 - `docs/AI_PROVIDERS.md` — configuração dos provedores de IA.
 - `docs/FIREBASE_SETUP.md` — Firebase e regras de segurança.
 - `docs/DEPLOY.md` — publicação do backend/frontend.
+- `docs/MOBILE_RUNTIME_SETUP.md` — runtime Android/iOS via Capacitor (login Google nativo, `VITE_API_BASE_URL`, testes no celular).
+- `docs/ANDROID_MONETIZATION_SETUP.md` — AdMob nativo + Google Play Billing no Android.
+- `docs/MONETIZATION_PRODUCTION_AUDIT.md` — auditoria de produção (AdMob/Billing).
 
-## Distribuição
+## Distribuição (Android)
 
-O projeto atual usa React + Vite + Express e pode ser empacotado para distribuição móvel conforme a camada nativa escolhida. A integração de anúncios deve usar o SDK nativo correspondente na versão publicada na loja.
+O projeto é uma aplicação web (React + Vite + Express) empacotada com
+[Capacitor](https://capacitorjs.com/) para Android. A pasta `android/` contém
+os fontes nativos e é versionada no Git (recomendado pelo Capacitor para
+builds reprodutíveis).
+
+Build do APK de debug:
+
+```bash
+npm install
+npx cap sync android
+npm run build
+npx cap copy android
+cd android
+.\gradlew.bat assembleDebug
+```
+
+Instalação em dispositivo (via ADB):
+
+```bash
+adb devices
+adb install -r ".\app\build\outputs\apk\debug\app-debug.apk"
+```
+
+> A integração de anúncios usa o SDK nativo real (`@capacitor-community/admob`)
+> e compras via `@capgo/native-purchases`. Consulte
+> [`docs/MOBILE_RUNTIME_SETUP.md`](docs/MOBILE_RUNTIME_SETUP.md) para o login
+> Google e a configuração de rede, e
+> [`docs/ANDROID_MONETIZATION_SETUP.md`](docs/ANDROID_MONETIZATION_SETUP.md)
+> para o App ID do AdMob e o Play Billing.
