@@ -34,10 +34,18 @@ export const auth = getAuth(app);
 export const db = firebaseConfig.firestoreDatabaseId ? getFirestore(app, firebaseConfig.firestoreDatabaseId) : getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 
-const isNative = Capacitor.isNativePlatform();
+// Capacitor.isNativePlatform() can be evaluated too early in some WebView
+// startup paths. The platform value is stable once the Capacitor bridge is
+// available, so use it explicitly to guarantee that Android/iOS never falls
+// back to Firebase's browser popup flow.
+const capacitorPlatform = Capacitor.getPlatform();
+const isNative = capacitorPlatform === 'android' || capacitorPlatform === 'ios';
 const configuredApiBaseUrl = String(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
-const googleWebClientId = String(import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID || '').trim();
+const googleWebClientId = String(
+  import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID || (firebaseConfig as any).oAuthClientId || ''
+).trim();
 let socialLoginInitialized = false;
+let googleLoginInProgress = false;
 
 function getGuestUserId(): string {
   const stored = localStorage.getItem('flashmind_guest_uid');
@@ -50,7 +58,7 @@ function getGuestUserId(): string {
 async function ensureSocialLoginInitialized(): Promise<void> {
   if (!isNative || socialLoginInitialized) return;
   if (!googleWebClientId) {
-    throw new Error('Login Google nativo não configurado. Defina VITE_GOOGLE_WEB_CLIENT_ID antes de gerar o APK.');
+    throw new Error('Login Google nativo não configurado. Defina VITE_GOOGLE_WEB_CLIENT_ID com o Web Client ID OAuth do Firebase/Google Cloud antes de gerar o APK.');
   }
 
   await SocialLogin.initialize({
@@ -63,34 +71,44 @@ async function ensureSocialLoginInitialized(): Promise<void> {
 }
 
 /**
- * Mantém a mesma API usada pelos componentes, mas troca o popup WebView pelo
- * Google Sign-In nativo quando o app roda no Android/iOS via Capacitor.
+ * Mantém a mesma API usada pelos componentes, mas usa o Google Sign-In
+ * nativo quando o app roda no Android/iOS via Capacitor. Isso evita abrir
+ * Gmail/SBrowser ou depender de popup dentro do WebView.
  */
 export async function signInWithPopup(authInstance: typeof auth, provider: GoogleAuthProvider) {
   if (!isNative || provider.providerId !== 'google.com') {
     return firebaseSignInWithPopup(authInstance, provider);
   }
 
-  await ensureSocialLoginInitialized();
-
-  const response = await SocialLogin.login({
-    provider: 'google',
-    options: {
-      scopes: ['profile', 'email'],
-      filterByAuthorizedAccounts: false,
-    },
-  });
-
-  const result = response?.result as { idToken?: string | null; accessToken?: { token?: string } | null } | undefined;
-  const idToken = result?.idToken || null;
-  const accessToken = result?.accessToken?.token || undefined;
-
-  if (!idToken) {
-    throw new Error('O Google não retornou um ID token válido. Verifique o SHA-1 e o Web Client ID no Firebase/Google Cloud.');
+  if (googleLoginInProgress) {
+    throw new Error('O login com Google já está em andamento. Aguarde a janela nativa terminar.');
   }
 
-  const credential = GoogleAuthProvider.credential(idToken, accessToken);
-  return signInWithCredential(authInstance, credential);
+  googleLoginInProgress = true;
+  try {
+    await ensureSocialLoginInitialized();
+
+    const response = await SocialLogin.login({
+      provider: 'google',
+      options: {
+        scopes: ['profile', 'email'],
+        filterByAuthorizedAccounts: false,
+      },
+    });
+
+    const result = response?.result as { idToken?: string | null; accessToken?: { token?: string } | null } | undefined;
+    const idToken = result?.idToken || null;
+    const accessToken = result?.accessToken?.token || undefined;
+
+    if (!idToken) {
+      throw new Error('O Google não retornou um ID token válido. Verifique o SHA-1, o pacote Android e o Web Client ID no Firebase/Google Cloud.');
+    }
+
+    const credential = GoogleAuthProvider.credential(idToken, accessToken);
+    return signInWithCredential(authInstance, credential);
+  } finally {
+    googleLoginInProgress = false;
+  }
 }
 
 export async function signOut(authInstance: typeof auth): Promise<void> {
