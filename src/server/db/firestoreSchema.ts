@@ -5,9 +5,7 @@
 import { createHash } from 'crypto';
 
 export type EducationLevel = 'fundamental' | 'medio' | 'faculdade' | 'concurso' | 'tecnico';
-
-export type CardContentType =
-  | 'definition' | 'quiz' | 'gap' | 'comparison' | 'applied' | 'review';
+export type CardContentType = 'definition' | 'quiz' | 'gap' | 'comparison' | 'applied' | 'review';
 
 export const TTL_DAYS = {
   SUBJECT_LEVELS: 90,
@@ -42,12 +40,7 @@ export function curriculumId(subject: string, level: EducationLevel): string {
   return shortHash(`${normalizeText(subject)}|${level}`);
 }
 
-export function bucketId(
-  subject: string,
-  topic: string,
-  level: EducationLevel,
-  cardType: CardContentType = 'definition',
-): string {
+export function bucketId(subject: string, topic: string, level: EducationLevel, cardType: CardContentType = 'definition'): string {
   return shortHash(`${normalizeText(subject)}|${normalizeText(topic)}|${level}|${cardType}`);
 }
 
@@ -66,23 +59,23 @@ export interface SubjectDoc {
   providerUsed: string;
 }
 
-/** Um tópico é um bloco da grade e seus subitens estudáveis. */
+/** Estrutura canônica: um tópico possui vários sub-tópicos estudáveis. */
 export interface CurriculumTopic {
   topic: string;
   subtopics: string[];
 }
 
 export interface CurriculumDoc {
-  subject: string;                 // matéria
-  level: EducationLevel;           // grade/nível educacional
-  categories: Array<{              // compatibilidade com versões anteriores
-    category: string;
-    topics: string[];
-  }>;
-  topicTree: CurriculumTopic[];    // estrutura canônica: tópico -> subtópicos
-  topicCount: number;
-  subtopicCount: number;
-  totalTopics: number;             // compatibilidade: total de subitens
+  subject: string;
+  level: EducationLevel;
+  // Formato legado e compatível com a UI atual.
+  categories: Array<{ category: string; topics: string[] }>;
+  // Opcional para manter leitura de documentos antigos. Novos documentos podem
+  // usar esta estrutura sem quebrar o formato anterior.
+  topicTree?: CurriculumTopic[];
+  topicCount?: number;
+  subtopicCount?: number;
+  totalTopics: number;
   updatedAt: string;
   ttlAt: number;
   providerUsed: string;
