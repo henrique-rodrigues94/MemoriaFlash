@@ -10,13 +10,12 @@ export function buildReferralLink(code: string): string {
   return `${base}/?ref=${code}`;
 }
 
-/** Lê `?ref=CODE` da URL atual (se houver) e guarda como pendente até a conta ativar. */
 export function capturePendingReferralFromURL(): void {
   if (typeof window === 'undefined') return;
   const params = new URLSearchParams(window.location.search);
   const ref = params.get('ref');
   if (ref && !localStorage.getItem(PENDING_REF_KEY)) {
-    localStorage.setItem(PENDING_REF_KEY, ref.toUpperCase());
+    localStorage.setItem(PENDING_REF_KEY, ref.toUpperCase().trim());
   }
 }
 
@@ -31,14 +30,10 @@ export function clearPendingReferralCode(): void {
 export interface ClaimReferralResult {
   success: boolean;
   message: string;
-  welcomeBonus?: number;
+  rewardDays?: number;
+  alreadyRewarded?: boolean;
 }
 
-/**
- * Garante que o mapeamento código→uid deste usuário existe no servidor
- * (necessário para que AMIGOS consigam resgatar o código dele depois).
- * Chame uma vez após a autenticação ser confirmada.
- */
 export async function ensureOwnReferralCodeRegistered(): Promise<string | null> {
   const user = auth.currentUser;
   if (!user || typeof (user as any).getIdToken !== 'function') return null;
@@ -53,31 +48,18 @@ export async function ensureOwnReferralCodeRegistered(): Promise<string | null> 
     const data = await res.json();
     return data?.code ?? deriveReferralCode(user.uid);
   } catch {
-    // Sem servidor/backend disponível (ex: preview estático) — ainda assim
-    // conseguimos mostrar o código localmente, só não fica resgatável por
-    // amigos até o backend estar no ar.
     return deriveReferralCode(user.uid);
   }
 }
 
-/**
- * Tenta resgatar o código de indicação pendente chamando o backend, que usa
- * o Firebase Admin SDK para validar e creditar ambas as contas com
- * segurança (evita que o próprio cliente possa se autocreditar créditos
- * infinitos escrevendo direto no Firestore).
- *
- * Requer que o usuário tenha um Firebase ID Token válido (login Google ou
- * autenticação anônima real do Firebase). Se o app estiver rodando em modo
- * "guest" local (sem Firebase Auth habilitado no console), a indicação fica
- * marcada como pendente e será resgatada automaticamente no primeiro login.
- */
-export async function tryClaimPendingReferral(): Promise<ClaimReferralResult | null> {
-  const code = getPendingReferralCode();
-  if (!code) return null;
+/** Resgata explicitamente um código digitado pelo usuário. */
+export async function claimReferralCode(referralCode: string): Promise<ClaimReferralResult> {
+  const code = referralCode.trim().toUpperCase();
+  if (!code) return { success: false, message: 'Digite um código de indicação.' };
 
   const user = auth.currentUser;
   if (!user || typeof (user as any).getIdToken !== 'function') {
-    return null;
+    return { success: false, message: 'Entre na sua conta para resgatar um código.' };
   }
 
   try {
@@ -87,27 +69,34 @@ export async function tryClaimPendingReferral(): Promise<ClaimReferralResult | n
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ referralCode: code, idToken }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
 
     if (res.ok && data.success) {
-      clearPendingReferralCode();
-      return { success: true, message: data.message, welcomeBonus: data.welcomeBonus };
+      return {
+        success: true,
+        message: data.message || 'Indicação registrada com sucesso.',
+        rewardDays: data.rewardDays,
+        alreadyRewarded: data.alreadyRewarded,
+      };
     }
 
-    // CORREÇÃO: antes, QUALQUER falha (inclusive erro transitório do servidor,
-    // ex: 500/503 por config do Firebase Admin ainda não pronta) descartava o
-    // código pendente para sempre — o usuário perdia o bônus de indicação
-    // mesmo que uma nova tentativa mais tarde funcionasse. Agora só
-    // descartamos em rejeições DEFINITIVAS do servidor (código inválido,
-    // autoindicação, já resgatado antes) — erros de servidor mantêm o código
-    // pendente para tentar de novo no próximo login.
-    const isDefinitiveRejection = res.status === 400 || res.status === 404 || res.status === 409;
-    if (isDefinitiveRejection) {
-      clearPendingReferralCode();
-    }
     return { success: false, message: data.error || 'Não foi possível validar o código de indicação.' };
-  } catch (err) {
-    console.warn('Falha ao resgatar indicação (tentaremos novamente mais tarde):', err);
-    return null;
+  } catch {
+    return { success: false, message: 'Não foi possível conectar ao servidor. Tente novamente.' };
   }
+}
+
+/**
+ * Resgata automaticamente a indicação recebida por link.
+ * Erros transitórios preservam o código para a próxima abertura/login.
+ */
+export async function tryClaimPendingReferral(): Promise<ClaimReferralResult | null> {
+  const code = getPendingReferralCode();
+  if (!code) return null;
+
+  const result = await claimReferralCode(code);
+  if (result.success || result.message.includes('já utilizou') || result.message.includes('já foi registrada')) {
+    clearPendingReferralCode();
+  }
+  return result;
 }
