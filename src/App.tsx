@@ -313,29 +313,34 @@ export function App() {
   };
 
   const handleSaveDeck = (updatedDeck: Deck) => {
-    const exists = decks.some((d) => d.id === updatedDeck.id);
-    if (exists) {
-      setDecks(decks.map((d) => (d.id === updatedDeck.id ? updatedDeck : d)));
-    } else {
-      setDecks([updatedDeck, ...decks]);
-    }
-    saveDeckToFirestore(updatedDeck);
+    // Functional update evita usar uma versão antiga de `decks` quando o
+    // listener do Firestore e o gerador IA atualizam o estado quase juntos.
+    setDecks((currentDecks) => {
+      const exists = currentDecks.some((d) => d.id === updatedDeck.id);
+      return exists
+        ? currentDecks.map((d) => (d.id === updatedDeck.id ? updatedDeck : d))
+        : [updatedDeck, ...currentDecks];
+    });
+
+    // O armazenamento local é atualizado pelo efeito de `decks`; o Firestore
+    // recebe a mesma versão do deck de forma independente.
+    void saveDeckToFirestore(updatedDeck);
   };
 
   // Salva o progresso do estudo automaticamente a cada card (mantém a sessão aberta)
   const handleSaveStudyProgress = (updatedDeck: Deck) => {
-    const exists = decks.some((d) => d.id === updatedDeck.id);
-    if (exists) {
-      setDecks(decks.map((d) => (d.id === updatedDeck.id ? updatedDeck : d)));
-    } else {
-      setDecks([updatedDeck, ...decks]);
-    }
-    saveDeckToFirestore(updatedDeck);
+    setDecks((currentDecks) => {
+      const exists = currentDecks.some((d) => d.id === updatedDeck.id);
+      return exists
+        ? currentDecks.map((d) => (d.id === updatedDeck.id ? updatedDeck : d))
+        : [updatedDeck, ...currentDecks];
+    });
+    void saveDeckToFirestore(updatedDeck);
   };
 
   const handleDeleteDeck = (deckId: string) => {
-    setDecks(decks.filter((d) => d.id !== deckId));
-    deleteDeckFromFirestore(deckId);
+    setDecks((currentDecks) => currentDecks.filter((d) => d.id !== deckId));
+    void deleteDeckFromFirestore(deckId);
   };
 
   const handleAddCardToDeck = (deckId: string, card: { front: string; back: string }) => {
