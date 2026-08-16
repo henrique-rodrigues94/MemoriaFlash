@@ -28,9 +28,25 @@ jobs:
 
           p = Path('src/server/ai/tasks/generateFlashcards.ts')
           s = p.read_text()
-          s = s.replace("const cards = rawCards.filter((card) => {", "const cards = rawCards.filter((card): card is Record<string, unknown> => Boolean(card && typeof card === 'object'));\n  const normalizedCards = cards.map(card => ({ ...card, topic: topicLabel }));")
-          s = s.replace("  }).map(card => ({ ...card, topic: topicLabel }));\n\n  let fixedExplanationCount = 0;\n  const finalCards = cards.map((card) => {", "  });\n\n  let fixedExplanationCount = 0;\n  const finalCards = normalizedCards.map((card) => {")
-          p.write_text(s)
+          pattern = r"  const rawCards = extractArrayField\(data, \['cards', 'flashcards'\]\).*?\n  let fixedExplanationCount = 0;\n  const finalCards = cards\.map\(\(card\) => \{"
+          replacement = '''  const rawCards = extractArrayField(data, ['cards', 'flashcards']) as Array<Record<string, unknown>>;
+  const seen = new Set<string>();
+  const cards: Array<Record<string, unknown> & { topic: string }> = [];
+  for (const card of rawCards) {
+    const front = typeof card?.front === 'string' ? card.front : '';
+    const back = typeof card?.back === 'string' ? card.back : '';
+    const key = normalizeForDedup(front);
+    if (!key || !back.trim() || seen.has(key)) continue;
+    seen.add(key);
+    cards.push({ ...card, topic: topicLabel });
+  }
+
+  let fixedExplanationCount = 0;
+  const finalCards = cards.map((card) => {'''
+          s2, n = re.subn(pattern, replacement, s, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit(f'generateFlashcards block replacement failed: {n}')
+          p.write_text(s2)
           PY
 
       - name: Verify TypeScript
