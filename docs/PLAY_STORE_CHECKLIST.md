@@ -33,6 +33,7 @@
 - [x] Tipagem explícita da coleção de tópicos da sessão de estudo
 - [x] Testes unitários alinhados aos contratos atuais do app
 - [x] Suite de testes atualizada para o modelo sem rewarded ads/créditos
+- [x] Cenário de reset de cooldown do AIOrchestrator coberto
 - [ ] Revisão final das variáveis de produção
 - [ ] Confirmar backend HTTPS de produção
 - [ ] Testar rate limiting em produção
