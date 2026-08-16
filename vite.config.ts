@@ -12,14 +12,27 @@ export default defineConfig(() => {
       },
     },
     build: {
+      // Chunks acima de 300kB atrasam o primeiro carregamento (crítico no
+      // WebView Android, que costuma ter CPU/rede mais fracas que desktop).
+      chunkSizeWarningLimit: 300,
       rollupOptions: {
         output: {
-          // Separa dependências pesadas e estáveis (mudam raramente) num
-          // chunk "vendor" próprio — melhora o cache do navegador entre
+          // Separa dependências pesadas e estáveis (mudam raramente) em
+          // chunks próprios — melhora o cache do navegador/WebView entre
           // deploys, já que o código do app muda bem mais que essas libs.
-          manualChunks: {
-            'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/messaging'],
-            'vendor-motion': ['motion', 'canvas-confetti'],
+          // Cada entrada é isolada para não puxar o Firebase inteiro (734kB)
+          // só porque uma tela usa auth, nem travar o carregamento inicial
+          // com libs que só entram em uso depois do primeiro paint.
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+            if (id.includes('firebase/firestore')) return 'vendor-firebase-firestore';
+            if (id.includes('firebase/auth')) return 'vendor-firebase-auth';
+            if (id.includes('firebase/messaging')) return 'vendor-firebase-messaging';
+            if (id.includes('firebase') || id.includes('@firebase')) return 'vendor-firebase-core';
+            if (id.includes('lucide-react')) return 'vendor-icons';
+            if (id.includes('motion') || id.includes('canvas-confetti')) return 'vendor-motion';
+            if (id.includes('@capacitor') || id.includes('@capgo')) return 'vendor-capacitor';
+            return 'vendor-misc';
           },
         },
       },
