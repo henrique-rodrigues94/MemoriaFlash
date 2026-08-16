@@ -21,6 +21,11 @@
 - [x] `sourceChunks` protegidos por proprietário
 - [x] Conteúdo compartilhado somente via Agent/Admin SDK
 - [x] Consentimento para alimentar conteúdo compartilhado
+- [x] Deduplicação por SHA-256
+- [x] Recuperação de requests presos em `processing`
+- [x] Limite de tentativas/retries
+- [x] Checklist de Data Safety documentado
+- [x] Runbook de release documentado
 - [ ] Revisão final das variáveis de produção
 - [ ] Confirmar backend HTTPS de produção
 - [ ] Testar rate limiting em produção
@@ -28,19 +33,24 @@
 
 ## Homologação Android
 
+- [ ] `npm ci`
+- [ ] `npm run typecheck`
+- [ ] `npm run test`
 - [ ] `npm run build`
 - [ ] `npm run android:sync:prod`
-- [ ] Gerar AAB Release
+- [ ] Gerar AAB Release assinado
 - [ ] Instalar e testar em aparelho físico
 - [ ] Login Google em release
 - [ ] Scanner/câmera
 - [ ] PDF/TXT
+- [ ] PDF sem camada de texto
 - [ ] Geração de cards
 - [ ] Sincronização Firestore
 - [ ] Feedback/relato de problema
 - [ ] AdMob em produção
 - [ ] Google Play Billing em produção
 - [ ] Testar recuperação após perda de conexão
+- [ ] Testar encerramento/reabertura do app
 
 ## Google Play Console
 
@@ -50,7 +60,8 @@
 - [ ] Screenshots de tablet, se aplicável
 - [ ] Feature graphic
 - [ ] Política de privacidade publicada
-- [ ] Formulário Data Safety
+- [x] Roteiro Data Safety documentado
+- [ ] Formulário Data Safety preenchido
 - [ ] Classificação indicativa
 - [ ] Público-alvo
 - [ ] Permissões declaradas
@@ -59,3 +70,8 @@
 - [ ] Teste fechado
 - [ ] AAB enviado
 - [ ] Produção
+
+## Documentação de release
+
+- `docs/PLAY_STORE_DATA_SAFETY.md`
+- `docs/RELEASE_RUNBOOK.md`
