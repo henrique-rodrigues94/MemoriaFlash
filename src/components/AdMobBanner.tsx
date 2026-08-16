@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { showFreeUserBanner, hideAdMobBanner } from '../services/ads/adMobNative';
+import { showFreeUserBanner, hideAdMobBanner, requestAdMobConsent } from '../services/ads/adMobNative';
 import { UserStats } from '../types';
 
 interface AdMobBannerProps {
@@ -31,18 +31,20 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({ stats, isPro }) => {
     }
 
     let disposed = false;
-    const refreshBanner = () => {
-      if (!disposed) {
-        void showFreeUserBanner().catch((error) => {
-          console.warn('[AdMob] Banner indisponível:', error);
-        });
+    const refreshBanner = async () => {
+      if (disposed || !Capacitor.isNativePlatform()) return;
+      try {
+        await requestAdMobConsent();
+        if (!disposed) await showFreeUserBanner();
+      } catch (error) {
+        console.warn('[AdMob] Banner indisponível:', error);
       }
     };
 
-    refreshBanner();
-    const interval = window.setInterval(refreshBanner, 60_000);
+    void refreshBanner();
+    const interval = window.setInterval(() => void refreshBanner(), 60_000);
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') refreshBanner();
+      if (document.visibilityState === 'visible') void refreshBanner();
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
@@ -50,9 +52,7 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({ stats, isPro }) => {
       disposed = true;
       window.clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
-      if (Capacitor.isNativePlatform()) {
-        void hideAdMobBanner().catch(() => undefined);
-      }
+      if (Capacitor.isNativePlatform()) void hideAdMobBanner().catch(() => undefined);
     };
   }, [activePro]);
 
