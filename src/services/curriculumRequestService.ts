@@ -15,6 +15,14 @@ function subjectId(value: string): string {
   return normalizeSubject(value).replace(/\s+/g, '-').slice(0, 100);
 }
 
+async function findUserRequests(uid: string) {
+  const snapshot = await getDocs(query(
+    collection(db, 'contentRequests'),
+    where('requestedBy', '==', uid),
+  ));
+  return snapshot.docs;
+}
+
 /**
  * Solicita ao Content Agent que prepare a grade e complete os cards
  * compartilhados da matéria/nível. A solicitação é idempotente por usuário,
@@ -33,16 +41,13 @@ export async function requestCurriculumPreparation(args: {
   if (!educationLevel) throw new Error('Informe o nível de ensino.');
 
   const normalizedSubject = normalizeSubject(subject);
-  const existingQuery = query(
-    collection(db, 'contentRequests'),
-    where('requestedBy', '==', user.uid),
-    where('normalizedSubject', '==', normalizedSubject),
-    where('educationLevel', '==', educationLevel),
-  );
-  const snapshot = await getDocs(existingQuery);
-  const reusable = snapshot.docs.find((item) => {
-    const status = String(item.data()?.status || '');
-    return status === 'pending' || status === 'processing' || status === 'analyzing' || status === 'generating' || status === 'validating';
+  const existingDocs = await findUserRequests(user.uid);
+  const reusable = existingDocs.find((item) => {
+    const data = item.data();
+    const status = String(data?.status || '');
+    return String(data?.normalizedSubject || '') === normalizedSubject
+      && String(data?.educationLevel || '') === educationLevel
+      && ['pending', 'processing', 'analyzing', 'generating', 'validating'].includes(status);
   });
 
   if (reusable) {
@@ -92,14 +97,14 @@ export async function getLatestCurriculumPreparationRequest(args: {
   const user = auth.currentUser;
   if (!user) return null;
   const normalizedSubject = normalizeSubject(args.subject);
-  const snapshot = await getDocs(query(
-    collection(db, 'contentRequests'),
-    where('requestedBy', '==', user.uid),
-    where('normalizedSubject', '==', normalizedSubject),
-    where('educationLevel', '==', args.educationLevel),
-  ));
-  if (snapshot.empty) return null;
-  const sorted = [...snapshot.docs].sort((a, b) => String(b.data()?.updatedAt || '').localeCompare(String(a.data()?.updatedAt || '')));
+  const docs = await findUserRequests(user.uid);
+  const matches = docs.filter(docSnapshot => {
+    const data = docSnapshot.data();
+    return String(data?.normalizedSubject || '') === normalizedSubject
+      && String(data?.educationLevel || '') === args.educationLevel;
+  });
+  if (matches.length === 0) return null;
+  const sorted = [...matches].sort((a, b) => String(b.data()?.updatedAt || '').localeCompare(String(a.data()?.updatedAt || '')));
   const data = sorted[0].data();
   return { id: sorted[0].id, ...data };
 }
