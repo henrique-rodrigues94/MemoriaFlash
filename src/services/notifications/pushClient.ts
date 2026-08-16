@@ -24,23 +24,37 @@ const DEFAULT_PREFS: NotificationPrefs = {
 const NATIVE_DAILY_REMINDER_ID = 42001;
 const NATIVE_STREAK_REMINDER_ID = 42003;
 const NATIVE_TEST_NOTIFICATION_ID = 42002;
+const NATIVE_OPERATION_TIMEOUT_MS = 8000;
 
 function prefsDocRef(uid: string) { return doc(db, 'notificationPrefs', uid); }
 function isNativeApp(): boolean { return Capacitor.isNativePlatform(); }
-
-export async function getNotificationPrefs(): Promise<NotificationPrefs> {
-  const user = await ensureAuthenticated();
-  try {
-    const snap = await getDoc(prefsDocRef(user.uid));
-    if (snap.exists()) return { ...DEFAULT_PREFS, ...(snap.data() as Partial<NotificationPrefs>) };
-  } catch (err) { console.warn('Falha ao carregar preferências de notificação:', err); }
-  return DEFAULT_PREFS;
-}
-
 function normalizeHour(hour: number): number { return Math.min(23, Math.max(0, Math.round(Number(hour) || 0))); }
 function localHourToUTCHour(localHour: number): number {
   const offsetMinutes = new Date().getTimezoneOffset();
   return ((normalizeHour(localHour) + Math.round(offsetMinutes / 60)) % 24 + 24) % 24;
+}
+
+async function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = NATIVE_OPERATION_TIMEOUT_MS): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} demorou mais que o esperado. Verifique a permissão de notificações e tente novamente.`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+export async function getNotificationPrefs(): Promise<NotificationPrefs> {
+  const user = await ensureAuthenticated();
+  try {
+    const snap = await withTimeout(getDoc(prefsDocRef(user.uid)), 'Carregamento dos lembretes');
+    if (snap.exists()) return { ...DEFAULT_PREFS, ...(snap.data() as Partial<NotificationPrefs>) };
+  } catch (err) { console.warn('Falha ao carregar preferências de notificação:', err); }
+  return DEFAULT_PREFS;
 }
 
 export async function isPushSupported(): Promise<boolean> {
@@ -56,53 +70,45 @@ async function getMessagingSafe(): Promise<Messaging | null> {
 }
 
 async function ensureNativeNotificationPermission(): Promise<boolean> {
-  const current = await LocalNotifications.checkPermissions();
+  const current = await withTimeout(LocalNotifications.checkPermissions(), 'Verificação da permissão de notificações');
   if (current.display === 'granted') return true;
-  const requested = await LocalNotifications.requestPermissions();
+  const requested = await withTimeout(LocalNotifications.requestPermissions(), 'Solicitação da permissão de notificações');
   return requested.display === 'granted';
 }
 
 export interface EnablePushResult { success: boolean; message: string; }
 
-async function cancelNativeReviewNotifications(): Promise<void> {
-  await LocalNotifications.cancel({ notifications: [
-    { id: NATIVE_DAILY_REMINDER_ID },
-    { id: NATIVE_STREAK_REMINDER_ID },
-  ] });
+async function cancelNativeNotifications(ids: number[]): Promise<void> {
+  await withTimeout(LocalNotifications.cancel({ notifications: ids.map(id => ({ id })) }), 'Cancelamento dos lembretes');
 }
 
 async function scheduleNativeDailyReminder(reminderHourLocal: number): Promise<EnablePushResult> {
   const granted = await ensureNativeNotificationPermission();
   if (!granted) return { success: false, message: 'Permissão de notificações negada. Ative as notificações do MemoriaFlash nas configurações do Android.' };
   const hour = normalizeHour(reminderHourLocal);
-  await LocalNotifications.cancel({ notifications: [{ id: NATIVE_DAILY_REMINDER_ID }] });
-  await LocalNotifications.schedule({ notifications: [{
+  await cancelNativeNotifications([NATIVE_DAILY_REMINDER_ID]);
+  await withTimeout(LocalNotifications.schedule({ notifications: [{
     id: NATIVE_DAILY_REMINDER_ID,
     title: 'Lembretes de Revisão',
     body: 'Você tem cartões para revisar. Reserve alguns minutos para manter sua memória em dia.',
     schedule: { on: { hour, minute: 0 }, repeats: true },
     extra: { type: 'daily-review' },
-  }] });
+  }] }), 'Agendamento do lembrete diário');
   return { success: true, message: `Lembrete diário configurado para ${String(hour).padStart(2, '0')}:00 neste celular.` };
 }
 
 async function scheduleNativeStreakReminder(reminderHourLocal: number): Promise<void> {
   const hour = (normalizeHour(reminderHourLocal) + 1) % 24;
-  await LocalNotifications.cancel({ notifications: [{ id: NATIVE_STREAK_REMINDER_ID }] });
-  await LocalNotifications.schedule({ notifications: [{
+  await cancelNativeNotifications([NATIVE_STREAK_REMINDER_ID]);
+  await withTimeout(LocalNotifications.schedule({ notifications: [{
     id: NATIVE_STREAK_REMINDER_ID,
     title: 'Sua sequência de estudos está em risco 🔥',
     body: 'Faça uma revisão hoje para manter sua sequência no MemoriaFlash.',
     schedule: { on: { hour, minute: 0 }, repeats: true },
     extra: { type: 'streak-risk' },
-  }] });
+  }] }), 'Agendamento do aviso de sequência');
 }
 
-async function disableNativeDailyReminder(): Promise<void> {
-  await LocalNotifications.cancel({ notifications: [{ id: NATIVE_DAILY_REMINDER_ID }] });
-}
-
-/** Ativa ou reprograma o lembrete diário. É seguro chamar novamente para trocar o horário. */
 export async function enableDailyReminders(reminderHourLocal: number): Promise<EnablePushResult> {
   const hour = normalizeHour(reminderHourLocal);
   if (isNativeApp()) {
@@ -112,13 +118,13 @@ export async function enableDailyReminders(reminderHourLocal: number): Promise<E
       const user = await ensureAuthenticated();
       const existing = await getNotificationPrefs();
       if (existing.streakReminderEnabled) await scheduleNativeStreakReminder(hour);
-      await setDoc(prefsDocRef(user.uid), {
+      await withTimeout(setDoc(prefsDocRef(user.uid), {
         ...existing,
         dailyReminderEnabled: true,
         reminderHourLocal: hour,
         reminderHourUTC: localHourToUTCHour(hour),
         updatedAt: Date.now(),
-      }, { merge: true });
+      }, { merge: true }), 'Salvamento das preferências');
       return result;
     } catch (err: any) {
       console.error('Erro ao ativar notificações nativas:', err);
@@ -150,10 +156,10 @@ export async function enableDailyReminders(reminderHourLocal: number): Promise<E
 
 export async function disableDailyReminders(): Promise<EnablePushResult> {
   try {
-    if (isNativeApp()) await disableNativeDailyReminder();
+    if (isNativeApp()) await cancelNativeNotifications([NATIVE_DAILY_REMINDER_ID]);
     const user = await ensureAuthenticated();
     const existing = await getNotificationPrefs();
-    await setDoc(prefsDocRef(user.uid), { ...existing, dailyReminderEnabled: false, updatedAt: Date.now() }, { merge: true });
+    await withTimeout(setDoc(prefsDocRef(user.uid), { ...existing, dailyReminderEnabled: false, updatedAt: Date.now() }, { merge: true }), 'Salvamento das preferências');
     return { success: true, message: 'Lembretes diários desativados.' };
   } catch (err: any) {
     return { success: false, message: err?.message || 'Não foi possível desativar os lembretes.' };
@@ -170,10 +176,10 @@ export async function updateStreakReminderPref(enabled: boolean): Promise<Enable
         if (!granted) return { success: false, message: 'Permissão de notificações negada. Ative as notificações do MemoriaFlash nas configurações do Android.' };
         await scheduleNativeStreakReminder(existing.reminderHourLocal);
       } else {
-        await LocalNotifications.cancel({ notifications: [{ id: NATIVE_STREAK_REMINDER_ID }] });
+        await cancelNativeNotifications([NATIVE_STREAK_REMINDER_ID]);
       }
     }
-    await setDoc(prefsDocRef(user.uid), { ...existing, streakReminderEnabled: enabled, updatedAt: Date.now() }, { merge: true });
+    await withTimeout(setDoc(prefsDocRef(user.uid), { ...existing, streakReminderEnabled: enabled, updatedAt: Date.now() }, { merge: true }), 'Salvamento das preferências');
     return { success: true, message: enabled ? 'Aviso de sequência em risco ativado.' : 'Aviso de sequência em risco desativado.' };
   } catch (err: any) {
     return { success: false, message: err?.message || 'Não foi possível atualizar o aviso de sequência.' };
@@ -185,7 +191,7 @@ export async function sendTestNotification(): Promise<EnablePushResult> {
     try {
       const granted = await ensureNativeNotificationPermission();
       if (!granted) return { success: false, message: 'Permissão de notificação negada. Ative as notificações do MemoriaFlash nas configurações do Android.' };
-      await LocalNotifications.schedule({ notifications: [{ id: NATIVE_TEST_NOTIFICATION_ID, title: 'MemoriaFlash', body: 'Notificação funcionando! Seus lembretes estão configurados.', schedule: { at: new Date(Date.now() + 3000) }, extra: { type: 'notification-test' } }] });
+      await withTimeout(LocalNotifications.schedule({ notifications: [{ id: NATIVE_TEST_NOTIFICATION_ID, title: 'MemoriaFlash', body: 'Notificação funcionando! Seus lembretes estão configurados.', schedule: { at: new Date(Date.now() + 3000) }, extra: { type: 'notification-test' } }] }), 'Agendamento da notificação de teste');
       return { success: true, message: 'Notificação de teste agendada para 3 segundos.' };
     } catch (err: any) { return { success: false, message: err?.message || 'Falha ao testar a notificação.' }; }
   }
