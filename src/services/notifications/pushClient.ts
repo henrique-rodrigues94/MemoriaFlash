@@ -31,7 +31,7 @@ async function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = NA
 }
 
 export async function getNotificationPrefs(): Promise<NotificationPrefs> {
-  const user = await ensureAuthenticated();
+  const user = await withTimeout(ensureAuthenticated(), 'Autenticação');
   try {
     const snap = await withTimeout(getDoc(prefsDocRef(user.uid)), 'Carregamento dos lembretes');
     return snap.exists() ? { ...DEFAULT_PREFS, ...(snap.data() as Partial<NotificationPrefs>) } : { ...DEFAULT_PREFS };
@@ -68,7 +68,7 @@ export async function enableDailyReminders(reminderHourLocal: number): Promise<E
   try {
     if (isNativeApp()) {
       const result = await scheduleNativeDailyReminder(hour); if (!result.success) return result;
-      const user = await ensureAuthenticated(); const existing = await getNotificationPrefs();
+      const user = await withTimeout(ensureAuthenticated(), 'Autenticação'); const existing = await getNotificationPrefs();
       if (existing.streakReminderEnabled) { try { await scheduleNativeStreakReminder(hour); } catch (err) { console.warn('[Notifications] streak schedule failed', err); } }
       try { await withTimeout(setDoc(prefsDocRef(user.uid), { ...existing, dailyReminderEnabled: true, reminderHourLocal: hour, reminderHourUTC: localHourToUTCHour(hour), updatedAt: Date.now() }, { merge: true }), 'Salvamento das preferências'); } catch (err) { console.warn('[Notifications] prefs save failed', err); }
       return result;
@@ -77,20 +77,20 @@ export async function enableDailyReminders(reminderHourLocal: number): Promise<E
     const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY; if (!vapidKey) return { success: false, message: 'VITE_FIREBASE_VAPID_KEY não configurada.' };
     const permission = await Notification.requestPermission(); if (permission !== 'granted') return { success: false, message: 'Permissão de notificação negada pelo usuário.' };
     const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js'); const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration }); if (!token) return { success: false, message: 'Não foi possível obter o token de notificação.' };
-    const user = await ensureAuthenticated(); const existing = await getNotificationPrefs();
+    const user = await withTimeout(ensureAuthenticated(), 'Autenticação'); const existing = await getNotificationPrefs();
     await setDoc(prefsDocRef(user.uid), { ...existing, tokens: Array.from(new Set([...existing.tokens, token])), dailyReminderEnabled: true, reminderHourLocal: hour, reminderHourUTC: localHourToUTCHour(hour), updatedAt: Date.now() }, { merge: true });
     return { success: true, message: `Lembretes diários ativados para ${String(hour).padStart(2, '0')}:00.` };
   } catch (err: any) { console.error('Erro ao ativar notificações:', err); return { success: false, message: err?.message || 'Erro ao ativar notificações.' }; }
 }
 
 export async function disableDailyReminders(): Promise<EnablePushResult> {
-  try { if (isNativeApp()) await cancelNativeNotifications([NATIVE_DAILY_REMINDER_ID]); const user = await ensureAuthenticated(); const existing = await getNotificationPrefs(); await withTimeout(setDoc(prefsDocRef(user.uid), { ...existing, dailyReminderEnabled: false, updatedAt: Date.now() }, { merge: true }), 'Salvamento das preferências'); return { success: true, message: 'Lembretes diários desativados.' }; }
+  try { if (isNativeApp()) await cancelNativeNotifications([NATIVE_DAILY_REMINDER_ID]); const user = await withTimeout(ensureAuthenticated(), 'Autenticação'); const existing = await getNotificationPrefs(); await withTimeout(setDoc(prefsDocRef(user.uid), { ...existing, dailyReminderEnabled: false, updatedAt: Date.now() }, { merge: true }), 'Salvamento das preferências'); return { success: true, message: 'Lembretes diários desativados.' }; }
   catch (err: any) { return { success: false, message: err?.message || 'Não foi possível desativar os lembretes.' }; }
 }
 
 export async function updateStreakReminderPref(enabled: boolean): Promise<EnablePushResult> {
   try {
-    const user = await ensureAuthenticated(); const existing = await getNotificationPrefs();
+    const user = await withTimeout(ensureAuthenticated(), 'Autenticação'); const existing = await getNotificationPrefs();
     if (isNativeApp()) {
       if (enabled) { if (!(await ensureNativeNotificationPermission())) return { success: false, message: 'Permissão de notificações negada. Ative as notificações do MemoriaFlash nas configurações do Android.' }; await scheduleNativeStreakReminder(existing.reminderHourLocal); }
       else await cancelNativeNotifications([NATIVE_STREAK_REMINDER_ID]);

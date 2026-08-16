@@ -21,24 +21,45 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
   const [supported, setSupported] = useState(true);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const mountedRef = React.useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  // Busca o estado real salvo no Firestore e sincroniza a UI com ele.
+  // É chamada tanto no carregamento inicial quanto ao final de cada ação,
+  // para que os botões nunca fiquem "presos" num estado desatualizado
+  // caso a atualização otimista tenha sido perdida (ex.: app pausado pelo
+  // Android durante o diálogo de permissão de notificação).
+  const refreshPrefs = React.useCallback(async () => {
+    try {
+      const loadedPrefs = await getNotificationPrefs();
+      if (!mountedRef.current) return loadedPrefs;
+      setPrefs(loadedPrefs);
+      setDailyEnabled(Boolean(loadedPrefs.dailyReminderEnabled));
+      setStreakEnabled(Boolean(loadedPrefs.streakReminderEnabled));
+      setSelectedHour(loadedPrefs.reminderHourLocal);
+      return loadedPrefs;
+    } catch {
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const [pushSupported, loadedPrefs] = await Promise.all([isPushSupported(), getNotificationPrefs()]);
+        const [pushSupported] = await Promise.all([isPushSupported(), refreshPrefs()]);
         if (!active) return;
         setSupported(pushSupported);
-        setPrefs(loadedPrefs);
-        setDailyEnabled(Boolean(loadedPrefs.dailyReminderEnabled));
-        setStreakEnabled(Boolean(loadedPrefs.streakReminderEnabled));
-        setSelectedHour(loadedPrefs.reminderHourLocal);
       } catch {
         if (active) setSupported(false);
       }
     })();
     return () => { active = false; };
-  }, []);
+  }, [refreshPrefs]);
 
   const handleToggleDaily = () => {
     if (!prefs || loadingAction === 'daily') return;
@@ -53,17 +74,18 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
         const result = next
           ? await enableDailyReminders(selectedHour)
           : await disableDailyReminders();
+        if (!mountedRef.current) return;
         setStatusMessage(result.message);
-        if (!result.success) {
-          setDailyEnabled(previous);
-        } else {
-          setPrefs((p) => p ? { ...p, dailyReminderEnabled: next } : null);
-        }
+        if (!result.success) setDailyEnabled(previous);
       } catch (err: any) {
+        if (!mountedRef.current) return;
         setDailyEnabled(previous);
         setStatusMessage(err?.message || 'Não foi possível atualizar o lembrete diário.');
       } finally {
-        setLoadingAction(null);
+        // Sempre revalida com o Firestore, garantindo que o botão reflita o
+        // estado real mesmo se a atualização otimista tiver sido perdida.
+        await refreshPrefs();
+        if (mountedRef.current) setLoadingAction(null);
       }
     })();
   };
@@ -79,17 +101,16 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
     void (async () => {
       try {
         const result = await updateStreakReminderPref(next);
+        if (!mountedRef.current) return;
         setStatusMessage(result.message);
-        if (!result.success) {
-          setStreakEnabled(previous);
-        } else {
-          setPrefs((p) => p ? { ...p, streakReminderEnabled: next } : null);
-        }
+        if (!result.success) setStreakEnabled(previous);
       } catch (err: any) {
+        if (!mountedRef.current) return;
         setStreakEnabled(previous);
         setStatusMessage(err?.message || 'Não foi possível atualizar o aviso de sequência.');
       } finally {
-        setLoadingAction(null);
+        await refreshPrefs();
+        if (mountedRef.current) setLoadingAction(null);
       }
     })();
   };
@@ -105,19 +126,20 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
     void (async () => {
       try {
         const result = await enableDailyReminders(selectedHour);
+        if (!mountedRef.current) return;
         setStatusMessage(result.message);
         if (!result.success) {
           setSelectedHour(previousHour);
           setDailyEnabled(previousEnabled);
-        } else {
-          setPrefs((p) => p ? { ...p, reminderHourLocal: selectedHour, dailyReminderEnabled: true } : null);
         }
       } catch (err: any) {
+        if (!mountedRef.current) return;
         setSelectedHour(previousHour);
         setDailyEnabled(previousEnabled);
         setStatusMessage(err?.message || 'Não foi possível atualizar o horário.');
       } finally {
-        setLoadingAction(null);
+        await refreshPrefs();
+        if (mountedRef.current) setLoadingAction(null);
       }
     })();
   };
