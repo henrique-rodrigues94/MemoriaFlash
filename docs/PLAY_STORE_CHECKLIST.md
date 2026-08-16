@@ -34,6 +34,7 @@
 - [x] Testes unitários alinhados aos contratos atuais do app
 - [x] Suite de testes atualizada para o modelo sem rewarded ads/créditos
 - [x] Cenário de reset de cooldown do AIOrchestrator coberto
+- [x] CI confirmou typecheck, testes, release preflight e build de produção
 - [ ] Revisão final das variáveis de produção
 - [ ] Confirmar backend HTTPS de produção
 - [ ] Testar rate limiting em produção
@@ -41,13 +42,16 @@
 
 ## Homologação Android
 
-- [ ] `npm ci`
-- [ ] `npm run typecheck`
-- [ ] `npm run test`
-- [ ] `npm run build`
-- [ ] `npm run android:sync:prod`
-- [ ] Gerar AAB Release assinado
-- [ ] Instalar e testar em aparelho físico
+- [x] `npm ci` — confirmado no GitHub Actions
+- [x] `npm run typecheck` — confirmado no GitHub Actions
+- [x] `npm run test` — confirmado no GitHub Actions
+- [x] `npm run build` — confirmado no GitHub Actions
+- [x] `npm run android:sync` — confirmado no GitHub Actions
+- [x] Compilação do APK debug — confirmada no GitHub Actions
+- [x] Compilação do AAB Release não assinado — confirmada no GitHub Actions
+- [ ] `npm run android:sync:prod` com variáveis reais
+- [ ] Gerar AAB Release assinado com keystore de produção
+- [ ] Instalar e testar release em aparelho físico
 - [ ] Login Google em release
 - [ ] Scanner/câmera
 - [ ] PDF/TXT
@@ -57,7 +61,7 @@
 - [ ] Sincronização Firestore
 - [ ] Feedback/relato de problema
 - [ ] Exclusão de conta
-- [ ] AdMob em produção
+- [ ] AdMob com IDs de produção
 - [ ] Google Play Billing em produção
 - [ ] Testar recuperação após perda de conexão
 - [ ] Testar encerramento/reabertura do app
@@ -78,7 +82,7 @@
 - [ ] Conta de desenvolvedor configurada
 - [ ] Teste interno
 - [ ] Teste fechado
-- [ ] AAB enviado
+- [ ] AAB assinado enviado
 - [ ] Produção
 
 ## Documentação de release
