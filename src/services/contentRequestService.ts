@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
 export type DocumentMimeType = 'application/pdf' | 'text/plain';
@@ -45,7 +45,7 @@ export async function enqueueDocumentContent(args: {
   mimeType: DocumentMimeType;
   sourceText: string;
   shareWithMemoriaFlash: boolean;
-}): Promise<{ requestId: string; totalChars: number; chunkCount: number; sourceHash: string }> {
+}): Promise<{ requestId: string; totalChars: number; chunkCount: number; sourceHash: string; reused: boolean }> {
   const user = auth.currentUser;
   if (!user) throw new Error('É necessário estar autenticado para enviar um documento.');
   if (!args.shareWithMemoriaFlash) throw new Error('É necessário autorizar o uso do material para alimentar o conteúdo do MemoriaFlash.');
@@ -58,12 +58,33 @@ export async function enqueueDocumentContent(args: {
   if (sourceText.length > MAX_SOURCE_CHARS) throw new Error('Este documento é grande demais para a versão atual. Divida o PDF/TXT em partes menores.');
 
   const sourceHash = await sha256(sourceText);
+  const normalized = normalizeSubject(subject);
+
+  const existingQuery = query(
+    collection(db, 'contentRequests'),
+    where('requestedBy', '==', user.uid),
+    where('source.sourceHash', '==', sourceHash),
+  );
+  const existingSnapshot = await getDocs(existingQuery);
+  if (!existingSnapshot.empty) {
+    const existing = existingSnapshot.docs[0];
+    const data = existing.data();
+    return {
+      requestId: existing.id,
+      totalChars: Number(data?.source?.totalChars) || sourceText.length,
+      chunkCount: Number(data?.source?.chunkCount) || Math.ceil(sourceText.length / MAX_CHUNK_CHARS),
+      sourceHash,
+      reused: true,
+    };
+  }
+
   const chunks: string[] = [];
-  for (let start = 0; start < sourceText.length; start += MAX_CHUNK_CHARS) chunks.push(sourceText.slice(start, start + MAX_CHUNK_CHARS));
+  for (let start = 0; start < sourceText.length; start += MAX_CHUNK_CHARS) {
+    chunks.push(sourceText.slice(start, start + MAX_CHUNK_CHARS));
+  }
 
   const requestRef = doc(collection(db, 'contentRequests'));
   const now = new Date().toISOString();
-  const normalized = normalizeSubject(subject);
   const subjectId = toSubjectId(subject, requestRef.id);
   const batch = writeBatch(db);
 
@@ -103,7 +124,13 @@ export async function enqueueDocumentContent(args: {
   });
 
   await batch.commit();
-  return { requestId: requestRef.id, totalChars: sourceText.length, chunkCount: chunks.length, sourceHash };
+  return {
+    requestId: requestRef.id,
+    totalChars: sourceText.length,
+    chunkCount: chunks.length,
+    sourceHash,
+    reused: false,
+  };
 }
 
 export async function getContentRequestStatus(requestId: string) {
