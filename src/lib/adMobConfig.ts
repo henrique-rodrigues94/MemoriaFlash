@@ -21,9 +21,13 @@ export function getAdMobConfig() {
     env.VITE_ADMOB_REWARDED_AD_UNIT_ID,
   );
 
-  // Produção nunca cai silenciosamente nos IDs de teste. Para homologação,
-  // VITE_ADMOB_USE_TEST_IDS=true força os IDs oficiais de demonstração.
-  const isUsingTestIds = forceTestIds || (!hasProductionIds && !isProductionBuild);
+  // Produção Web nunca cai silenciosamente nos IDs de teste. Já um APK/AAB
+  // nativo pode usar os IDs oficiais de demonstração quando os IDs reais não
+  // estiverem configurados. O gate de release (RELEASE_PRODUCTION=true)
+  // continua exigindo os IDs reais antes de uma publicação de produção.
+  // Isso permite gerar um APK local com `npm run build` e testar o AdMob sem
+  // que o build Vite em modo production desative os anúncios de homologação.
+  const isUsingTestIds = forceTestIds || (!hasProductionIds && (!isProductionBuild || isNative));
   const source = isUsingTestIds
     ? DEFAULT_TEST_ADMOB_CONFIG
     : {
