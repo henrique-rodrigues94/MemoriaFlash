@@ -1,8 +1,11 @@
 export type RatingGrade = 'hard' | 'good' | 'easy';
 
 export interface Flashcard {
-  id: string; front: string; back: string; topic?: string; subject?: string;
+  id: string; front: string; back: string; topic?: string; subject?: string; subtopic?: string;
   difficulty?: 'easy' | 'medium' | 'hard' | 'expert'; explanation?: string; curiosity?: string;
+  // Metadados de origem usados pelo sistema de feedback/curadoria. São opcionais
+  // para manter compatibilidade com decks antigos importados/localmente.
+  bucketId?: string; cardContentType?: string; educationLevel?: 'fundamental' | 'medio' | 'faculdade' | 'concurso' | 'tecnico';
   reps: number; interval: number; efactor: number; dueDate: string; lastReviewed?: string;
 }
 
@@ -29,17 +32,8 @@ export interface UserStats {
   playPurchaseToken?: string; playProductId?: string; billingLastVerifiedAt?: string;
   lastStudyDateKey?: string; activityLog?: DailyActivity[];
   interstitialTimestamps?: number[];
-
-  // Campos legados de dados antigos. A interface atual não exibe nem utiliza
-  // créditos como moeda do aplicativo.
-  aiCredits?: number;
-  adWatchTimestamps?: number[];
-  adWatchStreakDays?: number;
-  lastAdWatchDay?: string;
-  lastDailyGrantDay?: string;
-
-  referralCode?: string; referredByCode?: string; referralCount?: number;
-  referralProDaysEarned?: number;
+  aiCredits?: number; adWatchTimestamps?: number[]; adWatchStreakDays?: number; lastAdWatchDay?: string; lastDailyGrantDay?: string;
+  referralCode?: string; referredByCode?: string; referralCount?: number; referralProDaysEarned?: number;
 }
 
 export interface QuizQuestion { question: string; options: string[]; correctIndex: number; explanation: string; }
