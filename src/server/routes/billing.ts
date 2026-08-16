@@ -1,28 +1,16 @@
 // 📁 flashmind-ai/src/server/routes/billing.ts
 import { Router } from 'express';
 import { getAdminAuth, getAdminFirestore } from '../firebaseAdmin';
-import {
-  verifySubscriptionPurchase,
-  acknowledgeSubscriptionPurchase,
-  getAndroidPackageName,
-} from '../billing/googlePlayClient';
+import { verifySubscriptionPurchase, acknowledgeSubscriptionPurchase, getAndroidPackageName } from '../billing/googlePlayClient';
 
 export const billingRouter = Router();
 
 async function verifyRequestUser(idToken: string) {
   const adminAuth = getAdminAuth();
-  if (!adminAuth) {
-    throw Object.assign(new Error('Backend sem credenciais do Firebase Admin configuradas.'), { httpStatus: 503 });
-  }
+  if (!adminAuth) throw Object.assign(new Error('Backend sem credenciais do Firebase Admin configuradas.'), { httpStatus: 503 });
   return adminAuth.verifyIdToken(idToken);
 }
 
-/**
- * Exclui todos os dados de conta que o aplicativo mantém por usuário e, por
- * último, remove a identidade do Firebase Authentication. O token precisa
- * pertencer à própria conta e a operação é executada exclusivamente pelo
- * Admin SDK.
- */
 async function deleteAccountData(uid: string) {
   const db = getAdminFirestore();
   const adminAuth = getAdminAuth();
@@ -30,43 +18,43 @@ async function deleteAccountData(uid: string) {
 
   const ownedCollections = ['decks', 'notificationPrefs', 'userStats', 'referrals'];
   for (const collectionName of ownedCollections) {
-    const snapshot = await db.collection(collectionName).where('userId', '==', uid).get();
-    const batch = db.batch();
-    snapshot.docs.forEach(doc => batch.delete(doc.ref));
-    if (!snapshot.empty) await batch.commit();
+    const snapshot = await db.collection(collectionName).where(collectionName === 'decks' || collectionName === 'referrals' ? (collectionName === 'decks' ? 'userId' : 'uid') : 'uid', '==', uid).get().catch(async () => db.collection(collectionName).where('userId', '==', uid).get());
+    if (!snapshot.empty) {
+      const batch = db.batch();
+      snapshot.docs.forEach(document => batch.delete(document.ref));
+      await batch.commit();
+    }
   }
 
-  // userStats usa o próprio UID como documento.
   await db.collection('userStats').doc(uid).delete().catch(() => undefined);
   await db.collection('notificationPrefs').doc(uid).delete().catch(() => undefined);
   await db.collection('referrals').doc(uid).delete().catch(() => undefined);
 
-  // Requests e seus chunks podem conter documentos fornecidos pelo usuário.
   const requests = await db.collection('contentRequests').where('requestedBy', '==', uid).get();
   for (const request of requests.docs) {
-    await db.recursiveDelete(request.ref);
+    const chunks = await request.ref.collection('sourceChunks').get();
+    if (!chunks.empty) {
+      const batch = db.batch();
+      chunks.docs.forEach(chunk => batch.delete(chunk.ref));
+      await batch.commit();
+    }
+    await request.ref.delete();
   }
 
   const feedback = await db.collection('cardFeedback').where('userId', '==', uid).get();
   if (!feedback.empty) {
     const batch = db.batch();
-    feedback.docs.forEach(doc => batch.delete(doc.ref));
+    feedback.docs.forEach(document => batch.delete(document.ref));
     await batch.commit();
   }
 
   await adminAuth.deleteUser(uid);
 }
 
-/**
- * Exclusão de conta solicitada pelo usuário autenticado.
- * O app deve enviar Authorization: Bearer <Firebase ID token>.
- */
 billingRouter.delete('/account', async (req, res) => {
   try {
     const header = req.headers.authorization;
-    if (typeof header !== 'string' || !header.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Autenticação necessária.' });
-    }
+    if (typeof header !== 'string' || !header.startsWith('Bearer ')) return res.status(401).json({ error: 'Autenticação necessária.' });
     const decoded = await verifyRequestUser(header.slice('Bearer '.length).trim());
     await deleteAccountData(decoded.uid);
     return res.json({ ok: true, deleted: true });
@@ -74,31 +62,11 @@ billingRouter.delete('/account', async (req, res) => {
     console.error('[billing/account] Erro ao excluir conta:', error);
     return res.status(error?.httpStatus || 500).json({ error: error?.message || 'Não foi possível excluir a conta.' });
   }
-}
+});
 
-/**
- * Aplica o resultado de uma verificação de assinatura ao documento
- * userStats/{uid} via Admin SDK — o único caminho autorizado a alterar os
- * campos de billing.
- */
-async function applySubscriptionState(
-  uid: string,
-  purchaseToken: string,
-  productId: string,
-  result: Awaited<ReturnType<typeof verifySubscriptionPurchase>>
-) {
+async function applySubscriptionState(uid: string, purchaseToken: string, productId: string, result: Awaited<ReturnType<typeof verifySubscriptionPurchase>>) {
   const db = getAdminFirestore()!;
-  await db.collection('userStats').doc(uid).set(
-    {
-      isPro: result.isActive,
-      proPlanType: result.planType,
-      proExpiryDate: result.expiryTimeIso,
-      playPurchaseToken: purchaseToken,
-      playProductId: productId,
-      billingLastVerifiedAt: new Date().toISOString(),
-    },
-    { merge: true }
-  );
+  await db.collection('userStats').doc(uid).set({ isPro: result.isActive, proPlanType: result.planType, proExpiryDate: result.expiryTimeIso, playPurchaseToken: purchaseToken, playProductId: productId, billingLastVerifiedAt: new Date().toISOString() }, { merge: true });
 }
 
 billingRouter.post('/verify-purchase', async (req, res) => {
@@ -124,14 +92,11 @@ billingRouter.post('/rtdn', async (req, res) => {
     const decoded = JSON.parse(Buffer.from(message.data, 'base64').toString('utf-8'));
     const subscriptionNotification = decoded.subscriptionNotification;
     if (!subscriptionNotification?.purchaseToken) return res.status(200).send();
-    const purchaseToken = subscriptionNotification.purchaseToken;
-    const result = await verifySubscriptionPurchase(purchaseToken);
+    const result = await verifySubscriptionPurchase(subscriptionNotification.purchaseToken);
     const db = getAdminFirestore();
     if (db) {
-      const snapshot = await db.collection('userStats').where('playPurchaseToken', '==', purchaseToken).limit(1).get();
-      if (!snapshot.empty) {
-        await snapshot.docs[0].ref.set({ isPro: result.isActive, proPlanType: result.planType, proExpiryDate: result.expiryTimeIso, billingLastVerifiedAt: new Date().toISOString() }, { merge: true });
-      }
+      const snapshot = await db.collection('userStats').where('playPurchaseToken', '==', subscriptionNotification.purchaseToken).limit(1).get();
+      if (!snapshot.empty) await snapshot.docs[0].ref.set({ isPro: result.isActive, proPlanType: result.planType, proExpiryDate: result.expiryTimeIso, billingLastVerifiedAt: new Date().toISOString() }, { merge: true });
     }
     return res.status(200).send();
   } catch (error: any) {
