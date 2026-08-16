@@ -1,0 +1,66 @@
+name: Android Signing Smoke
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  signing-smoke:
+    runs-on: ubuntu-latest
+    env:
+      MEMORIAFLASH_KEYSTORE_PATH: ${{ github.workspace }}/android/smoke-keystore.jks
+      MEMORIAFLASH_KEYSTORE_PASSWORD: smoke-password
+      MEMORIAFLASH_KEY_ALIAS: memoriaflash-smoke
+      MEMORIAFLASH_KEY_PASSWORD: smoke-password
+      GEMINI_API_KEY: dummy
+      VITE_ADMOB_APP_ID: ca-app-pub-3940256099942544~3347511713
+      VITE_ADMOB_USE_TEST_IDS: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web
+        run: npm run build
+
+      - name: Sync Android with test AdMob IDs
+        run: npm run android:sync
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Generate ephemeral signing key
+        run: |
+          keytool -genkeypair -v \
+            -keystore "$MEMORIAFLASH_KEYSTORE_PATH" \
+            -storepass "$MEMORIAFLASH_KEYSTORE_PASSWORD" \
+            -alias "$MEMORIAFLASH_KEY_ALIAS" \
+            -keypass "$MEMORIAFLASH_KEY_PASSWORD" \
+            -keyalg RSA -keysize 2048 -validity 1 \
+            -dname "CN=MemoriaFlash Smoke,O=MemoriaFlash,C=BR"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build signed release AAB with ephemeral key
+        working-directory: android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew bundleRelease --no-daemon
+
+      - name: Verify signed AAB
+        run: |
+          test -s android/app/build/outputs/bundle/release/app-release.aab
+          jarsigner -verify -verbose -certs android/app/build/outputs/bundle/release/app-release.aab | grep -q 'jar verified'
