@@ -5,23 +5,27 @@ import { EducationLevel } from '../lib/educationLevels';
 export interface CachedCurriculumCategory { category: string; topics: string[]; }
 export interface CachedCurriculum { subject: string; level: EducationLevel; categories: CachedCurriculumCategory[]; totalTopics: number; updatedAt?: string; ttlAt?: number; providerUsed?: string; }
 export interface CachedSubjectLevel { level: EducationLevel; label: string; icon: string; reason: string; priority: number; }
-
 function normalizeText(text: string): string { return (text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim(); }
 async function shortHash(text: string): Promise<string> { const bytes = new TextEncoder().encode(text); const digest = await crypto.subtle.digest('SHA-1', bytes); return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 16); }
 function isValidTtl(ttlAt: unknown): boolean { return typeof ttlAt !== 'number' || ttlAt === 0 || ttlAt > Date.now(); }
 function sanitizeCategories(value: unknown): CachedCurriculumCategory[] { if (!Array.isArray(value)) return []; return value.map((category: any) => ({ category: typeof category?.category === 'string' ? category.category.trim() : '', topics: Array.isArray(category?.topics) ? category.topics.filter((topic: unknown): topic is string => typeof topic === 'string' && topic.trim().length > 0).map(topic => topic.trim()) : [] })).filter(category => category.category && category.topics.length > 0); }
 
 let subjectCatalogCache: { subjects: string[]; fetchedAt: number } | null = null;
-export async function findCachedSubjectSuggestions(input: string): Promise<string[]> {
-  const queryText = normalizeText(input); if (queryText.length < 2) return [];
+async function loadSubjectCatalog(): Promise<string[]> {
+  if (subjectCatalogCache && Date.now() - subjectCatalogCache.fetchedAt <= 60 * 60 * 1000) return subjectCatalogCache.subjects;
   try {
-    if (!subjectCatalogCache || Date.now() - subjectCatalogCache.fetchedAt > 60 * 60 * 1000) {
-      const snapshot = await getDocs(query(collection(db, 'subjects'), limit(100)));
-      const subjects = snapshot.docs.map(item => String((item.data() as any)?.subject || '').trim()).filter(Boolean);
-      subjectCatalogCache = { subjects: Array.from(new Set(subjects)), fetchedAt: Date.now() };
-    }
-    return subjectCatalogCache.subjects.filter(subject => normalizeText(subject).includes(queryText)).slice(0, 8);
-  } catch (error) { console.warn('[firestoreCurriculumCache] subject catalog read failed:', error); return []; }
+    const snapshot = await getDocs(query(collection(db, 'subjects'), limit(100)));
+    const subjects = snapshot.docs.map(item => String((item.data() as any)?.subject || '').trim()).filter(Boolean);
+    subjectCatalogCache = { subjects: Array.from(new Set(subjects)), fetchedAt: Date.now() };
+    return subjectCatalogCache.subjects;
+  } catch (error) { console.warn('[firestoreCurriculumCache] subject catalog read failed:', error); return subjectCatalogCache?.subjects || []; }
+}
+
+export async function findCachedSubjectSuggestions(input: string): Promise<string[]> {
+  const all = await loadSubjectCatalog();
+  const queryText = normalizeText(input);
+  if (queryText.length < 2) return [];
+  return all.filter(subject => normalizeText(subject).includes(queryText)).slice(0, 8);
 }
 
 export async function getCachedSubjectLevels(subject: string): Promise<CachedSubjectLevel[] | null> {
