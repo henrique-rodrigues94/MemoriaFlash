@@ -13,6 +13,8 @@
 - [x] Feedback de cards
 - [x] Relato de problema
 - [x] AdMob/Billing integrados em código
+- [x] Controle de exclusão de conta no perfil
+- [x] Política de privacidade em `public/privacy.html`
 
 ## Segurança e backend
 
@@ -24,6 +26,7 @@
 - [x] Deduplicação por SHA-256
 - [x] Recuperação de requests presos em `processing`
 - [x] Limite de tentativas/retries
+- [x] Exclusão autenticada de conta e dados pessoais
 - [x] Checklist de Data Safety documentado
 - [x] Runbook de release documentado
 - [ ] Revisão final das variáveis de produção
@@ -43,10 +46,12 @@
 - [ ] Login Google em release
 - [ ] Scanner/câmera
 - [ ] PDF/TXT
+- [ ] PDF grande dentro do limite de conteúdo
 - [ ] PDF sem camada de texto
 - [ ] Geração de cards
 - [ ] Sincronização Firestore
 - [ ] Feedback/relato de problema
+- [ ] Exclusão de conta
 - [ ] AdMob em produção
 - [ ] Google Play Billing em produção
 - [ ] Testar recuperação após perda de conexão
@@ -59,7 +64,7 @@
 - [ ] Screenshots de celular
 - [ ] Screenshots de tablet, se aplicável
 - [ ] Feature graphic
-- [ ] Política de privacidade publicada
+- [ ] Publicar `public/privacy.html` em URL HTTPS estável
 - [x] Roteiro Data Safety documentado
 - [ ] Formulário Data Safety preenchido
 - [ ] Classificação indicativa
@@ -75,3 +80,4 @@
 
 - `docs/PLAY_STORE_DATA_SAFETY.md`
 - `docs/RELEASE_RUNBOOK.md`
+- `public/privacy.html`
