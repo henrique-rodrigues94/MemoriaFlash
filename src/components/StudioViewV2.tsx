@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Loader2, PlusCircle, Save, Sparkles, Trash2, Crown } from 'lucide-react';
+import { Loader2, PlusCircle, Save, Sparkles, Trash2, Crown, AlertTriangle } from 'lucide-react';
 import { Deck, Flashcard, UserStats } from '../types';
 import { SupportedLanguage } from '../lib/i18n';
 import { ManualCardForm } from './ManualCardForm';
@@ -96,7 +96,7 @@ export const StudioView: React.FC<StudioViewProps> = ({ decks, stats, onSaveNewD
       : { id: `deck-${Date.now()}`, title, category: subject.trim() || 'Geral', description: '', color: '#60a5fa', accentBorder: 'border-l-primary', cards: generatedCards, createdAt: new Date().toISOString() };
     onSaveNewDeck(deck);
     setGeneratedCards([]);
-    setMessage(`${generatedCards.length} cards salvos em "${title}".`);
+    setMessage(`${generatedCards.length} cards salvos em \"${title}\".`);
     if (initialDeck) onConsumedInitialDeck?.();
   };
 
@@ -139,6 +139,15 @@ export const StudioView: React.FC<StudioViewProps> = ({ decks, stats, onSaveNewD
               <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-2">Quantidade</label>
               {options.length > 0 ? <div className="grid grid-cols-3 gap-2">{options.map((n) => <button key={n} type="button" onClick={() => setCardCount(n)} className={`py-3 rounded-xl border text-sm font-bold ${cardCount === n ? 'bg-blue-600/30 border-blue-500 text-blue-200' : 'bg-[#051424] border-[#424754]/50 text-slate-400 hover:text-white'}`}>{n}<span className="block text-[10px] opacity-60 mt-0.5">cards</span></button>)}</div> : <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">Você atingiu o limite gratuito de {FREE_AI_CARD_LIMIT} cards.</div>}
             </div>
+
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 flex items-start gap-3" role="alert">
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-extrabold text-amber-200">Atenção ao conteúdo gerado pela IA</p>
+                <p className="text-[11px] leading-relaxed text-amber-100/80 mt-1">O gerador de flash cards pode cometer erros. Por isso, lembre-se de conferir informações geradas.</p>
+              </div>
+            </div>
+
             {error && <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">{error}</div>}
             {message && <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300">{message}</div>}
             <button type="button" onClick={handleGenerate} disabled={loading || !canGenerate} className="w-full py-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">{loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Gerando...</> : <><Sparkles className="w-5 h-5" /> Gerar {cardCount} Flashcards</>}</button>
