@@ -17,6 +17,7 @@ import { ImportExportModal } from './components/ImportExportModal';
 // ----------------------------------------------------------------------------
 const ScannerView = lazy(() => import('./components/ScannerView').then((m) => ({ default: m.ScannerView })));
 const StudioView = lazy(() => import('./components/StudioView').then((m) => ({ default: m.StudioView })));
+const CurriculumPlannerView = lazy(() => import('./components/CurriculumPlannerView').then((m) => ({ default: m.CurriculumPlannerView })));
 const HelpView = lazy(() => import('./components/HelpView').then((m) => ({ default: m.HelpView })));
 const StatsView = lazy(() => import('./components/StatsView').then((m) => ({ default: m.StatsView })));
 const DeckManagerModal = lazy(() =>
@@ -101,6 +102,7 @@ export function App() {
   const [showImportExportModal, setShowImportExportModal] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [showAdvancedCardGenerator, setShowAdvancedCardGenerator] = useState(false);
 
   // Auto-detected or saved language
   const [currentLanguage, setCurrentLanguage] = useState<SupportedLanguage>(detectBrowserLanguage());
@@ -119,7 +121,6 @@ export function App() {
   // Storage states
   const [decks, setDecks] = useState<Deck[]>(() => getStoredDecks());
   const [stats, setStats] = useState<UserStats>(() => getStoredStats());
-
 
   // Active Session / Modal States
   const [activeStudyDeck, setActiveStudyDeck] = useState<Deck | null>(null);
@@ -189,24 +190,16 @@ export function App() {
     let receivedFirstDecksSnapshot = false;
 
     syncDecksFromFirestore((remoteDecks) => {
-      // Migração única: no PRIMEIRO snapshot, se a nuvem vier vazia mas já
-      // existem decks salvos localmente (ex: criados antes de fazer login),
-      // não apagamos a tela — enviamos esses decks locais para o Firestore.
-      // Sem essa checagem, corrigir a sincronização de exclusões (abaixo)
-      // faria login apagar decks locais ainda não sincronizados.
       if (!receivedFirstDecksSnapshot) {
         receivedFirstDecksSnapshot = true;
         if (remoteDecks.length === 0) {
           const localDecks = getStoredDecks();
           if (localDecks.length > 0) {
             localDecks.forEach((d) => saveDeckToFirestore(d));
-            return; // mantém os decks locais na tela; o snapshot seguinte os ecoa de volta
+            return;
           }
         }
       }
-      // A partir daqui, a nuvem é a fonte da verdade — inclusive quando
-      // fica vazia de propósito (ex: usuário apagou o último deck em outro
-      // dispositivo). Ver correção detalhada em firebaseStorage.ts.
       setDecks(remoteDecks);
     }).then((unsub) => {
       unsubDecks = unsub;
@@ -234,14 +227,11 @@ export function App() {
   };
 
   const handleRewardEarned = (creditsEarned?: number) => {
-    // Defesa em profundidade: mesmo que a UI do modal falhe em bloquear,
-    // a recompensa nunca é aplicada além do limite diário real.
     if (!canWatchRewardedAd(stats)) return;
     const { updated, creditsEarned: earned } = applyRewardedAdWatched(stats);
     setStats(updated);
     saveStoredStats(updated);
     saveStatsToFirestore(updated);
-    // Mostra toast de recompensa por 3 segundos
     const amount = creditsEarned ?? earned;
     setRewardToast({ credits: amount, visible: true });
     setTimeout(() => setRewardToast((prev) => ({ ...prev, visible: false })), 3000);
@@ -289,9 +279,6 @@ export function App() {
 
     const xpEarned = cardsReviewedCount * 25;
 
-    // Update user stats (streak, meta diária, activityLog, retenção e horas
-    // estudadas — tudo calculado a partir de dados reais da sessão; ver
-    // src/services/studyStreak.ts).
     const streakUpdatedStats = applyStudySessionCompleted(stats, cardsReviewedCount, {
       hardCount: summary.hardCount,
       correctCount: summary.correctCount,
@@ -300,8 +287,6 @@ export function App() {
     });
     const newStats: UserStats = {
       ...streakUpdatedStats,
-      // "Cards Dominados" reflete cards que de fato atingiram reps >= 3 no
-      // SM-2, em vez de um contador desconectado do desempenho real.
       totalCardsMastered: countMasteredCards(updatedDecks),
       xp: stats.xp + xpEarned,
     };
@@ -313,21 +298,15 @@ export function App() {
   };
 
   const handleSaveDeck = (updatedDeck: Deck) => {
-    // Functional update evita usar uma versão antiga de `decks` quando o
-    // listener do Firestore e o gerador IA atualizam o estado quase juntos.
     setDecks((currentDecks) => {
       const exists = currentDecks.some((d) => d.id === updatedDeck.id);
       return exists
         ? currentDecks.map((d) => (d.id === updatedDeck.id ? updatedDeck : d))
         : [updatedDeck, ...currentDecks];
     });
-
-    // O armazenamento local é atualizado pelo efeito de `decks`; o Firestore
-    // recebe a mesma versão do deck de forma independente.
     void saveDeckToFirestore(updatedDeck);
   };
 
-  // Salva o progresso do estudo automaticamente a cada card (mantém a sessão aberta)
   const handleSaveStudyProgress = (updatedDeck: Deck) => {
     setDecks((currentDecks) => {
       const exists = currentDecks.some((d) => d.id === updatedDeck.id);
@@ -367,13 +346,10 @@ export function App() {
     handleSaveDeck(updatedDeck);
   };
 
-
-
   const isLightTheme = theme === 'light';
 
   return (
     <div className={`min-h-screen font-sans antialiased transition-colors duration-300 ${isLightTheme ? 'bg-[#EEF0F8] text-[#1A1F36]' : 'bg-[#051424] text-[#d4e4fa]'} ${isLightTheme ? 'selection:bg-[#4F6EF7]/20 selection:text-[#1A1F36]' : 'selection:bg-[#adc6ff]/30 selection:text-white'}`}>
-      {/* App Header — oculto durante a sessão de estudo (tela cheia) */}
       {!activeStudyDeck && (
         <Header
           stats={stats}
@@ -392,9 +368,7 @@ export function App() {
         />
       )}
 
-      {/* Main Content Viewport */}
       <main className={`${activeStudyDeck ? '' : 'pt-20 px-4 sm:px-6 max-w-6xl mx-auto pb-24 sm:pb-28'}`}>
-        {/* If Active Study Session */}
         {activeStudyDeck ? (
           <StudySessionView
             deck={activeStudyDeck}
@@ -407,87 +381,100 @@ export function App() {
           <Suspense fallback={<TabLoadingFallback />}>
             <>
               {activeTab === 'home' && (
-              <DashboardView
+                <DashboardView
+                  stats={stats}
+                  decks={decks}
+                  currentLanguage={currentLanguage}
+                  onOpenLanguageSelector={() => setShowLanguageModal(true)}
+                  setActiveTab={setActiveTab}
+                  onStartStudySession={handleStartStudySession}
+                  onManageDeck={(deck) => setManagedDeck(deck)}
+                  onOpenQuickCreate={() => { setShowAdvancedCardGenerator(false); setActiveTab('cards'); }}
+                  onOpenAdMob={() => setShowAdMobModal(true)}
+                  onOpenSubscription={() => setShowSubscriptionModal(true)}
+                  onOpenReferral={() => setShowReferralModal(true)}
+                  onOpenImportExport={() => setShowImportExportModal(true)}
+                />
+              )}
+
+              {activeTab === 'explore' && (
+                <DecksLibraryView
+                  decks={decks}
+                  currentLanguage={currentLanguage}
+                  setActiveTab={setActiveTab}
+                  onStartStudySession={handleStartStudySession}
+                  onManageDeck={(deck) => setManagedDeck(deck)}
+                  onOpenQuickCreate={() => { setShowAdvancedCardGenerator(false); setActiveTab('cards'); }}
+                />
+              )}
+
+              {activeTab === 'quiz' && (
+                <HelpView currentLanguage={currentLanguage} />
+              )}
+
+              {activeTab === 'scanner' && (
+                <ScannerView
+                  onSaveNewDeck={handleSaveDeck}
+                  stats={stats}
+                  onDeductCredit={handleDeductCredit}
+                  onOpenAdMob={() => setShowAdMobModal(true)}
+                  onOpenSubscription={() => setShowSubscriptionModal(true)}
+                />
+              )}
+
+              {activeTab === 'cards' && (
+                showAdvancedCardGenerator ? (
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvancedCardGenerator(false)}
+                      className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-bold shadow-sm hover:bg-slate-50"
+                    >
+                      ← Voltar ao planejamento por matéria
+                    </button>
+                    <StudioView
+                      decks={decks}
+                      stats={stats}
+                      currentLanguage={currentLanguage}
+                      initialDeck={deckToPopulate}
+                      onConsumedInitialDeck={() => setDeckToPopulate(null)}
+                      onSaveNewDeck={handleSaveDeck}
+                      onDeductCredit={handleDeductCredit}
+                      onOpenAdMob={() => setShowAdMobModal(true)}
+                      onOpenSubscription={() => setShowSubscriptionModal(true)}
+                    />
+                  </div>
+                ) : (
+                  <CurriculumPlannerView
+                    decks={decks}
+                    stats={stats}
+                    onSaveNewDeck={handleSaveDeck}
+                    onOpenSubscription={() => setShowSubscriptionModal(true)}
+                    onOpenAdvanced={() => setShowAdvancedCardGenerator(true)}
+                  />
+                )
+              )}
+
+              {activeTab === 'stats' && <StatsView stats={stats} decks={decks} />}
+
+              <AdMobBanner
                 stats={stats}
-                decks={decks}
+                isPro={stats.isPro}
                 currentLanguage={currentLanguage}
-                onOpenLanguageSelector={() => setShowLanguageModal(true)}
-                setActiveTab={setActiveTab}
-                onStartStudySession={handleStartStudySession}
-                onManageDeck={(deck) => setManagedDeck(deck)}
-                onOpenQuickCreate={() => setActiveTab('cards')}
+                sticky
                 onOpenAdMob={() => setShowAdMobModal(true)}
                 onOpenSubscription={() => setShowSubscriptionModal(true)}
                 onOpenReferral={() => setShowReferralModal(true)}
-                onOpenImportExport={() => setShowImportExportModal(true)}
               />
-            )}
-
-            {activeTab === 'explore' && (
-              <DecksLibraryView
-                decks={decks}
-                currentLanguage={currentLanguage}
-                setActiveTab={setActiveTab}
-                onStartStudySession={handleStartStudySession}
-                onManageDeck={(deck) => setManagedDeck(deck)}
-                onOpenQuickCreate={() => setActiveTab('cards')}
-              />
-            )}
-
-            {activeTab === 'quiz' && (
-              <HelpView
-                currentLanguage={currentLanguage}
-              />
-            )}
-
-            {activeTab === 'scanner' && (
-              <ScannerView
-                onSaveNewDeck={handleSaveDeck}
-                stats={stats}
-                onDeductCredit={handleDeductCredit}
-                onOpenAdMob={() => setShowAdMobModal(true)}
-                onOpenSubscription={() => setShowSubscriptionModal(true)}
-              />
-            )}
-
-            {activeTab === 'cards' && (
-              <StudioView
-                decks={decks}
-                stats={stats}
-                currentLanguage={currentLanguage}
-                initialDeck={deckToPopulate}
-                onConsumedInitialDeck={() => setDeckToPopulate(null)}
-                onSaveNewDeck={handleSaveDeck}
-                onDeductCredit={handleDeductCredit}
-                onOpenAdMob={() => setShowAdMobModal(true)}
-                onOpenSubscription={() => setShowSubscriptionModal(true)}
-              />
-            )}
-
-            {activeTab === 'stats' && <StatsView stats={stats} decks={decks} />}
-
-            {/* Banner de monetização — fixo acima da barra de navegação, sempre visível ao rolar */}
-            <AdMobBanner
-              stats={stats}
-              isPro={stats.isPro}
-              currentLanguage={currentLanguage}
-              sticky
-              onOpenAdMob={() => setShowAdMobModal(true)}
-              onOpenSubscription={() => setShowSubscriptionModal(true)}
-              onOpenReferral={() => setShowReferralModal(true)}
-            />
-
-          </>
+            </>
           </Suspense>
         )}
       </main>
 
-      {/* Bottom Mobile Shell Nav */}
       {!activeStudyDeck && (
         <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} currentLanguage={currentLanguage} />
       )}
 
-      {/* Onboarding Intro Modal */}
       {showOnboarding && (
         <OnboardingModal
           onClose={handleCloseOnboarding}
@@ -495,11 +482,7 @@ export function App() {
         />
       )}
 
-      {/* Modais sob demanda (code-split via React.lazy) — fallback nulo pois o
-          carregamento é quase instantâneo (poucos KB) e o usuário acabou de
-          clicar em algo, então uma tela em branco por ~alguns ms passa despercebido. */}
       <Suspense fallback={null}>
-        {/* Deck Manager Modal */}
         {managedDeck && (
           <DeckManagerModal
             deck={managedDeck}
@@ -509,12 +492,12 @@ export function App() {
             onOpenCards={() => {
               setManagedDeck(null);
               setDeckToPopulate(managedDeck);
+              setShowAdvancedCardGenerator(false);
               setActiveTab('cards');
             }}
           />
         )}
 
-        {/* AdMob Rewarded Video Ad Modal */}
         {showAdMobModal && (
           <AdMobRewardedModal
             stats={stats}
@@ -524,7 +507,6 @@ export function App() {
           />
         )}
 
-        {/* AdMob Interstitial (frequency-capped, shown after study sessions) */}
         {showInterstitial && (
           <AdMobInterstitialModal
             onClose={() => setShowInterstitial(false)}
@@ -532,7 +514,6 @@ export function App() {
           />
         )}
 
-        {/* Toast de recompensa de anúncio */}
         {rewardToast.visible && (
           <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] animate-fade-in">
             <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600 text-white text-sm font-bold shadow-xl shadow-emerald-500/30 border border-emerald-400/40">
@@ -542,7 +523,6 @@ export function App() {
           </div>
         )}
 
-        {/* Referral / Indique e Ganhe Modal */}
         {showReferralModal && <ReferralModal stats={stats} onClose={() => setShowReferralModal(false)} />}
 
         {showImportExportModal && (
@@ -553,10 +533,8 @@ export function App() {
           />
         )}
 
-        {/* Lembretes de Revisão (Push Notifications) Modal */}
         {showNotificationsModal && <NotificationSettingsModal onClose={() => setShowNotificationsModal(false)} />}
 
-        {/* Subscription Plans Modal */}
         {showSubscriptionModal && (
           <SubscriptionModal
             stats={stats}
@@ -570,7 +548,6 @@ export function App() {
           />
         )}
 
-        {/* Google Login / Auth Modal */}
         {showAuthModal && (
           <AuthModal
             stats={stats}
@@ -584,7 +561,6 @@ export function App() {
           />
         )}
 
-        {/* Language Selector Modal */}
         {showLanguageModal && (
           <LanguageSelectorModal
             currentLanguage={currentLanguage}
@@ -594,7 +570,6 @@ export function App() {
         )}
       </Suspense>
 
-      {/* LGPD/GDPR Consent Banner — exibido antes de qualquer coleta não essencial */}
       <ConsentBanner />
     </div>
   );
