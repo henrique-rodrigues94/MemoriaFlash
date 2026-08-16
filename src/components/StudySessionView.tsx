@@ -93,9 +93,9 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
 
   // ── Tópicos únicos ────────────────────────────────────────────────────────
   const uniqueTopics = useMemo(() =>
-    Array.from(new Set(
-      deck.cards.map(c => String(c.topic || c.subject || deck.category || '')).filter(Boolean)
-    )).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    Array.from<string>(new Set<string>(
+      deck.cards.map(c => String(c.topic || c.subject || deck.category || '')).filter(Boolean) as string[]
+    )).sort((a: string, b: string) => a.localeCompare(b, 'pt-BR')),
     [deck.cards, deck.category]
   );
 
