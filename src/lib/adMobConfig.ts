@@ -12,7 +12,7 @@ const DEFAULT_TEST_ADMOB_CONFIG = {
 export function getAdMobConfig() {
   const env = import.meta.env;
   const isNative = Capacitor.isNativePlatform();
-  const useExplicitTestIds = env.VITE_ADMOB_USE_TEST_IDS === 'true';
+  const forceTestIds = env.VITE_ADMOB_USE_TEST_IDS === 'true';
   const hasProductionIds = Boolean(
     env.VITE_ADMOB_APP_ID &&
     env.VITE_ADMOB_BANNER_AD_UNIT_ID &&
@@ -20,23 +20,21 @@ export function getAdMobConfig() {
     env.VITE_ADMOB_REWARDED_AD_UNIT_ID
   );
 
-  // Android debug/test installs often do not receive Vite environment
-  // variables. When no production IDs exist, use Google's official test IDs
-  // so the free-tier banner can actually be tested. Production release checks
-  // must still provide real IDs.
-  const isUsingTestIds = !hasProductionIds && (Boolean(import.meta.env.DEV) || isNative || useExplicitTestIds);
-
-  const config = {
-    appId: env.VITE_ADMOB_APP_ID || (isUsingTestIds ? DEFAULT_TEST_ADMOB_CONFIG.appId : ''),
-    bannerAdUnitId: env.VITE_ADMOB_BANNER_AD_UNIT_ID || (isUsingTestIds ? DEFAULT_TEST_ADMOB_CONFIG.bannerAdUnitId : ''),
-    interstitialAdUnitId: env.VITE_ADMOB_INTERSTITIAL_AD_UNIT_ID || (isUsingTestIds ? DEFAULT_TEST_ADMOB_CONFIG.interstitialAdUnitId : ''),
-    rewardedAdUnitId: env.VITE_ADMOB_REWARDED_AD_UNIT_ID || (isUsingTestIds ? DEFAULT_TEST_ADMOB_CONFIG.rewardedAdUnitId : ''),
-    nativeAdUnitId: env.VITE_ADMOB_NATIVE_AD_UNIT_ID || (isUsingTestIds ? DEFAULT_TEST_ADMOB_CONFIG.nativeAdUnitId : ''),
-  } as const;
+  // Quando o modo de teste é explicitamente solicitado, os IDs oficiais do
+  // Google vencem qualquer ID de produção presente no .env. Isso evita que
+  // um APK de teste tente carregar unidades reais e fique sem anúncio.
+  const isUsingTestIds = forceTestIds || (!hasProductionIds && (Boolean(import.meta.env.DEV) || isNative));
+  const source = isUsingTestIds ? DEFAULT_TEST_ADMOB_CONFIG : {
+    appId: env.VITE_ADMOB_APP_ID || '',
+    bannerAdUnitId: env.VITE_ADMOB_BANNER_AD_UNIT_ID || '',
+    interstitialAdUnitId: env.VITE_ADMOB_INTERSTITIAL_AD_UNIT_ID || '',
+    rewardedAdUnitId: env.VITE_ADMOB_REWARDED_AD_UNIT_ID || '',
+    nativeAdUnitId: env.VITE_ADMOB_NATIVE_AD_UNIT_ID || '',
+  };
 
   return {
-    ...config,
-    isConfigured: Boolean(config.appId && config.bannerAdUnitId && config.interstitialAdUnitId && config.rewardedAdUnitId),
+    ...source,
+    isConfigured: Boolean(source.appId && source.bannerAdUnitId && source.interstitialAdUnitId && source.rewardedAdUnitId),
     isUsingTestIds,
     hasProductionIds,
   } as const;
