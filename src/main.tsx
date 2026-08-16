@@ -1,12 +1,14 @@
-import {StrictMode} from 'react';
+import {StrictMode, useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import App from './App.tsx';
+import { EntryGate } from './components/EntryGate';
 import './index.css';
 import { initErrorLogger } from './lib/errorLogger';
 import { installCameraPlaybackFix } from './lib/cameraPlaybackFix';
 import { installStudyCardFeedbackOverlay } from './services/studyCardFeedback';
 import { initializeAdMob, requestAdMobConsent, installAdMobListeners } from './services/ads/adMobNative';
+import { auth, onAuthStateChanged } from './lib/firebase';
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
@@ -48,9 +50,39 @@ initErrorLogger();
 installCameraPlaybackFix();
 installStudyCardFeedbackOverlay();
 
+function AuthenticatedShell() {
+  const [authResolved, setAuthResolved] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      const validUser = Boolean(user && !user.isAnonymous);
+      setSignedIn(validUser);
+      setAuthResolved(true);
+    });
+    return unsubscribe;
+  }, []);
+
+  if (!authResolved) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#EEF0F8] text-[#1A1F36] theme-auth-loading">
+        <div className="rounded-3xl bg-white border border-slate-200 shadow-xl px-6 py-5 text-sm font-semibold">
+          Verificando sua conta Google…
+        </div>
+      </div>
+    );
+  }
+
+  if (!signedIn) {
+    return <EntryGate onAuthenticated={() => undefined} />;
+  }
+
+  return <App />;
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <AuthenticatedShell />
   </StrictMode>,
 );
 
