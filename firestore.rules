@@ -40,35 +40,28 @@ service cloud.firestore {
         && request.resource.data.text is string
         && request.resource.data.text.size()>0
         && request.resource.data.text.size()<=12000
-        && request.resource.data.index is int
-        && request.resource.data.index>=0
-        && request.resource.data.index<80
         && request.resource.data.chars is int
         && request.resource.data.chars==request.resource.data.text.size()
+        && request.resource.data.index is int
+        && request.resource.data.index>=0
+        && request.resource.data.index<parent.source.chunkCount
         && request.resource.data.sourceHash is string
         && request.resource.data.sourceHash==parent.source.sourceHash;
     }
 
-    match /decks/{deckId}{
-      allow read:if isSignedIn()&&resource.data.userId==request.auth.uid;
-      allow create:if isSignedIn()&&request.resource.data.userId==request.auth.uid;
-      allow update,delete:if isSignedIn()&&resource.data.userId==request.auth.uid;
-    }
+    match /decks/{deckId}{allow read:if isSignedIn()&&resource.data.userId==request.auth.uid;allow create:if isSignedIn()&&request.resource.data.userId==request.auth.uid;allow update,delete:if isSignedIn()&&resource.data.userId==request.auth.uid;}
     match /userStats/{statsId}{allow read:if isOwner(statsId);allow create:if isOwner(statsId)&&clientStatsCreateAllowed();allow update:if isOwner(statsId)&&clientStatsWriteAllowed();}
     match /classes/{classId}{allow read:if true;allow create:if isSignedIn()&&request.resource.data.teacherId==request.auth.uid;allow update,delete:if isSignedIn()&&resource.data.teacherId==request.auth.uid;}
     match /notificationPrefs/{uid}{allow read,write:if isOwner(uid);}
-
     match /subjects/{id}{allow read:if true;allow write:if false;}
     match /curricula/{id}{allow read:if true;allow write:if false;}
     match /cardBuckets/{id}{allow read:if true;allow write:if false;}
     match /contentIndex/{id}{allow read:if true;allow write:if false;}
     match /contentCatalog/{id}{allow read:if true;allow write:if false;}
-
     match /contentRequests/{id}{
       allow create:if validContentRequest();
       allow read:if isSignedIn()&&resource.data.requestedBy==request.auth.uid;
       allow update,delete:if false;
-
       match /sourceChunks/{chunkId}{
         allow create:if validSourceChunk();
         allow read:if get(/databases/$(database)/documents/contentRequests/$(id)).data.requestedBy==request.auth.uid;
@@ -79,11 +72,7 @@ service cloud.firestore {
     match /agentMetrics/{id}{allow read,write:if false;}
     match /agentErrors/{id}{allow read,write:if false;}
     match /aiCache/{id}{allow read,write:if false;}
-
-    match /cardFeedback/{id}{
-      allow create:if validCardProblem()||validRatingFeedback();
-      allow read,update,delete:if false;
-    }
+    match /cardFeedback/{id}{allow create:if validCardProblem()||validRatingFeedback();allow read,update,delete:if false;}
     match /feedback/{id}{allow read,write:if false;}
     match /referralCodes/{code}{allow read,write:if false;}
     match /referrals/{uid}{allow read,write:if false;}
