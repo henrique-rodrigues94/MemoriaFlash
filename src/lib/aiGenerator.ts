@@ -32,6 +32,7 @@ export const generateAICards = async (
   educationLevel: EducationLevel = 'medio',
   existingFronts: string[] = [],
   onUsageCommitted?: (usage: GenerationUsage) => void,
+  cardContentType: string = 'definition',
 ): Promise<Flashcard[]> => {
   const user = auth.currentUser || await ensureAuthenticated();
   const idToken = await user.getIdToken();
@@ -43,7 +44,7 @@ export const generateAICards = async (
       Authorization: `Bearer ${idToken}`,
       'X-Timezone': timeZone,
     },
-    body: JSON.stringify({ prompt: subject, count, language: 'pt', difficulty: 'medium', selectedTopics: topics, educationLevel, existingFronts }),
+    body: JSON.stringify({ prompt: subject, count, language: 'pt', difficulty: 'medium', selectedTopics: topics, educationLevel, existingFronts, cardContentType }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -74,14 +75,18 @@ export const generateAICards = async (
   }
 
   return raw.map((item: any, idx: number) => ({
-    id: `ai-card-${Date.now()}-${idx}`,
+    id: item.id || `ai-card-${Date.now()}-${idx}`,
     subject: item.subject || subject,
     topic: item.topic || topics[0] || subject,
+    subtopic: item.subtopic || undefined,
     front: item.front || item.question || '',
     back: item.back || item.answer || '',
     explanation: item.explanation || '',
     curiosity: item.curiosity || '',
     difficulty: (item.difficulty as Flashcard['difficulty']) || 'medium',
+    bucketId: item.bucketId || undefined,
+    cardContentType: item.cardContentType || cardContentType,
+    educationLevel: item.educationLevel || educationLevel,
     reps: 0, interval: 0, efactor: 2.5, dueDate: new Date().toISOString(),
   }));
 };
