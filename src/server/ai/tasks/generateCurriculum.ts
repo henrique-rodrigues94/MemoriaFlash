@@ -10,98 +10,48 @@ export interface CurriculumCategory {
   topics: string[];
 }
 
-// ─── Prompts por nível ────────────────────────────────────────────────────────
+const CURRICULUM_VERSION = 2;
 
 const LEVEL_SYSTEM_SUFFIX: Record<EducationLevel, string> = {
   fundamental: `- Linguagem simples e clara. Conteúdo alinhado à BNCC (1º ao 9º ano).
 - Subtópicos devem ser concretos e acessíveis para crianças e adolescentes.`,
-
   medio: `- Linguagem formal porém acessível. Conteúdo da BNCC para Ensino Médio.
 - Priorize tópicos cobrados no ENEM e principais vestibulares brasileiros.`,
-
   faculdade: `- Linguagem técnica, nível de graduação universitária.
 - Subtópicos devem refletir a ementa típica de cursos de graduação no Brasil.
 - Inclua fundamentos teóricos, metodologias e aplicações práticas da área.`,
-
   tecnico: `- Foco em competências práticas e aplicadas.
 - Inclua normas técnicas, procedimentos, equipamentos e situações reais de trabalho.
 - Conteúdo alinhado ao ensino técnico profissionalizante (SENAI, SENAC, ETECs etc.).`,
-
   concurso: `- ATENÇÃO ESPECIAL: você está gerando conteúdo para preparação de CONCURSO PÚBLICO.
 - Base nos editais reais das principais bancas brasileiras: CESPE/CEBRASPE, FGV, FCC, VUNESP, IBFC, NUCEPE, UEG, FUNRIO.
 - Para cargos específicos (Perito Criminal, Delegado, Auditor, Analista, etc.), use o programa dos concursos mais recentes desse cargo.
-- Os tópicos devem refletir EXATAMENTE o que cai nas provas, com ênfase em:
-  * Lei seca (artigos, incisos e parágrafos cobrados com frequência)
-  * Jurisprudência consolidada dos tribunais superiores (STF, STJ, TST)
-  * Entendimentos sumulados das bancas
-  * Pontos diferenciadores que caem em "pegadinhas"
+- Os tópicos devem refletir o conteúdo efetivamente cobrado, com lei seca, jurisprudência, súmulas e pontos de prova.
 - Organize por área de conhecimento da forma como aparece nos editais.
 - NÃO inclua conteúdos raramente cobrados ou de nível muito teórico/acadêmico.`,
 };
 
-// ─── Contexto adicional por cargo/matéria em concurso ─────────────────────────
-// Banco de conhecimento sobre o programa real dos principais concursos.
-// Cresce conforme novos cargos são identificados.
-
 function getConcursoContext(subject: string): string {
   const s = subject.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-  // Perito Criminal / Criminalística
-  if (/perito|criminalistica|pericia/.test(s)) {
-    return `CONTEXTO ESPECÍFICO — PERITO CRIMINAL:
-Baseie-se nos editais recentes de concursos para Perito Criminal da Polícia Civil e Federal (PCDF, PCSP, PCMG, PCBA, PCRS, PCES, PCGO, DPF, PGE, etc.) e perícias estaduais.
-Bancas frequentes: CESPE/CEBRASPE, VUNESP, IBFC, FGV, NUCEPE.
-
-Matérias e tópicos típicos desses editais:
-1. Criminalística Geral: conceito, histórico, princípios (troca de Locard), local de crime, cadeia de custódia (Lei 13.964/2019 — Pacote Anticrime), classificação de locais, isolamento e preservação.
-2. Documentoscopia: análise de documentos, falsificações, grafoscopia, datiloscopia (papiloroscopia), sistemas de classificação (Vucetich, Henry, galton).
-3. Balística Forense: armas de fogo (classificação, funcionamento, câmara), munição, fenômenos do disparo, resíduo de disparo (GSR), trajetória de projéteis, distância de disparo.
-4. Toxicologia Forense: substâncias psicoativas, testes presuntivos e confirmatórios, cadeia de custódia toxicológica, lei antidrogas (Lei 11.343/2006).
-5. Medicina Legal / Tanatologia: causa mortis, fenômenos cadavéricos, traumatologia forense, sexologia forense, asfixia, intoxicações exógenas.
-6. Informática Forense: análise de dispositivos digitais, hash, metadados, cadeia de custódia digital, legislação (Marco Civil, LGPD, Lei de Crimes Cibernéticos 12.737/2012).
-7. Incêndio e Explosões: origem e causa de incêndio, ponto de ignição, acelerador de chamas, explosivos, dinâmica do fogo.
-8. Química e Biologia Forense: análise de vestígios biológicos (DNA, sangue, sêmen), sorologia forense, química analítica aplicada.
-9. Legislação Pertinente: CPP (provas — arts. 155-250), Código Penal (crimes contra a pessoa, patrimônio, tráfico), Lei 9.807/1999, Res. 213/2015 CNJ, Portaria MJ sobre perícia.
-10. Redação Oficial e Laudo Pericial: estrutura do laudo, quesitos, linguagem técnica, conclusão fundamentada.`;
-  }
-
-  // Delegado de Polícia
-  if (/delegado/.test(s)) {
-    return `CONTEXTO ESPECÍFICO — DELEGADO DE POLÍCIA:
-Editais recentes: PCDF, PCSP, PCMG, PCBA, PCRS, PCGO, PCPR, PCES, DPF.
-Bancas: CESPE/CEBRASPE, FGV, VUNESP, IBFC.
-Matérias típicas: Direito Penal (Parte Geral e Especial), Direito Processual Penal, Direito Constitucional, Direito Administrativo, Legislação Especial (Lei de Drogas, ECA, Lei Maria da Penha, Estatuto do Desarmamento, Pacote Anticrime), Medicina Legal, Criminalística, Direitos Humanos.`;
-  }
-
-  // Auditor Fiscal / Receita
-  if (/auditor|fiscal|receita|tributar/.test(s)) {
-    return `CONTEXTO ESPECÍFICO — AUDITOR FISCAL / RECEITA:
-Editais recentes: Receita Federal, SEFAZ estaduais, TCU, TCE.
-Bancas: CESPE/CEBRASPE, FGV, FCC, VUNESP.
-Matérias típicas: Direito Tributário (CTN, CF/88 arts. 145-162), Legislação Tributária Federal/Estadual, Contabilidade Geral e Pública, Auditoria, Direito Administrativo, Raciocínio Lógico, Tecnologia da Informação (para cargos TI).`;
-  }
-
-  // Analista/Técnico Judiciário
-  if (/judiciario|judici|tribunal|trf|tjsp|stj|stf/.test(s)) {
-    return `CONTEXTO ESPECÍFICO — ANALISTA/TÉCNICO JUDICIÁRIO:
-Editais recentes: STJ, STF, TRF (1ª a 6ª Região), TRT, TRE, TJ estaduais.
-Bancas: CESPE/CEBRASPE, FGV, FCC, VUNESP.
-Matérias típicas: Direito Constitucional, Direito Administrativo, Direito Processual Civil, Direito Processual Penal, Português, Raciocínio Lógico, Informática, Regimento Interno do respectivo tribunal.`;
-  }
-
-  // Agente / Escrivão de Polícia
-  if (/agente|escrivao|escrivão|investigador/.test(s)) {
-    return `CONTEXTO ESPECÍFICO — AGENTE/ESCRIVÃO/INVESTIGADOR DE POLÍCIA:
-Editais recentes: Polícias Civis estaduais (PCDF, PCSP, PCMG, etc.).
-Bancas: CESPE/CEBRASPE, VUNESP, IBFC, NUCEPE.
-Matérias típicas: Direito Penal (parte geral e crimes), Direito Processual Penal, Direito Constitucional, Legislação Especial (Lei de Drogas, ECA, Maria da Penha), Língua Portuguesa, Raciocínio Lógico, Informática Básica.`;
-  }
-
-  // Nenhum contexto específico — instrução genérica para concurso
-  return `CONTEXTO: Use como referência os editais mais recentes publicados para o cargo/área "${subject}" nas principais bancas brasileiras (CESPE/CEBRASPE, FGV, FCC, VUNESP, IBFC). Se o cargo não for identificável, gere o conteúdo mais cobrado genericamente para concursos públicos dessa área.`;
+  if (/perito|criminalistica|pericia/.test(s)) return `CONTEXTO ESPECÍFICO — PERITO CRIMINAL:
+Considere editais recentes de Perito Criminal das principais Polícias Civis e Federal, cobrindo Criminalística, Documentoscopia, Balística, Toxicologia, Medicina Legal, Informática Forense, Incêndios e Explosões, Química/Biologia Forense, legislação e laudo pericial.`;
+  if (/delegado/.test(s)) return `CONTEXTO ESPECÍFICO — DELEGADO DE POLÍCIA:
+Considere editais recentes de Polícia Civil e Federal, cobrindo Direito Penal, Processo Penal, Constitucional, Administrativo, legislação especial, Medicina Legal, Criminalística e Direitos Humanos.`;
+  if (/auditor|fiscal|receita|tributar/.test(s)) return `CONTEXTO ESPECÍFICO — AUDITOR FISCAL / RECEITA:
+Considere editais recentes de Receita Federal, SEFAZ, TCU e TCE, cobrindo Direito Tributário, legislação tributária, contabilidade, auditoria, administrativo, raciocínio lógico e TI quando aplicável.`;
+  if (/judiciario|judici|tribunal|trf|tjsp|stj|stf/.test(s)) return `CONTEXTO ESPECÍFICO — JUDICIÁRIO:
+Considere editais recentes de STJ, STF, TRF, TRT, TRE e Tribunais estaduais, cobrindo Direito Constitucional, Administrativo, Processual, Português, Raciocínio Lógico, Informática e regimentos.`;
+  if (/agente|escrivao|escrivão|investigador/.test(s)) return `CONTEXTO ESPECÍFICO — POLÍCIA:
+Considere editais recentes para Agente, Escrivão e Investigador, cobrindo Direito Penal, Processo Penal, Constitucional, legislação especial, Português, Raciocínio Lógico e Informática.`;
+  return `CONTEXTO: Use como referência programas e editais recentes da área "${subject}". Gere uma grade ampla e realmente estudável.`;
 }
 
-// ─── Função principal ─────────────────────────────────────────────────────────
+function isLegacyLimited(categories: CurriculumCategory[]): boolean {
+  const totalTopics = categories.reduce((sum, category) => sum + category.topics.length, 0);
+  // Currículos gerados pela versão anterior tinham no máximo 10 categorias e 8 subtópicos.
+  // Reprocessamos os casos pequenos para não perpetuar uma grade artificialmente truncada.
+  return categories.length <= 10 && totalTopics <= 40;
+}
 
 export async function generateCurriculumTask(args: {
   subject: string;
@@ -114,33 +64,34 @@ export async function generateCurriculumTask(args: {
   const concursoContext = educationLevel === 'concurso' ? getConcursoContext(subject) : '';
 
   const systemPrompt = `Você é um especialista em currículo educacional e preparação para concursos públicos brasileiros.
-Sua tarefa: gerar uma grade curricular COMPLETA e PRECISA para a matéria/cargo indicado, baseada em conteúdo REAL.
+Sua tarefa é gerar uma grade curricular COMPLETA, AMPLA e PRECISA para a matéria/cargo indicado, baseada em conteúdo REAL.
 
 REGRAS OBRIGATÓRIAS:
 - Retorne APENAS JSON válido. Sem markdown, sem texto fora do JSON.
-- Categorias: 4 a 10, cobrindo toda a grade programática relevante.
-- Subtópicos: 3 a 8 por categoria, ESPECÍFICOS e REAIS (não genéricos).
-- NÃO use subtópicos vagos como "Revisão Geral", "Introdução a X", "Outros temas".
-- Cada subtópico deve ser algo que um candidato/aluno saberia estudar diretamente.
+- NÃO existe limite artificial de categorias ou subtópicos. Cubra TODOS os assuntos relevantes que um aluno/candidato realmente precisa estudar.
+- Organize em categorias/tópicos hierárquicos e não omita subáreas importantes apenas para reduzir a resposta.
+- Cada categoria deve conter tantos subtópicos quanto forem necessários para cobrir a área, preferencialmente 5 a 20 quando houver conteúdo suficiente.
+- Evite duplicidades e subtópicos vagos como "Revisão Geral", "Introdução a X" ou "Outros temas".
+- Cada subtópico deve ser específico e estudável diretamente.
 
 DIRETRIZES DO NÍVEL:
 ${levelSuffix}
 ${concursoContext ? '\n' + concursoContext : ''}`;
 
-  const userPrompt = `Gere a grade curricular completa para: "${subject}"
-${educationLevel === 'concurso' ? 'Modalidade: Concurso Público\nBase: editais reais das principais bancas brasileiras para este cargo/área.' : ''}
+  const userPrompt = `Gere a grade curricular COMPLETA para: "${subject}"
+${educationLevel === 'concurso' ? 'Modalidade: Concurso Público. Considere os conteúdos efetivamente cobrados nos editais recentes.' : ''}
 
 Formato JSON obrigatório:
 {
   "categories": [
     {
-      "category": "Nome da Categoria",
-      "topics": ["Subtópico específico 1", "Subtópico específico 2", ...]
+      "category": "Nome do Tópico",
+      "topics": ["Subtópico específico 1", "Subtópico específico 2", "... todos os subtópicos relevantes ..."]
     }
   ]
 }
 
-${langInstruction}. De 4 a 10 categorias, cada uma com 3 a 8 subtópicos reais e específicos.`;
+${langInstruction}. Não reduza a quantidade por economia de tokens: a prioridade é cobertura completa da grade.`;
 
   const geminiSchema = {
     type: Type.OBJECT,
@@ -151,33 +102,20 @@ ${langInstruction}. De 4 a 10 categorias, cada uma com 3 a 8 subtópicos reais e
           type: Type.OBJECT,
           properties: {
             category: { type: Type.STRING },
-            topics: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-              minItems: 2,
-              maxItems: 10,
-            },
+            topics: { type: Type.ARRAY, items: { type: Type.STRING } },
           },
           required: ['category', 'topics'],
         },
-        minItems: 4,
-        maxItems: 12,
       },
     },
     required: ['categories'],
   };
 
-  // 1. Tenta buscar do banco (curricula/{id}) — 1 read, sem IA
   const cached = await getCurriculum(subject, educationLevel);
-  if (cached) {
-    return {
-      categories: cached.data.categories,
-      providerUsed: 'db-cache',
-      cacheHit: true,
-    };
+  if (cached && !isLegacyLimited(cached.data.categories)) {
+    return { categories: cached.data.categories, providerUsed: 'db-cache', cacheHit: true };
   }
 
-  // 2. Não tem no banco — gera via IA
   const { data, providerUsed } = await aiOrchestrator.generateJSON({
     systemPrompt,
     userPrompt,
@@ -187,17 +125,20 @@ ${langInstruction}. De 4 a 10 categorias, cada uma com 3 a 8 subtópicos reais e
 
   let categories: CurriculumCategory[] = [];
   if (Array.isArray((data as any)?.categories)) {
-    categories = (data as any).categories.filter(
-      (c: any) => c?.category && Array.isArray(c?.topics) && c.topics.length > 0,
-    );
+    categories = (data as any).categories
+      .map((category: any) => ({
+        category: String(category?.category || '').trim(),
+        topics: Array.isArray(category?.topics)
+          ? Array.from(new Set(category.topics.filter((topic: unknown): topic is string => typeof topic === 'string' && topic.trim().length > 0).map((topic: string) => topic.trim())))
+          : [],
+      }))
+      .filter((category: CurriculumCategory) => category.category && category.topics.length > 0);
   }
 
-  if (categories.length === 0) {
-    throw new Error('IA não retornou categorias válidas para o currículo.');
-  }
+  if (categories.length === 0) throw new Error('IA não retornou categorias válidas para o currículo.');
 
-  // 3. Salva no banco para próximas requisições (assíncrono)
+  // A versão fica registrada para futuras migrações; não limita a quantidade retornada.
+  void CURRICULUM_VERSION;
   saveCurriculum(subject, educationLevel, categories, providerUsed).catch(() => {});
-
   return { categories, providerUsed, cacheHit: false };
 }
