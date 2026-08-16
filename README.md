@@ -4,14 +4,15 @@ Aplicativo de flashcards com IA, repetição espaçada e sincronização Firebas
 
 ## Geração e monetização
 
-- **Usuário gratuito:** até **200 cards gerados por IA no total**.
-- **Usuário PRO:** **geração ilimitada**.
-- A geração de IA **não usa mais créditos**.
+- **Usuário gratuito:** até **200 cards gerados por IA por dia**.
+- O contador gratuito é renovado automaticamente **após 00:00 no fuso horário do dispositivo**.
+- Se o usuário consumir os 200 cards do dia, novas gerações ficam bloqueadas até o próximo dia.
+- **Usuário PRO:** **geração ilimitada**, no plano mensal ou anual enquanto a assinatura estiver ativa.
+- A geração de IA é controlada pelo backend autenticado; o cliente não consegue liberar créditos alterando o contador local.
 - Usuários gratuitos recebem anúncios normais.
 - Usuários PRO não recebem anúncios.
-- O contador `userStats/{uid}.aiCardsGenerated` é controlado pelo backend.
-
-O limite é acumulado por conta, não diário. O backend valida o ID token do Firebase antes de gerar, bloqueia solicitações acima do saldo restante e registra somente os cards realmente devolvidos.
+- O contador diário fica em `userStats/{uid}.aiCardsGeneratedToday`, acompanhado de `aiCardsGenerationDay`.
+- O antigo `aiCardsGenerated` pode permanecer como histórico e não limita mais a cota diária.
 
 ## IA
 
@@ -19,7 +20,11 @@ Gemini e DeepSeek podem atuar como provedores de geração, com fallback automá
 
 ## Segurança
 
-As regras do Firestore protegem os campos de assinatura e `aiCardsGenerated` contra alterações pelo cliente. A geração usa autenticação Firebase no backend.
+As regras do Firestore protegem os campos de assinatura e contadores contra alterações pelo cliente. A geração usa autenticação Firebase no backend.
+
+## Lembretes de revisão
+
+No Android, os lembretes usam `@capacitor/local-notifications` e são agendados como notificações recorrentes diárias. O usuário pode ativar/desativar o lembrete diário, alterar o horário e ativar/desativar o aviso de sequência em risco. O botão de teste agenda uma notificação imediata para validar a permissão do Android.
 
 ## Desenvolvimento
 
