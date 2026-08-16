@@ -4,37 +4,17 @@ import { getAvailableEducationLevels, recommendEducationLevels, recommendEducati
 const ALL = ['fundamental', 'medio', 'faculdade', 'concurso', 'tecnico'];
 
 describe('getAvailableEducationLevels', () => {
-  it('libera todos os níveis para assunto vazio ou muito curto', () => {
+  it('mantém todos os níveis no DOM para que a UI possa desabilitar os incompatíveis', () => {
     expect(getAvailableEducationLevels('')).toEqual(ALL);
-    expect(getAvailableEducationLevels('ab')).toEqual(ALL);
-  });
-
-  it('libera fundamental e medio para matérias escolares clássicas', () => {
-    expect(getAvailableEducationLevels('Matemática')).toEqual(expect.arrayContaining(['fundamental', 'medio']));
-    expect(getAvailableEducationLevels('Biologia')).toEqual(expect.arrayContaining(['fundamental', 'medio']));
-  });
-
-  it('remove fundamental e medio para matérias de nível superior/profissional', () => {
-    const levels = getAvailableEducationLevels('Direito Penal');
-    expect(levels).not.toContain('fundamental');
-    expect(levels).not.toContain('medio');
-    expect(levels).toEqual(expect.arrayContaining(['faculdade', 'concurso', 'tecnico']));
-  });
-
-  it('remove fundamental/medio independente de maiúsculas/acentos', () => {
-    expect(getAvailableEducationLevels('DIREITO')).not.toContain('fundamental');
-    expect(getAvailableEducationLevels('médicina')).not.toContain('medio');
-  });
-
-  it('libera todos os níveis para assuntos desconhecidos (fallback permissivo)', () => {
-    expect(getAvailableEducationLevels('Xadrez Avançado')).toEqual(ALL);
+    expect(getAvailableEducationLevels('Matemática')).toEqual(ALL);
+    expect(getAvailableEducationLevels('Direito Penal')).toEqual(ALL);
   });
 });
 
 describe('recommendEducationLevels', () => {
-  it('recomenda fundamental + medio para matérias escolares clássicas', () => {
-    expect(recommendEducationLevels('Matemática')).toEqual(['fundamental', 'medio']);
-    expect(recommendEducationLevels('Biologia')).toEqual(['fundamental', 'medio']);
+  it('recomenda fundamental + medio + faculdade para matérias escolares clássicas', () => {
+    expect(recommendEducationLevels('Matemática')).toEqual(['fundamental', 'medio', 'faculdade']);
+    expect(recommendEducationLevels('Biologia')).toEqual(['fundamental', 'medio', 'faculdade']);
   });
 
   it('recomenda concurso + faculdade para ramos do Direito cobrados em prova objetiva', () => {
@@ -46,12 +26,12 @@ describe('recommendEducationLevels', () => {
     expect(recommendEducationLevels('Concurso INSS - Raciocínio Lógico')[0]).toBe('concurso');
   });
 
-  it('recomenda técnico + faculdade para áreas técnicas/profissionalizantes', () => {
-    expect(recommendEducationLevels('Eletrônica')).toEqual(['tecnico', 'faculdade']);
-    expect(recommendEducationLevels('Segurança do Trabalho')).toEqual(['tecnico', 'faculdade']);
+  it('recomenda técnico para áreas técnicas/profissionalizantes', () => {
+    expect(recommendEducationLevels('Eletrônica')).toEqual(['tecnico']);
+    expect(recommendEducationLevels('Segurança do Trabalho')).toEqual(['tecnico']);
   });
 
-  it('usa "faculdade" como fallback único para assuntos desconhecidos/genéricos', () => {
+  it('usa faculdade como fallback para assuntos desconhecidos', () => {
     expect(recommendEducationLevels('Xadrez Avançado')).toEqual(['faculdade']);
   });
 
