@@ -1,7 +1,7 @@
 {
   "name": "memoriaflash",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "release:check": "node scripts/release-check.mjs",
     "android:sync": "npx cap sync android && node scripts/configure-android-admob.mjs",
     "android:sync:prod": "npx cap sync android && node scripts/configure-android-admob.mjs --production"
   },
