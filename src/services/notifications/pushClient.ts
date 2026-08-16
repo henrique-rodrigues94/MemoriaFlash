@@ -12,8 +12,17 @@ export interface NotificationPrefs {
   updatedAt: number;
 }
 
-const DEFAULT_PREFS: NotificationPrefs = { tokens: [], dailyReminderEnabled: false, streakReminderEnabled: true, reminderHourLocal: 19, reminderHourUTC: 22, updatedAt: 0 };
+const DEFAULT_PREFS: NotificationPrefs = {
+  tokens: [],
+  dailyReminderEnabled: false,
+  streakReminderEnabled: true,
+  reminderHourLocal: 19,
+  reminderHourUTC: 22,
+  updatedAt: 0,
+};
+
 const NATIVE_DAILY_REMINDER_ID = 42001;
+const NATIVE_STREAK_REMINDER_ID = 42003;
 const NATIVE_TEST_NOTIFICATION_ID = 42002;
 
 function prefsDocRef(uid: string) { return doc(db, 'notificationPrefs', uid); }
@@ -55,6 +64,13 @@ async function ensureNativeNotificationPermission(): Promise<boolean> {
 
 export interface EnablePushResult { success: boolean; message: string; }
 
+async function cancelNativeReviewNotifications(): Promise<void> {
+  await LocalNotifications.cancel({ notifications: [
+    { id: NATIVE_DAILY_REMINDER_ID },
+    { id: NATIVE_STREAK_REMINDER_ID },
+  ] });
+}
+
 async function scheduleNativeDailyReminder(reminderHourLocal: number): Promise<EnablePushResult> {
   const granted = await ensureNativeNotificationPermission();
   if (!granted) return { success: false, message: 'Permissão de notificações negada. Ative as notificações do MemoriaFlash nas configurações do Android.' };
@@ -63,11 +79,23 @@ async function scheduleNativeDailyReminder(reminderHourLocal: number): Promise<E
   await LocalNotifications.schedule({ notifications: [{
     id: NATIVE_DAILY_REMINDER_ID,
     title: 'Lembretes de Revisão',
-    body: 'Você tem cartões para revisar. Não deixe seus estudos acumularem.',
-    schedule: { on: { hour, minute: 0 } },
+    body: 'Você tem cartões para revisar. Reserve alguns minutos para manter sua memória em dia.',
+    schedule: { on: { hour, minute: 0 }, repeats: true },
     extra: { type: 'daily-review' },
   }] });
   return { success: true, message: `Lembrete diário configurado para ${String(hour).padStart(2, '0')}:00 neste celular.` };
+}
+
+async function scheduleNativeStreakReminder(reminderHourLocal: number): Promise<void> {
+  const hour = (normalizeHour(reminderHourLocal) + 1) % 24;
+  await LocalNotifications.cancel({ notifications: [{ id: NATIVE_STREAK_REMINDER_ID }] });
+  await LocalNotifications.schedule({ notifications: [{
+    id: NATIVE_STREAK_REMINDER_ID,
+    title: 'Sua sequência de estudos está em risco 🔥',
+    body: 'Faça uma revisão hoje para manter sua sequência no MemoriaFlash.',
+    schedule: { on: { hour, minute: 0 }, repeats: true },
+    extra: { type: 'streak-risk' },
+  }] });
 }
 
 async function disableNativeDailyReminder(): Promise<void> {
@@ -83,7 +111,14 @@ export async function enableDailyReminders(reminderHourLocal: number): Promise<E
       if (!result.success) return result;
       const user = await ensureAuthenticated();
       const existing = await getNotificationPrefs();
-      await setDoc(prefsDocRef(user.uid), { ...existing, dailyReminderEnabled: true, reminderHourLocal: hour, reminderHourUTC: localHourToUTCHour(hour), updatedAt: Date.now() }, { merge: true });
+      if (existing.streakReminderEnabled) await scheduleNativeStreakReminder(hour);
+      await setDoc(prefsDocRef(user.uid), {
+        ...existing,
+        dailyReminderEnabled: true,
+        reminderHourLocal: hour,
+        reminderHourUTC: localHourToUTCHour(hour),
+        updatedAt: Date.now(),
+      }, { merge: true });
       return result;
     } catch (err: any) {
       console.error('Erro ao ativar notificações nativas:', err);
@@ -129,6 +164,15 @@ export async function updateStreakReminderPref(enabled: boolean): Promise<Enable
   try {
     const user = await ensureAuthenticated();
     const existing = await getNotificationPrefs();
+    if (isNativeApp()) {
+      if (enabled) {
+        const granted = await ensureNativeNotificationPermission();
+        if (!granted) return { success: false, message: 'Permissão de notificações negada. Ative as notificações do MemoriaFlash nas configurações do Android.' };
+        await scheduleNativeStreakReminder(existing.reminderHourLocal);
+      } else {
+        await LocalNotifications.cancel({ notifications: [{ id: NATIVE_STREAK_REMINDER_ID }] });
+      }
+    }
     await setDoc(prefsDocRef(user.uid), { ...existing, streakReminderEnabled: enabled, updatedAt: Date.now() }, { merge: true });
     return { success: true, message: enabled ? 'Aviso de sequência em risco ativado.' : 'Aviso de sequência em risco desativado.' };
   } catch (err: any) {
