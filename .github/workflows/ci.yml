@@ -1,7 +1,5 @@
 name: CI
 
-# Roda em todo push e Pull Request: garante que o projeto compila e os
-# tipos TypeScript estão corretos antes de qualquer merge em main.
 on:
   push:
     branches: ['**']
@@ -30,9 +28,10 @@ jobs:
       - name: Testes automatizados (Vitest)
         run: npm run test
 
+      - name: Release preflight
+        run: npm run release:check
+
       - name: Build de produção
         run: npm run build
         env:
-          # Chaves dummy só para o build não falhar por variável ausente.
-          # As chaves reais são configuradas no host de produção (ver docs/DEPLOY.md).
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'dummy' }}
