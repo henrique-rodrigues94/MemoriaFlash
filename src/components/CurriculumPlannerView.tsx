@@ -12,8 +12,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { Deck, UserStats } from '../types';
-import { EducationLevel } from '../lib/educationLevels';
-import { EDUCATION_LEVEL_META } from '../lib/educationLevels';
+import { EducationLevel, EDUCATION_LEVEL_META } from '../lib/educationLevels';
 import { identifySubjectLevels, loadAllLevelCurricula, LevelCurriculum, LevelInfo } from '../services/subjectLevelsService';
 import { CurriculumCategory } from '../services/curriculumService';
 import { queryBankAvailability, BankAvailability } from '../services/cardBankService';
@@ -154,7 +153,7 @@ export const CurriculumPlannerView: React.FC<CurriculumPlannerViewProps> = ({
 
   useEffect(() => {
     if (!curriculum.length) return;
-    const next = new Set(flattenSubtopics(curriculum));
+    const next = new Set<string>(flattenSubtopics(curriculum));
     setSelectedSubtopics(next);
     setExpandedTopics(new Set(curriculum.map(category => category.category)));
   }, [educationLevel, curriculum.length]);
@@ -180,7 +179,7 @@ export const CurriculumPlannerView: React.FC<CurriculumPlannerViewProps> = ({
   }, [subject, educationLevel, selectedSubtopics]);
 
   const toggleAll = () => {
-    setSelectedSubtopics(allSelected ? new Set() : new Set(allSubtopics));
+    setSelectedSubtopics(allSelected ? new Set<string>() : new Set<string>(allSubtopics));
   };
 
   const toggleSubtopic = (subtopic: string) => {
@@ -215,7 +214,7 @@ export const CurriculumPlannerView: React.FC<CurriculumPlannerViewProps> = ({
   const handleLevelChange = (level: EducationLevel) => {
     setEducationLevel(level);
     setEducationLevelLocked(true);
-    setSelectedSubtopics(new Set());
+    setSelectedSubtopics(new Set<string>());
     setBankAvailability(null);
   };
 
@@ -268,9 +267,6 @@ export const CurriculumPlannerView: React.FC<CurriculumPlannerViewProps> = ({
       let remainingToGenerate = target;
       let safetyRounds = 0;
 
-      // O endpoint limita cada chamada a 100 cards. Para o plano gratuito,
-      // duas chamadas de 100 permitem usar os 200 cards diários. No PRO,
-      // repetimos até consumir todos os cards disponíveis no banco.
       while (remainingToGenerate > 0 && safetyRounds < 20) {
         safetyRounds += 1;
         const batchSize = Math.min(100, remainingToGenerate);
@@ -294,8 +290,6 @@ export const CurriculumPlannerView: React.FC<CurriculumPlannerViewProps> = ({
 
         if (newCount === 0) break;
         remainingToGenerate -= newCount;
-
-        // Se o banco devolveu menos que o lote, não fazemos chamadas infinitas.
         if (cards.length < batchSize) break;
       }
 
@@ -343,12 +337,7 @@ export const CurriculumPlannerView: React.FC<CurriculumPlannerViewProps> = ({
       <section className="rounded-3xl bg-white border border-slate-200 p-5 sm:p-7 shadow-sm space-y-5">
         <div>
           <label className="block text-xs font-black uppercase tracking-wider text-slate-600 mb-2">📚 Matéria / assunto</label>
-          <input
-            value={subject}
-            onChange={event => { setSubject(event.target.value.toUpperCase()); setEducationLevelLocked(false); }}
-            placeholder="Ex.: Português, Direito Penal, Biologia..."
-            className="w-full rounded-2xl border border-slate-300 px-4 py-3.5 text-sm text-slate-900 outline-none focus:border-[#6658f5] focus:ring-4 focus:ring-[#6658f5]/10"
-          />
+          <input value={subject} onChange={event => { setSubject(event.target.value.toUpperCase()); setEducationLevelLocked(false); }} placeholder="Ex.: Português, Direito Penal, Biologia..." className="w-full rounded-2xl border border-slate-300 px-4 py-3.5 text-sm text-slate-900 outline-none focus:border-[#6658f5] focus:ring-4 focus:ring-[#6658f5]/10" />
         </div>
 
         <div>
@@ -361,11 +350,7 @@ export const CurriculumPlannerView: React.FC<CurriculumPlannerViewProps> = ({
               const value = level.level || level.value;
               const label = level.label;
               const active = educationLevel === value;
-              return (
-                <button key={value} type="button" onClick={() => handleLevelChange(value)} className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition ${active ? 'bg-[#6658f5] text-white border-[#6658f5]' : 'bg-white text-slate-600 border-slate-200 hover:border-[#6658f5]/40'}`}>
-                  {level.icon || '🎓'} {label}
-                </button>
-              );
+              return <button key={value} type="button" onClick={() => handleLevelChange(value)} className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition ${active ? 'bg-[#6658f5] text-white border-[#6658f5]' : 'bg-white text-slate-600 border-slate-200 hover:border-[#6658f5]/40'}`}>{level.icon || '🎓'} {label}</button>;
             })}
           </div>
           {detectedLevels.length > 1 && <p className="text-[11px] text-slate-500 mt-2">O nível principal é selecionado automaticamente. Você pode trocar antes de carregar a grade.</p>}
@@ -378,9 +363,7 @@ export const CurriculumPlannerView: React.FC<CurriculumPlannerViewProps> = ({
                 <p className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5"><Wand2 className="w-4 h-4 text-[#6658f5]" /> Grade curricular</p>
                 <p className="text-[11px] text-slate-500 mt-1">{selectedSubtopics.size} de {allSubtopics.length} subtópicos selecionados</p>
               </div>
-              <button type="button" onClick={toggleAll} className="px-3.5 py-2 rounded-xl bg-[#6658f5]/10 text-[#5143d9] border border-[#6658f5]/20 text-xs font-black flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5" /> {allSelected ? 'Desmarcar todos' : 'Selecionar todos'}
-              </button>
+              <button type="button" onClick={toggleAll} className="px-3.5 py-2 rounded-xl bg-[#6658f5]/10 text-[#5143d9] border border-[#6658f5]/20 text-xs font-black flex items-center gap-1.5"><Check className="w-3.5 h-3.5" /> {allSelected ? 'Desmarcar todos' : 'Selecionar todos'}</button>
             </div>
 
             <div className="rounded-2xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
@@ -401,21 +384,13 @@ export const CurriculumPlannerView: React.FC<CurriculumPlannerViewProps> = ({
                         <span className="font-black text-sm text-slate-800">{category.category}</span>
                         <span className="block text-[11px] text-slate-500 mt-0.5">{selectedCount}/{subtopics.length} subtópicos</span>
                       </button>
-                      <button type="button" onClick={() => toggleExpanded(category.category)} className="p-2 text-slate-400">
-                        {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </button>
+                      <button type="button" onClick={() => toggleExpanded(category.category)} className="p-2 text-slate-400">{expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
                     </div>
-
                     {expanded && (
                       <div className="px-4 pb-4 pl-12 grid sm:grid-cols-2 gap-2">
                         {subtopics.map(subtopic => {
                           const selected = selectedSubtopics.has(subtopic);
-                          return (
-                            <button key={subtopic} type="button" onClick={() => toggleSubtopic(subtopic)} className={`text-left px-3 py-2.5 rounded-xl border text-xs flex items-center gap-2 transition ${selected ? 'bg-[#6658f5]/8 border-[#6658f5]/30 text-slate-800' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
-                              <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selected ? 'bg-[#6658f5] border-[#6658f5]' : 'border-slate-300 bg-white'}`}>{selected && <Check className="w-3 h-3 text-white" />}</span>
-                              <span>{subtopic}</span>
-                            </button>
-                          );
+                          return <button key={subtopic} type="button" onClick={() => toggleSubtopic(subtopic)} className={`text-left px-3 py-2.5 rounded-xl border text-xs flex items-center gap-2 transition ${selected ? 'bg-[#6658f5]/8 border-[#6658f5]/30 text-slate-800' : 'bg-slate-50 border-slate-200 text-slate-500'}`}><span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selected ? 'bg-[#6658f5] border-[#6658f5]' : 'border-slate-300 bg-white'}`}>{selected && <Check className="w-3 h-3 text-white" />}</span><span>{subtopic}</span></button>;
                         })}
                       </div>
                     )}
@@ -430,10 +405,7 @@ export const CurriculumPlannerView: React.FC<CurriculumPlannerViewProps> = ({
 
         {bankAvailability && selectedSubtopics.size > 0 && (
           <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-black text-slate-700">Cards disponíveis para sua seleção</span>
-              <span className="text-sm font-black text-[#5143d9]">{readyNewEstimate}</span>
-            </div>
+            <div className="flex items-center justify-between gap-3"><span className="text-xs font-black text-slate-700">Cards disponíveis para sua seleção</span><span className="text-sm font-black text-[#5143d9]">{readyNewEstimate}</span></div>
             <p className="text-[11px] text-slate-500">{bankAvailability.available.length} subtópicos já possuem conteúdo pronto e {bankAvailability.needsGeneration.length} ainda precisam ser preparados.</p>
             {!stats.isPro && <p className="text-[11px] text-[#5143d9] font-bold">Plano gratuito: até 200 cards por dia. Você pode voltar amanhã e continuar preenchendo esta mesma matéria.</p>}
             {stats.isPro && <p className="text-[11px] text-emerald-600 font-bold">PRO: sem limite diário de geração. O app entrega os cards disponíveis sem exigir seleção manual de quantidade.</p>}
@@ -444,16 +416,12 @@ export const CurriculumPlannerView: React.FC<CurriculumPlannerViewProps> = ({
         {message && <div className="rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 text-xs flex gap-2"><Check className="w-4 h-4 shrink-0" />{message}</div>}
 
         <div className="flex flex-col sm:flex-row gap-3 pt-1">
-          <button type="button" onClick={handleGenerate} disabled={isGenerating || !subject.trim() || selectedSubtopics.size === 0 || (!stats.isPro && freeDailyTarget <= 0 && readyNewEstimate > 0)} className="flex-1 py-4 rounded-2xl bg-[#6658f5] hover:bg-[#5849e8] disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#6658f5]/20">
-            {isGenerating ? <><Loader2 className="w-5 h-5 animate-spin" /> Montando seus cards...</> : <><Sparkles className="w-5 h-5" /> {stats.isPro ? 'Gerar todos os cards disponíveis' : `Gerar até ${Math.min(200, remainingToday)} cards hoje`}</>}
-          </button>
+          <button type="button" onClick={handleGenerate} disabled={isGenerating || !subject.trim() || selectedSubtopics.size === 0 || (!stats.isPro && freeDailyTarget <= 0 && readyNewEstimate > 0)} className="flex-1 py-4 rounded-2xl bg-[#6658f5] hover:bg-[#5849e8] disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#6658f5]/20">{isGenerating ? <><Loader2 className="w-5 h-5 animate-spin" /> Montando seus cards...</> : <><Sparkles className="w-5 h-5" /> {stats.isPro ? 'Gerar todos os cards disponíveis' : `Gerar até ${Math.min(200, remainingToday)} cards hoje`}</>}</button>
           {!stats.isPro && onOpenSubscription && <button type="button" onClick={onOpenSubscription} className="sm:w-52 py-4 rounded-2xl border border-[#6658f5]/30 text-[#5143d9] font-black text-sm bg-[#6658f5]/5 hover:bg-[#6658f5]/10 flex items-center justify-center gap-2"><Lock className="w-4 h-4" /> Conhecer PRO</button>}
         </div>
       </section>
 
-      <div className="text-[10px] text-slate-400 text-center px-4">
-        O MemoriaFlash prioriza cards já existentes no banco compartilhado. Quando uma matéria ou subtópico ainda não está pronto, o Content Agent recebe uma solicitação para preparar a grade e completar o conteúdo, evitando chamadas de IA desnecessárias.
-      </div>
+      <div className="text-[10px] text-slate-400 text-center px-4">O MemoriaFlash prioriza cards já existentes no banco compartilhado. Quando uma matéria ou subtópico ainda não está pronto, o Content Agent recebe uma solicitação para preparar a grade e completar o conteúdo, evitando chamadas de IA desnecessárias.</div>
     </div>
   );
 };
