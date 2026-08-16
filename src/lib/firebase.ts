@@ -1,10 +1,7 @@
 import { Capacitor } from '@capacitor/core';
-import {
-  initializeApp,
-} from 'firebase/app';
+import { initializeApp } from 'firebase/app';
 import {
   getAuth,
-  signInAnonymously,
   signInWithPopup as firebaseSignInWithPopup,
   signInWithCredential,
   GoogleAuthProvider,
@@ -34,10 +31,6 @@ export const auth = getAuth(app);
 export const db = firebaseConfig.firestoreDatabaseId ? getFirestore(app, firebaseConfig.firestoreDatabaseId) : getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 
-// Capacitor.isNativePlatform() can be evaluated too early in some WebView
-// startup paths. The platform value is stable once the Capacitor bridge is
-// available, so use it explicitly to guarantee that Android/iOS never falls
-// back to Firebase's browser popup flow.
 const capacitorPlatform = Capacitor.getPlatform();
 const isNative = capacitorPlatform === 'android' || capacitorPlatform === 'ios';
 const configuredApiBaseUrl = String(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
@@ -46,14 +39,6 @@ const googleWebClientId = String(
 ).trim();
 let socialLoginInitialized = false;
 let googleLoginInProgress = false;
-
-function getGuestUserId(): string {
-  const stored = localStorage.getItem('flashmind_guest_uid');
-  if (stored) return stored;
-  const newId = 'guest_' + Math.random().toString(36).substring(2, 11);
-  localStorage.setItem('flashmind_guest_uid', newId);
-  return newId;
-}
 
 async function ensureSocialLoginInitialized(): Promise<void> {
   if (!isNative || socialLoginInitialized) return;
@@ -70,11 +55,6 @@ async function ensureSocialLoginInitialized(): Promise<void> {
   socialLoginInitialized = true;
 }
 
-/**
- * Mantém a mesma API usada pelos componentes, mas usa o Google Sign-In
- * nativo quando o app roda no Android/iOS via Capacitor. Isso evita abrir
- * Gmail/SBrowser ou depender de popup dentro do WebView.
- */
 export async function signInWithPopup(authInstance: typeof auth, provider: GoogleAuthProvider) {
   if (!isNative || provider.providerId !== 'google.com') {
     return firebaseSignInWithPopup(authInstance, provider);
@@ -87,7 +67,6 @@ export async function signInWithPopup(authInstance: typeof auth, provider: Googl
   googleLoginInProgress = true;
   try {
     await ensureSocialLoginInitialized();
-
     const response = await SocialLogin.login({
       provider: 'google',
       options: {
@@ -99,7 +78,6 @@ export async function signInWithPopup(authInstance: typeof auth, provider: Googl
     const result = response?.result as { idToken?: string | null; accessToken?: { token?: string } | null } | undefined;
     const idToken = result?.idToken || null;
     const accessToken = result?.accessToken?.token || undefined;
-
     if (!idToken) {
       throw new Error('O Google não retornou um ID token válido. Verifique o SHA-1, o pacote Android e o Web Client ID no Firebase/Google Cloud.');
     }
@@ -116,45 +94,34 @@ export async function signOut(authInstance: typeof auth): Promise<void> {
     try {
       await SocialLogin.logout({ provider: 'google' });
     } catch {
-      // O logout do Firebase JS continua mesmo se a sessão nativa já tiver expirado.
+      // O logout do Firebase continua mesmo se a sessão nativa já tiver expirado.
     }
   }
   await firebaseSignOut(authInstance);
 }
 
+/**
+ * Aguarda autenticação Google. Não cria conta anônima nem usuário convidado.
+ * O aplicativo usa esta função apenas para inicializações que dependem de um
+ * usuário autenticado; a tela de entrada é responsável por iniciar o login.
+ */
 export async function ensureAuthenticated(): Promise<User> {
+  if (auth.currentUser && !auth.currentUser.isAnonymous) return auth.currentUser;
   return new Promise((resolve) => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user && !user.isAnonymous) {
         unsubscribe();
         resolve(user);
-      } else {
-        try {
-          const anon = await signInAnonymously(auth);
-          unsubscribe();
-          resolve(anon.user);
-        } catch {
-          unsubscribe();
-          const guestUid = getGuestUserId();
-          resolve({ uid: guestUid, isAnonymous: true } as User);
-        }
       }
     });
   });
 }
 
-// Todas as chamadas /api/* precisam alcançar o Express quando o app estiver
-// empacotado no Capacitor. No navegador continuam relativas ao host atual.
 if (typeof window !== 'undefined' && !(window as any).__memoriaFlashApiFetchInstalled) {
   const originalFetch = window.fetch.bind(window);
   (window as any).__memoriaFlashApiFetchInstalled = true;
   window.fetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
-    const originalUrl = typeof input === 'string'
-      ? input
-      : input instanceof URL
-        ? input.toString()
-        : input.url;
-
+    const originalUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     let resolvedInput: RequestInfo | URL = input;
     let url = originalUrl;
 
@@ -163,16 +130,13 @@ if (typeof window !== 'undefined' && !(window as any).__memoriaFlashApiFetchInst
         throw new Error('Servidor do MemoriaFlash não configurado para o aplicativo. Defina VITE_API_BASE_URL com a URL HTTPS da API.');
       }
       url = `${configuredApiBaseUrl}${originalUrl}`;
-      if (input instanceof Request) {
-        resolvedInput = new Request(url, input);
-      } else {
-        resolvedInput = url;
-      }
+      if (input instanceof Request) resolvedInput = new Request(url, input);
+      else resolvedInput = url;
     }
 
     if (url.includes('/api/gemini/generate-flashcards') || url.includes('/api/gemini/scanner-process')) {
       const user = auth.currentUser;
-      if (user) {
+      if (user && !user.isAnonymous) {
         try {
           const token = await user.getIdToken();
           const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
