@@ -1,0 +1,35 @@
+name: Fix Study Session typing 2
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Force Set and Array types
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/StudySessionView.tsx')
+          s = p.read_text()
+          old = "Array.from(new Set(\n      deck.cards.map(c => String(c.topic || c.subject || deck.category || '')).filter(Boolean)\n    )).sort((a, b) => a.localeCompare(b, 'pt-BR'))"
+          new = "Array.from<string>(new Set<string>(\n      deck.cards.map(c => String(c.topic || c.subject || deck.category || '')).filter(Boolean) as string[]\n    )).sort((a: string, b: string) => a.localeCompare(b, 'pt-BR'))"
+          if old not in s:
+              raise SystemExit('StudySessionView Set expression not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Commit and remove workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/StudySessionView.tsx
+          git rm .github/workflows/fix-study-session.yml
+          git commit -m 'fix: force study topic collection types'
+          git push
