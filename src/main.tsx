@@ -5,6 +5,7 @@ import App from './App.tsx';
 import './index.css';
 import { initErrorLogger } from './lib/errorLogger';
 import { installCameraPlaybackFix } from './lib/cameraPlaybackFix';
+import { installStudyCardFeedbackOverlay } from './services/studyCardFeedback';
 import { initializeAdMob, requestAdMobConsent, installAdMobListeners } from './services/ads/adMobNative';
 
 const API_BASE_URL = (
@@ -45,6 +46,7 @@ if (API_BASE_URL && typeof window !== 'undefined') {
 
 initErrorLogger();
 installCameraPlaybackFix();
+installStudyCardFeedbackOverlay();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
