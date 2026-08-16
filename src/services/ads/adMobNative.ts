@@ -20,20 +20,34 @@ async function withTimeout<T>(promise: Promise<T>, label: string, timeout = OP_T
 export async function initializeAdMob(): Promise<boolean> {
   if (!isNativeAndroid()) return false;
   const config = assertConfigured();
-  if (!initialized) { await withTimeout(AdMob.initialize({ initializeForTesting: config.isUsingTestIds }), 'Inicialização do AdMob'); initialized = true; }
+  if (!initialized) {
+    await withTimeout(AdMob.initialize({ initializeForTesting: config.isUsingTestIds }), 'Inicialização do AdMob');
+    initialized = true;
+  }
   return true;
 }
 
 export async function requestAdMobConsent(): Promise<void> {
   if (!isNativeAndroid() || consentRequested) return;
+  const config = assertConfigured();
   await initializeAdMob();
+
+  // No APK de testes usamos os IDs oficiais de demonstração do Google.
+  // Não abrimos o fluxo UMP, pois ele pode impedir a exibição do anúncio de
+  // teste em instalações locais. O fluxo de consentimento permanece ativo
+  // para os IDs reais de produção.
+  if (config.isUsingTestIds) {
+    consentRequested = true;
+    return;
+  }
+
   try {
     const status = await withTimeout(AdMob.requestConsentInfo(), 'Verificação de consentimento');
     consentRequested = true;
-    if (status.isConsentFormAvailable && !status.canRequestAds) await withTimeout(AdMob.showConsentForm(), 'Formulário de consentimento');
+    if (status.isConsentFormAvailable && !status.canRequestAds) {
+      await withTimeout(AdMob.showConsentForm(), 'Formulário de consentimento');
+    }
   } catch (error) {
-    // Não bloqueia o banner inteiro se o formulário de consentimento estiver indisponível.
-    // O SDK continuará respeitando as próprias regras de consentimento.
     console.warn('[AdMob] Consentimento indisponível:', error);
     consentRequested = true;
   }
@@ -43,9 +57,18 @@ export async function showFreeUserBanner(): Promise<void> {
   if (!isNativeAndroid()) return;
   const config = assertConfigured();
   await initializeAdMob();
-  try { await requestAdMobConsent(); } catch (error) { console.warn('[AdMob] Consent request skipped:', error); }
+  await requestAdMobConsent();
+
   try {
-    await withTimeout(AdMob.showBanner({ adId: config.bannerAdUnitId, adSize: BannerAdSize.ADAPTIVE_BANNER, position: BannerAdPosition.BOTTOM_CENTER, margin: 0 }), 'Exibição do banner');
+    await withTimeout(
+      AdMob.showBanner({
+        adId: config.bannerAdUnitId,
+        adSize: BannerAdSize.ADAPTIVE_BANNER,
+        position: BannerAdPosition.BOTTOM_CENTER,
+        margin: 0,
+      }),
+      'Exibição do banner'
+    );
     bannerVisible = true;
   } catch (error) {
     bannerVisible = false;
