@@ -4,9 +4,10 @@ import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import App from './App.tsx';
 import { EntryGate } from './components/EntryGate';
 import './index.css';
+import './themeCompatibility.css';
 import { initErrorLogger } from './lib/errorLogger';
 import { installCameraPlaybackFix } from './lib/cameraPlaybackFix';
-import { installStudyCardFeedbackOverlay } from './services/studyCardFeedback';
+import { installStudyCardFeedbackOverlayV2 } from './services/studyCardFeedbackOverlay';
 import { initializeAdMob, requestAdMobConsent, installAdMobListeners } from './services/ads/adMobNative';
 import { auth, onAuthStateChanged } from './lib/firebase';
 
@@ -48,7 +49,7 @@ if (API_BASE_URL && typeof window !== 'undefined') {
 
 initErrorLogger();
 installCameraPlaybackFix();
-installStudyCardFeedbackOverlay();
+installStudyCardFeedbackOverlayV2();
 
 function AuthenticatedShell() {
   const [authResolved, setAuthResolved] = useState(false);
@@ -73,10 +74,7 @@ function AuthenticatedShell() {
     );
   }
 
-  if (!signedIn) {
-    return <EntryGate onAuthenticated={() => undefined} />;
-  }
-
+  if (!signedIn) return <EntryGate onAuthenticated={() => undefined} />;
   return <App />;
 }
 
