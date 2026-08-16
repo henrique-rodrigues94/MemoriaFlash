@@ -31,6 +31,7 @@
 - [x] Runbook de release documentado
 - [x] CI configurado para Node.js 22
 - [x] Tipagem explícita da coleção de tópicos da sessão de estudo
+- [x] Testes unitários alinhados aos contratos atuais do app
 - [ ] Revisão final das variáveis de produção
 - [ ] Confirmar backend HTTPS de produção
 - [ ] Testar rate limiting em produção
