@@ -4,10 +4,16 @@ import { auth, ensureAuthenticated } from './firebase';
 
 export type { EducationLevel };
 
-export interface GenerationUsage { generated: number; remaining: number; limit?: number; isPro?: boolean; }
+export interface GenerationUsage {
+  generated: number;
+  remaining: number;
+  limit?: number;
+  isPro?: boolean;
+  generationDay?: string;
+  resetAt?: string;
+}
 
 function publishGenerationUsage(usage: GenerationUsage): void {
-  // Atualiza a UI imediatamente. O Firestore continua sendo a fonte de verdade.
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('memoriaflash:generation-usage', { detail: usage }));
 }
 
@@ -29,16 +35,23 @@ export const generateAICards = async (
 ): Promise<Flashcard[]> => {
   const user = auth.currentUser || await ensureAuthenticated();
   const idToken = await user.getIdToken();
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const res = await fetch('/api/gemini/generate-flashcards', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+      'X-Timezone': timeZone,
+    },
     body: JSON.stringify({ prompt: subject, count, language: 'pt', difficulty: 'medium', selectedTopics: topics, educationLevel, existingFronts }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const limitMessage = data?.code === 'GENERATION_LIMIT_REACHED'
-      ? `Limite gratuito de 200 cards atingido. ${data?.remaining ?? 0} cards restantes. Assine o PRO para gerar ilimitadamente.`
-      : data?.error;
+    const limitMessage = data?.code === 'GENERATION_DAILY_LIMIT_REACHED'
+      ? `Você atingiu os 200 cards gratuitos de hoje. Você poderá gerar novamente após 00:00. ${data?.remaining ?? 0} cards restantes hoje. Assine o PRO para gerar ilimitadamente.`
+      : data?.code === 'GENERATION_LIMIT_REACHED'
+        ? `Limite gratuito de 200 cards atingido. Assine o PRO para gerar ilimitadamente.`
+        : data?.error;
     throw new Error(limitMessage || `Erro ao gerar flashcards (${res.status})`);
   }
 
@@ -46,7 +59,14 @@ export const generateAICards = async (
   if (!raw.length) throw new Error('Nenhum flashcard foi gerado. Tente novamente.');
 
   const usage: GenerationUsage | null = data?.usage && typeof data.usage.generated === 'number'
-    ? { generated: data.usage.generated, remaining: Number(data.usage.remaining), limit: data.usage.limit, isPro: data.usage.isPro }
+    ? {
+        generated: data.usage.generated,
+        remaining: Number(data.usage.remaining),
+        limit: data.usage.limit,
+        isPro: data.usage.isPro,
+        generationDay: data.usage.generationDay,
+        resetAt: data.usage.resetAt,
+      }
     : null;
   if (usage) {
     publishGenerationUsage(usage);
