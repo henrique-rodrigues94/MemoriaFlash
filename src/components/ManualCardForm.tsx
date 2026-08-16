@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlusCircle, HelpCircle, CheckCircle2, Layers, Sparkles } from 'lucide-react';
+import { CheckCircle2, HelpCircle, Layers, PlusCircle, Sparkles, Trash2 } from 'lucide-react';
 import { Flashcard } from '../types';
 import { findClosestMatch } from '../lib/spellCheck';
 
@@ -9,50 +9,38 @@ interface ManualCardFormProps {
   onAddCardDirectly: (card: Flashcard, deckName: string) => void;
 }
 
-export const ManualCardForm: React.FC<ManualCardFormProps> = ({
-  existingDecks,
-  subjects,
-  onAddCardDirectly,
-}) => {
+export const ManualCardForm: React.FC<ManualCardFormProps> = ({ existingDecks, subjects, onAddCardDirectly }) => {
   const [deckName, setDeckName] = useState('');
   const [subject, setSubject] = useState('');
   const [topic, setTopic] = useState('');
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
-
-  // Correção ortográfica — "Você quis dizer?" (ex: "geogafia" → "geografia").
-  const [deckNameSuggestion, setDeckNameSuggestion] = useState<string | null>(null);
+  const [addedCards, setAddedCards] = useState<Flashcard[]>([]);
+  const [deckSuggestion, setDeckSuggestion] = useState<string | null>(null);
   const [subjectSuggestion, setSubjectSuggestion] = useState<string | null>(null);
 
-  const handleDeckNameChange = (value: string) => {
-    const upper = value.toUpperCase();
-    setDeckName(upper);
-    setDeckNameSuggestion(findClosestMatch(upper, existingDecks));
+  const changeDeck = (value: string) => {
+    const next = value.toUpperCase();
+    setDeckName(next);
+    setDeckSuggestion(findClosestMatch(next, existingDecks));
   };
 
-  const handleSubjectChange = (value: string) => {
-    const upper = value.toUpperCase();
-    setSubject(upper);
-    setSubjectSuggestion(findClosestMatch(upper, subjects));
+  const changeSubject = (value: string) => {
+    const next = value.toUpperCase();
+    setSubject(next);
+    setSubjectSuggestion(findClosestMatch(next, subjects));
   };
 
-  const handleAddCard = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!deckName.trim()) {
-      alert('Por favor, informe o Nome do Baralho.');
+  const handleAdd = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!deckName.trim() || !subject.trim() || !front.trim() || !back.trim()) {
+      alert('Preencha NOME DO BARALHO, MATÉRIA / ASSUNTO, PERGUNTA e RESPOSTA.');
       return;
     }
-
-    if (!subject.trim() || !front.trim() || !back.trim()) {
-      alert('Por favor, preencha a Matéria, a Pergunta e a Resposta.');
-      return;
-    }
-
-    const newCard: Flashcard = {
-      id: `manual-card-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      subject: subject.trim(),
-      topic: topic.trim() || 'Geral',
+    const card: Flashcard = {
+      id: `manual-card-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      subject: subject.trim().toUpperCase(),
+      topic: topic.trim().toUpperCase() || 'GERAL',
       front: front.trim(),
       back: back.trim(),
       difficulty: 'medium',
@@ -61,134 +49,51 @@ export const ManualCardForm: React.FC<ManualCardFormProps> = ({
       efactor: 2.5,
       dueDate: new Date().toISOString(),
     };
-
-    // Grava o card atribuindo ao Nome do Baralho digitado/selecionado
-    onAddCardDirectly(newCard, deckName.trim());
-
-    // Limpa a Pergunta e Resposta para facilitar o cadastro do próximo card do mesmo baralho
+    onAddCardDirectly(card, deckName.trim().toUpperCase());
+    setAddedCards(current => [...current, card]);
     setFront('');
     setBack('');
   };
 
   return (
-    <form onSubmit={handleAddCard} className="space-y-4 text-left">
-      {/* Nome do Baralho (Com Autocomplete) */}
-      <div>
-        <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5 flex items-center gap-1.5">
-          <Layers className="w-4 h-4 text-blue-400" /> NOME DO BARALHO *
-        </label>
-        <input
-          type="text"
-          placeholder="DIGITE OU SELECIONE UM BARALHO EXISTENTE..."
-          value={deckName}
-          onChange={(e) => handleDeckNameChange(e.target.value)}
-          list="existing-decks-list"
-          className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm font-semibold uppercase"
-        />
-        {deckNameSuggestion && deckNameSuggestion.toUpperCase() !== deckName.trim().toUpperCase() && (
-          <div className="mt-2 px-3.5 py-2.5 rounded-xl bg-[#122131] border border-blue-500/30 flex items-center gap-2 text-xs animate-fade-in">
-            <Sparkles className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-            <span className="text-[#c2c6d6]">Você quis dizer</span>
-            <button
-              type="button"
-              onClick={() => handleDeckNameChange(deckNameSuggestion)}
-              className="font-extrabold text-[#60a5fa] hover:text-white underline decoration-dotted underline-offset-2 cursor-pointer"
-            >
-              {deckNameSuggestion.toUpperCase()}
-            </button>
-            <span className="text-[#8c91a0]">?</span>
-          </div>
-        )}
-        <datalist id="existing-decks-list">
-          {existingDecks.map((deckTitle, i) => (
-            <option key={i} value={deckTitle} />
-          ))}
-        </datalist>
-      </div>
+    <div className="space-y-5 text-left">
+      <form onSubmit={handleAdd} className="space-y-4">
+        <div>
+          <label className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300"><Layers className="h-4 w-4" /> NOME DO BARALHO *</label>
+          <input value={deckName} onChange={e => changeDeck(e.target.value)} list="manual-existing-decks" placeholder="DIGITE OU SELECIONE UM BARALHO EXISTENTE..." className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold uppercase text-slate-900 outline-none focus:border-[#6658f5] dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+          <datalist id="manual-existing-decks">{existingDecks.map((item, index) => <option key={`${item}-${index}`} value={item.toUpperCase()} />)}</datalist>
+          {deckSuggestion && deckSuggestion.toUpperCase() !== deckName.trim().toUpperCase() && <button type="button" onClick={() => changeDeck(deckSuggestion!)} className="mt-2 flex items-center gap-2 text-xs font-bold text-[#6658f5]"><Sparkles className="h-3.5 w-3.5" /> VOCÊ QUIS DIZER {deckSuggestion.toUpperCase()}?</button>}
+        </div>
 
-      {/* Matéria / Assunto */}
-      <div>
-        <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5">
-          💻 MATÉRIA / ASSUNTO *
-        </label>
-        <input
-          type="text"
-          placeholder="EX: DIREITO PENAL, BIOLOGIA..."
-          value={subject}
-          onChange={(e) => handleSubjectChange(e.target.value)}
-          list="subjects-list"
-          className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm uppercase"
-        />
-        {subjectSuggestion && subjectSuggestion.toUpperCase() !== subject.trim().toUpperCase() && (
-          <div className="mt-2 px-3.5 py-2.5 rounded-xl bg-[#122131] border border-blue-500/30 flex items-center gap-2 text-xs animate-fade-in">
-            <Sparkles className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-            <span className="text-[#c2c6d6]">Você quis dizer</span>
-            <button
-              type="button"
-              onClick={() => handleSubjectChange(subjectSuggestion)}
-              className="font-extrabold text-[#60a5fa] hover:text-white underline decoration-dotted underline-offset-2 cursor-pointer"
-            >
-              {subjectSuggestion.toUpperCase()}
-            </button>
-            <span className="text-[#8c91a0]">?</span>
-          </div>
-        )}
-        <datalist id="subjects-list">
-          {subjects.map((sub, i) => (
-            <option key={i} value={sub} />
-          ))}
-        </datalist>
-      </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">MATÉRIA / ASSUNTO *</label>
+          <input value={subject} onChange={e => changeSubject(e.target.value)} list="manual-subjects" placeholder="EX.: DIREITO PENAL, BIOLOGIA..." className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold uppercase text-slate-900 outline-none focus:border-[#6658f5] dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+          <datalist id="manual-subjects">{subjects.map((item, index) => <option key={`${item}-${index}`} value={item.toUpperCase()} />)}</datalist>
+          {subjectSuggestion && subjectSuggestion.toUpperCase() !== subject.trim().toUpperCase() && <button type="button" onClick={() => changeSubject(subjectSuggestion!)} className="mt-2 flex items-center gap-2 text-xs font-bold text-[#6658f5]"><Sparkles className="h-3.5 w-3.5" /> VOCÊ QUIS DIZER {subjectSuggestion.toUpperCase()}?</button>}
+        </div>
 
-      {/* Tópico */}
-      <div>
-        <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5">
-          🏷️ TÓPICO DE ESTUDO
-        </label>
-        <input
-          type="text"
-          placeholder="Ex: Homicídio, Mitocôndria..."
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm"
-        />
-      </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">TÓPICO DE ESTUDO</label>
+          <input value={topic} onChange={e => setTopic(e.target.value.toUpperCase())} placeholder="EX.: MORFOLOGIA, HOMICÍDIO, MITOCÔNDRIA..." className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold uppercase text-slate-900 outline-none focus:border-[#6658f5] dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+        </div>
 
-      {/* Pergunta */}
-      <div>
-        <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5 flex items-center gap-1">
-          <HelpCircle className="w-3.5 h-3.5 text-amber-400" /> PERGUNTA (FRENTE) *
-        </label>
-        <textarea
-          rows={2}
-          placeholder="Digite a pergunta do card..."
-          value={front}
-          onChange={(e) => setFront(e.target.value)}
-          className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm resize-none"
-        />
-      </div>
+        <div>
+          <label className="mb-1.5 flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300"><HelpCircle className="h-4 w-4 text-amber-500" /> PERGUNTA (FRENTE) *</label>
+          <textarea rows={3} value={front} onChange={e => setFront(e.target.value)} placeholder="DIGITE A PERGUNTA DO CARD..." className="w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#6658f5] dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+        </div>
 
-      {/* Resposta */}
-      <div>
-        <label className="block text-xs font-bold uppercase tracking-wider text-[#adc6ff] mb-1.5 flex items-center gap-1">
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> RESPOSTA (VERSO) *
-        </label>
-        <textarea
-          rows={2}
-          placeholder="Digite a resposta do card..."
-          value={back}
-          onChange={(e) => setBack(e.target.value)}
-          className="w-full bg-[#051424] border border-[#424754]/50 rounded-xl px-4 py-3 text-white placeholder-[#8c91a0] focus:outline-none focus:border-[#60a5fa] text-sm resize-none"
-        />
-      </div>
+        <div>
+          <label className="mb-1.5 flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> RESPOSTA (VERSO) *</label>
+          <textarea rows={3} value={back} onChange={e => setBack(e.target.value)} placeholder="DIGITE A RESPOSTA DO CARD..." className="w-full resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#6658f5] dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+        </div>
 
-      {/* BOTÃO ADICIONAR CARD */}
-      <button
-        type="submit"
-        className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all"
-      >
-        <PlusCircle className="w-5 h-5" /> Adicionar Card
-      </button>
-    </form>
+        <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#6658f5] py-4 text-sm font-black text-white shadow-lg shadow-[#6658f5]/20"><PlusCircle className="h-5 w-5" /> ADICIONAR CARD</button>
+      </form>
+
+      {addedCards.length > 0 && <section className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900 dark:bg-emerald-950/20">
+        <div className="flex items-center justify-between"><h3 className="text-sm font-black text-emerald-800 dark:text-emerald-200">CARDS ADICIONADOS ({addedCards.length})</h3><button type="button" onClick={() => setAddedCards([])} className="text-[11px] font-bold text-slate-500 hover:text-rose-500">LIMPAR LISTA</button></div>
+        {addedCards.map((card, index) => <article key={card.id} className="rounded-xl border border-emerald-200 bg-white p-3 dark:border-emerald-900 dark:bg-slate-900"><div className="flex items-start gap-2"><span className="text-[10px] font-black text-emerald-600">#{index + 1}</span><div className="min-w-0 flex-1"><p className="text-xs font-black text-slate-900 dark:text-white">{card.front}</p><p className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">{card.back}</p><p className="mt-1 text-[10px] font-bold uppercase text-slate-400">{card.topic}</p></div><button type="button" aria-label="Remover da lista" onClick={() => setAddedCards(current => current.filter(item => item.id !== card.id))} className="text-slate-400 hover:text-rose-500"><Trash2 className="h-4 w-4" /></button></div></article>)}
+      </section>}
+    </div>
   );
 };
