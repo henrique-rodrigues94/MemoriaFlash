@@ -54,7 +54,11 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
           ? await enableDailyReminders(selectedHour)
           : await disableDailyReminders();
         setStatusMessage(result.message);
-        if (!result.success) setDailyEnabled(previous);
+        if (!result.success) {
+          setDailyEnabled(previous);
+        } else {
+          setPrefs((p) => p ? { ...p, dailyReminderEnabled: next } : null);
+        }
       } catch (err: any) {
         setDailyEnabled(previous);
         setStatusMessage(err?.message || 'Não foi possível atualizar o lembrete diário.');
@@ -76,7 +80,11 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
       try {
         const result = await updateStreakReminderPref(next);
         setStatusMessage(result.message);
-        if (!result.success) setStreakEnabled(previous);
+        if (!result.success) {
+          setStreakEnabled(previous);
+        } else {
+          setPrefs((p) => p ? { ...p, streakReminderEnabled: next } : null);
+        }
       } catch (err: any) {
         setStreakEnabled(previous);
         setStatusMessage(err?.message || 'Não foi possível atualizar o aviso de sequência.');
@@ -101,6 +109,8 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
         if (!result.success) {
           setSelectedHour(previousHour);
           setDailyEnabled(previousEnabled);
+        } else {
+          setPrefs((p) => p ? { ...p, reminderHourLocal: selectedHour, dailyReminderEnabled: true } : null);
         }
       } catch (err: any) {
         setSelectedHour(previousHour);

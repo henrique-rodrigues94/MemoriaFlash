@@ -38,11 +38,11 @@ async function getFirebaseIdToken(): Promise<string> {
  */
 export async function getPlaySubscriptionProduct(planType: PlayPlanType) {
   const config = assertAndroidBillingConfig(planType);
-  const { product } = await NativePurchases.getProduct({
-    productIdentifier: config.productId,
+  const { products } = await NativePurchases.getProducts({
+    productIdentifiers: [config.productId],
     productType: PURCHASE_TYPE.SUBS,
   });
-  return product;
+  return products[0];
 }
 
 /**

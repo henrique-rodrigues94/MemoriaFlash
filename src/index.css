@@ -327,7 +327,7 @@ body {
 :root[data-theme='light'] ::-webkit-scrollbar-thumb:hover { background: #8B91AA; }
 
 /* ── DeckCard no tema claro — badge de categoria ── */
-:root[data-theme='light'] .glass-card .\[\&_span\[class\*=\"rounded-md bg-\[\#122131\]\"\"\]\] {
+:root[data-theme='light'] .glass-card span[class*="bg-[#122131]"] {
   background: #E5E8F4;
   color: #4F6EF7;
   border-color: rgba(79,110,247,0.25);
