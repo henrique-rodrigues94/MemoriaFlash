@@ -32,6 +32,7 @@
 - [x] CI configurado para Node.js 22
 - [x] Tipagem explícita da coleção de tópicos da sessão de estudo
 - [x] Testes unitários alinhados aos contratos atuais do app
+- [x] Suite de testes atualizada para o modelo sem rewarded ads/créditos
 - [ ] Revisão final das variáveis de produção
 - [ ] Confirmar backend HTTPS de produção
 - [ ] Testar rate limiting em produção
