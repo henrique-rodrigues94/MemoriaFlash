@@ -17,7 +17,14 @@ export interface UserStats {
   name: string; avatar: string; streakDays: number; bestStreakDays?: number;
   dailyGoalTotal: number; dailyGoalCompleted: number; totalCardsMastered: number;
   timeStudiedHours: number; retentionRate: number; xp: number; globalRank: number;
+  // Histórico acumulado (não limita mais a geração gratuita).
   aiCardsGenerated?: number;
+  // Cota gratuita atual: 200 cards por dia. Fonte de verdade: backend.
+  aiCardsGeneratedToday?: number;
+  aiCardsGenerationDay?: string;
+  aiCardsDailyLimit?: number;
+  aiCardsDailyResetTimeZone?: string;
+  aiCardsGeneratedLastUpdatedAt?: string;
   isPro?: boolean; proPlanType?: 'monthly' | 'annual' | 'referral'; proExpiryDate?: string;
   playPurchaseToken?: string; playProductId?: string; billingLastVerifiedAt?: string;
   lastStudyDateKey?: string; activityLog?: DailyActivity[];
