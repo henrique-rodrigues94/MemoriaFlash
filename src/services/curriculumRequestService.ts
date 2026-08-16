@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
 function normalizeSubject(value: string): string {
@@ -51,16 +51,16 @@ export async function requestCurriculumPreparation(args: {
   });
 
   if (reusable) {
-    await reusable.ref.set({
+    await updateDoc(reusable.ref, {
       requestCount: Number(reusable.data()?.requestCount || 0) + 1,
       updatedAt: new Date().toISOString(),
-    }, { merge: true });
+    });
     return { requestId: reusable.id, reused: true };
   }
 
   const ref = doc(collection(db, 'contentRequests'));
   const now = new Date().toISOString();
-  await ref.set({
+  await setDoc(ref, {
     subject,
     requestedSubject: subject,
     normalizedSubject,
