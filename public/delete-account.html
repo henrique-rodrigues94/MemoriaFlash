@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>MemoriaFlash — Exclusão de conta</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172033;background:#f5f7fb}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box}
+    main{width:min(720px,100%);background:#fff;border:1px solid #dfe4ef;border-radius:24px;padding:32px;box-shadow:0 18px 50px rgba(23,32,51,.08)}
+    h1{margin-top:0;font-size:30px}.muted{color:#5c667a;line-height:1.6}.notice{padding:16px;border-radius:14px;background:#f0f4ff;border:1px solid #d7e0ff;line-height:1.55}
+    label{display:block;font-weight:700;margin:18px 0 8px}input{width:100%;box-sizing:border-box;padding:13px 14px;border:1px solid #cbd3e1;border-radius:12px;font:inherit}
+    button{margin-top:20px;width:100%;padding:14px;border:0;border-radius:12px;background:#3657d6;color:#fff;font-weight:800;font:inherit;cursor:pointer}button:disabled{opacity:.6;cursor:wait}
+    #status{margin-top:16px;line-height:1.5}.success{color:#167447}.error{color:#a12626}
+    a{color:#3657d6}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Excluir minha conta</h1>
+  <p class="muted">Use esta página para solicitar a exclusão da sua conta e dos dados associados ao MemoriaFlash, inclusive se o aplicativo não estiver mais instalado.</p>
+  <div class="notice"><strong>Importante:</strong> a solicitação é validada antes da exclusão definitiva. Se a conta estiver vinculada ao Google, informe o mesmo e-mail usado no login.</div>
+  <form id="deletion-form" novalidate>
+    <label for="email">E-mail da conta</label>
+    <input id="email" name="email" type="email" autocomplete="email" required maxlength="320" placeholder="voce@exemplo.com">
+    <label for="confirmation">Digite <strong>EXCLUIR MINHA CONTA</strong> para confirmar</label>
+    <input id="confirmation" name="confirmation" required maxlength="24" autocomplete="off" placeholder="EXCLUIR MINHA CONTA">
+    <button id="submit" type="submit">Solicitar exclusão</button>
+    <div id="status" role="status" aria-live="polite"></div>
+  </form>
+  <p class="muted"><a href="/privacy.html">Política de privacidade</a></p>
+</main>
+<script>
+  const form = document.getElementById('deletion-form');
+  const button = document.getElementById('submit');
+  const status = document.getElementById('status');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    status.className = '';
+    status.textContent = '';
+    const email = document.getElementById('email').value.trim();
+    const confirmation = document.getElementById('confirmation').value.trim();
+    if (!email || confirmation !== 'EXCLUIR MINHA CONTA') {
+      status.className = 'error';
+      status.textContent = 'Preencha o e-mail e a confirmação exatamente como solicitado.';
+      return;
+    }
+    button.disabled = true;
+    button.textContent = 'Enviando...';
+    try {
+      const response = await fetch('/api/billing/account-deletion/request', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({email, confirmation})
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Não foi possível registrar a solicitação.');
+      status.className = 'success';
+      status.textContent = data.message || 'Solicitação recebida.';
+      form.reset();
+    } catch (error) {
+      status.className = 'error';
+      status.textContent = error?.message || 'Não foi possível registrar a solicitação.';
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Solicitar exclusão';
+    }
+  });
+</script>
+</body>
+</html>
