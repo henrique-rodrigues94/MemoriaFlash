@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Bell, BellOff, Flame, Send, CheckCircle2 } from 'lucide-react';
+import { X, Bell, Flame, Send, CheckCircle2, Check, Loader2 } from 'lucide-react';
 import { NotificationPrefs, getNotificationPrefs, enableDailyReminders, disableDailyReminders, updateStreakReminderPref, isPushSupported, sendTestNotification } from '../services/notifications/pushClient';
 
 interface NotificationSettingsModalProps { onClose: () => void; }
@@ -18,48 +18,103 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
     setSelectedHour(updated.reminderHourLocal);
   };
 
-  useEffect(() => { (async () => { setSupported(await isPushSupported()); await reloadPrefs(); })(); }, []);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const [pushSupported] = await Promise.all([isPushSupported(), reloadPrefs()]);
+        if (active) setSupported(pushSupported);
+      } catch {
+        if (active) setSupported(false);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
 
-  const handleToggleDaily = async () => {
-    if (!prefs) return;
+  const setOptimistic = (field: 'dailyReminderEnabled' | 'streakReminderEnabled', value: boolean) => {
+    setPrefs(current => current ? { ...current, [field]: value, updatedAt: Date.now() } : current);
+  };
+
+  const handleToggleDaily = () => {
+    if (!prefs || loadingAction) return;
+    const previous = prefs.dailyReminderEnabled;
+    const next = !previous;
+    setOptimistic('dailyReminderEnabled', next);
     setLoadingAction('daily'); setStatusMessage(null);
-    try {
-      const result = prefs.dailyReminderEnabled ? await disableDailyReminders() : await enableDailyReminders(selectedHour);
-      setStatusMessage(result.message);
-      await reloadPrefs();
-    } catch (err: any) { setStatusMessage(err?.message || 'Não foi possível atualizar os lembretes.'); }
-    finally { setLoadingAction(null); }
+
+    void (async () => {
+      try {
+        const result = next ? await enableDailyReminders(selectedHour) : await disableDailyReminders();
+        setStatusMessage(result.message);
+        if (!result.success) setOptimistic('dailyReminderEnabled', previous);
+      } catch (err: any) {
+        setOptimistic('dailyReminderEnabled', previous);
+        setStatusMessage(err?.message || 'Não foi possível atualizar o lembrete diário.');
+      } finally { setLoadingAction(null); }
+    })();
   };
 
-  const handleApplyNewHour = async () => {
-    if (!prefs) return;
+  const handleApplyNewHour = () => {
+    if (!prefs || loadingAction) return;
+    const previousHour = prefs.reminderHourLocal;
+    const previousEnabled = prefs.dailyReminderEnabled;
+    setPrefs(current => current ? { ...current, reminderHourLocal: selectedHour, updatedAt: Date.now() } : current);
     setLoadingAction('hour'); setStatusMessage(null);
-    try {
-      const result = await enableDailyReminders(selectedHour);
-      setStatusMessage(result.message);
-      if (result.success) await reloadPrefs();
-    } catch (err: any) { setStatusMessage(err?.message || 'Não foi possível atualizar o horário.'); }
-    finally { setLoadingAction(null); }
+
+    void (async () => {
+      try {
+        const result = await enableDailyReminders(selectedHour);
+        setStatusMessage(result.message);
+        if (!result.success) setPrefs(current => current ? { ...current, reminderHourLocal: previousHour, dailyReminderEnabled: previousEnabled } : current);
+        else setPrefs(current => current ? { ...current, dailyReminderEnabled: true, reminderHourLocal: selectedHour } : current);
+      } catch (err: any) {
+        setPrefs(current => current ? { ...current, reminderHourLocal: previousHour, dailyReminderEnabled: previousEnabled } : current);
+        setStatusMessage(err?.message || 'Não foi possível atualizar o horário.');
+      } finally { setLoadingAction(null); }
+    })();
   };
 
-  const handleToggleStreak = async () => {
-    if (!prefs) return;
-    const next = !prefs.streakReminderEnabled;
+  const handleToggleStreak = () => {
+    if (!prefs || loadingAction) return;
+    const previous = prefs.streakReminderEnabled;
+    const next = !previous;
+    setOptimistic('streakReminderEnabled', next);
     setLoadingAction('streak'); setStatusMessage(null);
-    try {
-      const result = await updateStreakReminderPref(next);
-      setStatusMessage(result.message);
-      if (result.success) await reloadPrefs();
-    } catch (err: any) { setStatusMessage(err?.message || 'Não foi possível atualizar a sequência.'); }
-    finally { setLoadingAction(null); }
+
+    void (async () => {
+      try {
+        const result = await updateStreakReminderPref(next);
+        setStatusMessage(result.message);
+        if (!result.success) setOptimistic('streakReminderEnabled', previous);
+      } catch (err: any) {
+        setOptimistic('streakReminderEnabled', previous);
+        setStatusMessage(err?.message || 'Não foi possível atualizar a sequência.');
+      } finally { setLoadingAction(null); }
+    })();
   };
 
-  const handleTest = async () => {
+  const handleTest = () => {
+    if (loadingAction) return;
     setLoadingAction('test'); setStatusMessage(null);
-    try { const result = await sendTestNotification(); setStatusMessage(result.message); }
-    catch (err: any) { setStatusMessage(err?.message || 'Não foi possível enviar a notificação de teste.'); }
-    finally { setLoadingAction(null); }
+    void (async () => {
+      try { const result = await sendTestNotification(); setStatusMessage(result.message); }
+      catch (err: any) { setStatusMessage(err?.message || 'Não foi possível enviar a notificação de teste.'); }
+      finally { setLoadingAction(null); }
+    })();
   };
+
+  const controlButton = (checked: boolean, action: 'daily' | 'streak', label: string, onClick: () => void) => (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loadingAction !== null}
+      aria-pressed={checked}
+      aria-label={`${label}: ${checked ? 'ativado' : 'desativado'}`}
+      className={`w-11 h-11 rounded-xl border flex items-center justify-center transition-all cursor-pointer disabled:opacity-60 ${checked ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-300' : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-slate-300'}`}
+    >
+      {loadingAction === action ? <Loader2 className="w-5 h-5 animate-spin" /> : checked ? <Check className="w-5 h-5" strokeWidth={3} /> : <span className="w-4 h-4 rounded-md border-2 border-current" />}
+    </button>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
@@ -69,11 +124,11 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
 
         {supported && prefs && <>
           <div className="p-4 rounded-2xl bg-[#122131] border border-[#424754]/30 space-y-4">
-            <div className="flex items-center justify-between"><div><div className="text-xs font-bold text-white">Lembrete diário de revisão</div><div className="text-[10px] text-[#8c91a0]">Avisa quando você tem cartões para revisar</div></div><button type="button" onClick={handleToggleDaily} disabled={loadingAction !== null} aria-pressed={prefs.dailyReminderEnabled} className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 cursor-pointer disabled:opacity-50 ${prefs.dailyReminderEnabled ? 'bg-emerald-500' : 'bg-slate-700'}`}><span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${prefs.dailyReminderEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} /></button></div>
+            <div className="flex items-center justify-between gap-3"><div><div className="text-xs font-bold text-white">Lembrete diário de revisão</div><div className="text-[10px] text-[#8c91a0]">Avisa quando você tem cartões para revisar</div></div>{controlButton(prefs.dailyReminderEnabled, 'daily', 'Lembrete diário de revisão', handleToggleDaily)}</div>
             <div><div className="text-[10px] text-[#8c91a0] mb-1.5">Horário preferido</div><div className="flex flex-wrap gap-1.5">{HOUR_OPTIONS.map((h) => <button key={h} type="button" onClick={() => setSelectedHour(h)} disabled={loadingAction !== null} className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all disabled:opacity-50 ${selectedHour === h ? 'bg-blue-600 text-white ring-2 ring-blue-400/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>{h}h</button>)}</div>{selectedHour !== prefs.reminderHourLocal && <button type="button" onClick={handleApplyNewHour} disabled={loadingAction !== null} className="mt-2.5 w-full py-2 rounded-xl bg-blue-500/15 border border-blue-500/30 text-[11px] font-bold text-blue-300 hover:bg-blue-500/25 cursor-pointer disabled:opacity-50">{loadingAction === 'hour' ? 'Salvando horário…' : `Salvar horário ${selectedHour}:00`}</button>}</div>
           </div>
 
-          <div className="flex items-center justify-between p-4 rounded-2xl bg-[#122131] border border-[#424754]/30"><div className="flex items-center gap-2.5"><Flame className="w-4 h-4 text-orange-400" /><div><div className="text-xs font-bold text-white">Aviso de sequência em risco</div><div className="text-[10px] text-[#8c91a0]">Controla o lembrete de streak no sistema de notificações</div></div></div><button type="button" onClick={handleToggleStreak} disabled={loadingAction !== null} aria-pressed={prefs.streakReminderEnabled} className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 cursor-pointer disabled:opacity-50 ${prefs.streakReminderEnabled ? 'bg-emerald-500' : 'bg-slate-700'}`}><span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${prefs.streakReminderEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} /></button></div>
+          <div className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-[#122131] border border-[#424754]/30"><div className="flex items-center gap-2.5"><Flame className="w-4 h-4 text-orange-400" /><div><div className="text-xs font-bold text-white">Aviso de sequência em risco</div><div className="text-[10px] text-[#8c91a0]">Controla o lembrete de streak no sistema de notificações</div></div></div>{controlButton(prefs.streakReminderEnabled, 'streak', 'Aviso de sequência em risco', handleToggleStreak)}</div>
 
           <button type="button" onClick={handleTest} disabled={loadingAction !== null} className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-[#424754]/50 text-xs font-bold text-white flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"><Send className="w-4 h-4 text-blue-400" />{loadingAction === 'test' ? 'Enviando…' : 'Testar notificação agora'}</button>
         </>}
