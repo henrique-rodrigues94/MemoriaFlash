@@ -133,14 +133,15 @@ Gere exatamente ${count} flashcards distintos entre si, cobrindo os conceitos, d
 
   const rawCards = extractArrayField(data, ['cards', 'flashcards']) as Array<Record<string, unknown>>;
   const seen = new Set<string>();
-  const cards = rawCards.filter((card) => {
+  const cards: Array<Record<string, unknown> & { topic: string }> = [];
+  for (const card of rawCards) {
     const front = typeof card?.front === 'string' ? card.front : '';
     const back = typeof card?.back === 'string' ? card.back : '';
     const key = normalizeForDedup(front);
-    if (!key || !back.trim() || seen.has(key)) return false;
+    if (!key || !back.trim() || seen.has(key)) continue;
     seen.add(key);
-    return true;
-  }).map(card => ({ ...card, topic: topicLabel }));
+    cards.push({ ...card, topic: topicLabel });
+  }
 
   let fixedExplanationCount = 0;
   const finalCards = cards.map((card) => {
