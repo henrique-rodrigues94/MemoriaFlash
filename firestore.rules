@@ -19,19 +19,25 @@ service cloud.firestore {
         && request.resource.data.status=='pending'
         && request.resource.data.requestCount==1
         && request.resource.data.attempts==0
-        && request.resource.data.source is map
-        && request.resource.data.source.fileName is string
-        && request.resource.data.source.fileName.size()>0
-        && request.resource.data.source.fileName.size()<=180
-        && request.resource.data.source.mimeType in ['application/pdf','text/plain']
-        && request.resource.data.source.totalChars is int
-        && request.resource.data.source.totalChars>0
-        && request.resource.data.source.totalChars<=960000
-        && request.resource.data.source.chunkCount is int
-        && request.resource.data.source.chunkCount>0
-        && request.resource.data.source.chunkCount<=80
-        && request.resource.data.source.sourceHash is string
-        && request.resource.data.source.sourceHash.size()==64;
+        && (!request.resource.data.keys().hasAny(['educationLevel']) || request.resource.data.educationLevel is string)
+        && (
+          request.resource.data.source==null
+          || (
+            request.resource.data.source is map
+            && request.resource.data.source.fileName is string
+            && request.resource.data.source.fileName.size()>0
+            && request.resource.data.source.fileName.size()<=180
+            && request.resource.data.source.mimeType in ['application/pdf','text/plain']
+            && request.resource.data.source.totalChars is int
+            && request.resource.data.source.totalChars>0
+            && request.resource.data.source.totalChars<=960000
+            && request.resource.data.source.chunkCount is int
+            && request.resource.data.source.chunkCount>0
+            && request.resource.data.source.chunkCount<=80
+            && request.resource.data.source.sourceHash is string
+            && request.resource.data.source.sourceHash.size()==64
+          )
+        );
     }
     function validSourceChunk(){
       let parent=get(/databases/$(database)/documents/contentRequests/$(id)).data;
