@@ -13,29 +13,11 @@ function sanitizeCategories(value: unknown): CachedCurriculumCategory[] { if (!A
 let subjectCatalogCache: { subjects: string[]; fetchedAt: number } | null = null;
 async function loadSubjectCatalog(): Promise<string[]> {
   if (subjectCatalogCache && Date.now() - subjectCatalogCache.fetchedAt <= 60 * 60 * 1000) return subjectCatalogCache.subjects;
-  try {
-    const snapshot = await getDocs(query(collection(db, 'subjects'), limit(100)));
-    const subjects = snapshot.docs.map(item => String((item.data() as any)?.subject || '').trim()).filter(Boolean);
-    subjectCatalogCache = { subjects: Array.from(new Set(subjects)), fetchedAt: Date.now() };
-    return subjectCatalogCache.subjects;
-  } catch (error) { console.warn('[firestoreCurriculumCache] subject catalog read failed:', error); return subjectCatalogCache?.subjects || []; }
+  try { const snapshot = await getDocs(query(collection(db, 'subjects'), limit(100))); const subjects = snapshot.docs.map(item => String((item.data() as any)?.subject || '').trim()).filter(Boolean); subjectCatalogCache = { subjects: Array.from(new Set(subjects)), fetchedAt: Date.now() }; return subjectCatalogCache.subjects; }
+  catch (error) { console.warn('[firestoreCurriculumCache] subject catalog read failed:', error); return subjectCatalogCache?.subjects || []; }
 }
+export async function warmSubjectCatalog(): Promise<void> { await loadSubjectCatalog(); }
+export async function findCachedSubjectSuggestions(input: string): Promise<string[]> { const all = await loadSubjectCatalog(); const queryText = normalizeText(input); if (queryText.length < 2) return []; return all.filter(subject => normalizeText(subject).includes(queryText)).slice(0, 8); }
 
-export async function findCachedSubjectSuggestions(input: string): Promise<string[]> {
-  const all = await loadSubjectCatalog();
-  const queryText = normalizeText(input);
-  if (queryText.length < 2) return [];
-  return all.filter(subject => normalizeText(subject).includes(queryText)).slice(0, 8);
-}
-
-export async function getCachedSubjectLevels(subject: string): Promise<CachedSubjectLevel[] | null> {
-  const normalized = normalizeText(subject); if (!normalized) return null;
-  try { const id = await shortHash(normalized); const snapshot = await getDoc(doc(db, 'subjects', id)); if (!snapshot.exists()) return null; const data = snapshot.data() as any; if (!isValidTtl(data?.ttlAt) || !Array.isArray(data?.levels)) return null; const levels = data.levels.filter((level: any) => level?.level && typeof level.label === 'string' && typeof level.priority === 'number'); return levels.length > 0 ? levels : null; }
-  catch (error) { console.warn('[firestoreCurriculumCache] subject read failed:', error); return null; }
-}
-
-export async function getCachedCurriculum(subject: string, level: EducationLevel): Promise<CachedCurriculum | null> {
-  const normalized = normalizeText(subject); if (!normalized) return null;
-  try { const id = await shortHash(`${normalized}|${level}`); const snapshot = await getDoc(doc(db, 'curricula', id)); if (!snapshot.exists()) return null; const data = snapshot.data() as any; const categories = sanitizeCategories(data?.categories); if (!isValidTtl(data?.ttlAt) || categories.length === 0) return null; return { subject: typeof data.subject === 'string' ? data.subject : subject.trim(), level, categories, totalTopics: typeof data.totalTopics === 'number' ? data.totalTopics : categories.reduce((total, category) => total + category.topics.length, 0), updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : undefined, ttlAt: data.ttlAt, providerUsed: typeof data.providerUsed === 'string' ? data.providerUsed : undefined }; }
-  catch (error) { console.warn('[firestoreCurriculumCache] curriculum read failed:', error); return null; }
-}
+export async function getCachedSubjectLevels(subject: string): Promise<CachedSubjectLevel[] | null> { const normalized = normalizeText(subject); if (!normalized) return null; try { const id = await shortHash(normalized); const snapshot = await getDoc(doc(db, 'subjects', id)); if (!snapshot.exists()) return null; const data = snapshot.data() as any; if (!isValidTtl(data?.ttlAt) || !Array.isArray(data?.levels)) return null; const levels = data.levels.filter((level: any) => level?.level && typeof level.label === 'string' && typeof level.priority === 'number'); return levels.length > 0 ? levels : null; } catch (error) { console.warn('[firestoreCurriculumCache] subject read failed:', error); return null; } }
+export async function getCachedCurriculum(subject: string, level: EducationLevel): Promise<CachedCurriculum | null> { const normalized = normalizeText(subject); if (!normalized) return null; try { const id = await shortHash(`${normalized}|${level}`); const snapshot = await getDoc(doc(db, 'curricula', id)); if (!snapshot.exists()) return null; const data = snapshot.data() as any; const categories = sanitizeCategories(data?.categories); if (!isValidTtl(data?.ttlAt) || categories.length === 0) return null; return { subject: typeof data.subject === 'string' ? data.subject : subject.trim(), level, categories, totalTopics: typeof data.totalTopics === 'number' ? data.totalTopics : categories.reduce((total, category) => total + category.topics.length, 0), updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : undefined, ttlAt: data.ttlAt, providerUsed: typeof data.providerUsed === 'string' ? data.providerUsed : undefined }; } catch (error) { console.warn('[firestoreCurriculumCache] curriculum read failed:', error); return null; } }
