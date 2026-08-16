@@ -54,7 +54,7 @@ const deletionPage = fs.readFileSync(path.join(root, 'public/delete-account.html
 if (!deletionPage.includes('/api/billing/account-deletion/request')) errors.push('Página pública de exclusão sem integração com o endpoint.');
 
 const adMob = fs.readFileSync(path.join(root, 'src/lib/adMobConfig.ts'), 'utf8');
-if (!adMob.includes('isProductionBuild')) errors.push('Proteção de IDs de teste do AdMob não configurada.');
+if (!adMob.includes('isProductionBuild') || !adMob.includes('isNative')) errors.push('Proteção de IDs de teste do AdMob não configurada.');
 if (production) {
   const requiredProductionEnv = [
     'VITE_ADMOB_APP_ID',
