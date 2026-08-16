@@ -1,6 +1,6 @@
 # MemoriaFlash — checklist de publicação
 
-## Aplicativo
+## 1. Aplicativo
 
 - [x] React/Vite build configurado
 - [x] Capacitor Android versionado
@@ -9,16 +9,17 @@
 - [x] Firestore
 - [x] Scanner/OCR
 - [x] PDF/TXT
-- [x] Geração de cards
-- [x] Feedback de cards
-- [x] Relato de problema
+- [x] Geração de cards independente do MemoriaFlashAgent
+- [x] Feedback de cards durante o estudo
+- [x] Relato de problema com contexto do card
+- [x] Feedback persistido no Firestore para processamento assíncrono pelo Agent
 - [x] AdMob/Billing integrados em código
 - [x] Controle de exclusão de conta no perfil
 - [x] Página pública de solicitação de exclusão fora do app
 - [x] Processamento administrativo das solicitações externas de exclusão
 - [x] Política de privacidade pública com link para exclusão
 
-## Segurança e backend
+## 2. Segurança e backend
 
 - [x] Contadores de IA protegidos no backend/Firestore Rules
 - [x] `contentRequests` protegidos por proprietário
@@ -40,42 +41,55 @@
 - [x] Testes unitários alinhados aos contratos atuais do app
 - [x] Suite de testes atualizada para o modelo sem rewarded ads/créditos
 - [x] Cenário de reset de cooldown do AIOrchestrator coberto
-- [x] CI confirmou typecheck, testes, release preflight e build de produção
+- [x] CI confirma typecheck, testes, release preflight e build de produção
 - [x] Preflight de produção valida HTTPS, IDs de AdMob, produtos Play e RTDN
 
-### Validações externas ainda obrigatórias
+### Validações externas obrigatórias antes da publicação
 
 - [ ] Confirmar backend HTTPS de produção e `/api/health`
 - [ ] Testar rate limiting em produção
 - [ ] Testar regras Firestore no projeto de produção
 - [ ] Revisar variáveis de produção no host/CI
+- [ ] Confirmar Firebase Project usado pelo APK/AAB de produção
 
-## Homologação Android
+## 3. Homologação Android
 
-- [x] `npm ci` — confirmado no GitHub Actions
-- [x] `npm run typecheck` — confirmado no GitHub Actions
-- [x] `npm run test` — confirmado no GitHub Actions
-- [x] `npm run build` — confirmado no GitHub Actions
-- [x] `npm run android:sync` — confirmado no GitHub Actions
-- [x] Compilação do APK debug — confirmada no GitHub Actions
-- [x] Compilação do AAB Release não assinado — confirmada no GitHub Actions
+- [x] `npm ci` — CI
+- [x] `npm run typecheck` — CI
+- [x] `npm run test` — CI
+- [x] `npm run build` — CI
+- [x] `npm run android:sync` — CI
+- [x] Compilação do APK debug — CI
+- [x] Compilação do AAB Release candidato — workflow `release-candidate.yml`
 - [x] Configuração de assinatura Release implementada
 - [x] Workflow manual para AAB Release assinado implementado
 - [x] Sync de produção impede IDs AdMob de teste
 
-### Testes físicos / de serviços externos
+### Para você testar agora
+
+1. Abra **GitHub → MemoriaFlash → Actions**.
+2. Execute **release-candidate** manualmente.
+3. Aguarde o workflow terminar.
+4. Baixe o artifact `memoriaflash-release-candidate`.
+5. Use o AAB no fluxo de teste interno/fechado do Google Play quando estiver com assinatura de produção configurada.
+
+### Testes físicos / serviços externos
 
 - [ ] `npm run android:sync:prod` com variáveis reais
 - [ ] Gerar AAB Release assinado com keystore de produção
-- [ ] Instalar e testar release em aparelho físico
+- [ ] Instalar/testar release em aparelho físico
 - [ ] Login Google em release
 - [ ] Scanner/câmera
 - [ ] PDF/TXT
 - [ ] PDF grande dentro do limite de conteúdo
 - [ ] PDF sem camada de texto
-- [ ] Geração de cards
+- [ ] Geração independente do Agent
+- [ ] Geração quando Agent está desligado
 - [ ] Sincronização Firestore
 - [ ] Feedback/relato de problema
+- [ ] Confirmar `cardFeedback` como `pending`
+- [ ] Executar Agent e confirmar correção do card
+- [ ] Confirmar `cardFeedback` como `processed`
 - [ ] Exclusão de conta dentro do app
 - [ ] Solicitação externa de exclusão + processamento administrativo
 - [ ] AdMob com IDs de produção e Ad Inspector
@@ -85,7 +99,7 @@
 - [ ] Encerramento/reabertura do app
 - [ ] Reinicialização do aparelho e persistência das preferências
 
-## Google Play Console
+## 4. Google Play Console
 
 - [ ] Nome, descrição e categoria
 - [ ] Ícone 512x512
@@ -107,7 +121,7 @@
 - [ ] AAB assinado enviado
 - [ ] Produção
 
-## AdMob
+## 5. AdMob
 
 - [x] Integração nativa real
 - [x] Banner/interstitial/rewarded implementados
@@ -119,10 +133,25 @@
 - [ ] Ad Inspector validado
 - [ ] `app-ads.txt` publicado e verificado
 
-## Documentação de release
+## 6. MemoriaFlashAgent / conteúdo
+
+- [x] Mobile funciona sem o Agent
+- [x] Feedback do Mobile entra no Firestore
+- [x] Agent corrige cards com feedback
+- [x] Agent atualiza conteúdo solicitado
+- [x] Agent descobre novos conteúdos somente quando autorizado
+- [x] Agent possui limpeza com dry-run
+- [x] Admin Agent audita matérias, níveis, tópicos, subtópicos, cards e feedbacks
+- [x] Admin Agent estima uso do Firestore
+- [x] Workflow `admin-audit.yml` gera relatório JSON
+- [ ] Executar primeira auditoria real do banco de produção
+- [ ] Revisar cobertura e lacunas antes da publicação
+
+## 7. Documentação
 
 - `docs/PLAY_STORE_DATA_SAFETY.md`
 - `docs/RELEASE_RUNBOOK.md`
 - `docs/MONETIZATION_PRODUCTION_AUDIT.md`
 - `public/privacy.html`
 - `public/delete-account.html`
+- `MemoriaFlashAgent/docs/PRODUCTION_CHECKLIST.md`
