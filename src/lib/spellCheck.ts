@@ -12,8 +12,6 @@ export function levenshtein(a: string, b: string): number {
   const n = t.length;
   if (m === 0) return n;
   if (n === 0) return m;
-
-  // Vetor rolling de distâncias — O(n) de memória.
   let prev = Array.from({ length: n + 1 }, (_, j) => j);
   for (let i = 1; i <= m; i++) {
     const curr = new Array<number>(n + 1);
@@ -29,29 +27,21 @@ export function levenshtein(a: string, b: string): number {
 
 /**
  * Encontra o candidato existente mais próximo do texto digitado.
- * Retorna `null` quando não há nenhum candidato "suficientemente parecido".
- *
- * @param input        O que o usuário digitou.
- * @param candidates   Lista de valores conhecidos (matérias/decks existentes).
- * @param maxDistance  Distância máxima aceita. O padrão (2) corrige erros
- *                     comuns de digitação (troca de letras, letra faltando,
- *                     letra sobrando) sem sugerir coisas absurdas.
+ * Valores não textuais são ignorados para manter o autocomplete seguro
+ * mesmo quando a origem dos dados vem de estruturas parcialmente tipadas.
  */
-export function findClosestMatch(input: string, candidates: string[], maxDistance = 2): string | null {
+export function findClosestMatch(input: string, candidates: readonly unknown[], maxDistance = 2): string | null {
   const q = input.trim().toLowerCase();
   if (!q || q.length < 3) return null;
-
   let best: { value: string; dist: number } | null = null;
-  for (const c of candidates) {
-    const cLower = c.trim().toLowerCase();
-    if (!cLower || cLower === q) continue; // idêntico → não é "erro"
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const c = candidate.trim();
+    const cLower = c.toLowerCase();
+    if (!cLower || cLower === q) continue;
     const dist = levenshtein(q, cLower);
-    // Aceita apenas se a distância for pequena e proporcional ao tamanho
-    // (evita sugerir "geografia" quando o usuário digitou "programação").
     if (dist > 0 && dist <= maxDistance && dist <= Math.max(2, Math.floor(q.length / 3))) {
-      if (!best || dist < best.dist) {
-        best = { value: c, dist };
-      }
+      if (!best || dist < best.dist) best = { value: c, dist };
     }
   }
   return best?.value ?? null;
