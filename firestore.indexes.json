@@ -2,6 +2,7 @@
   "indexes": [
     {"collectionGroup":"contentRequests","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"priority","order":"DESCENDING"},{"fieldPath":"updatedAt","order":"ASCENDING"}]},
     {"collectionGroup":"contentRequests","queryScope":"COLLECTION","fields":[{"fieldPath":"normalizedSubject","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"}]},
+    {"collectionGroup":"contentRequests","queryScope":"COLLECTION","fields":[{"fieldPath":"requestedBy","order":"ASCENDING"},{"fieldPath":"source.sourceHash","order":"ASCENDING"}]},
     {"collectionGroup":"cardFeedback","queryScope":"COLLECTION","fields":[{"fieldPath":"cardId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
     {"collectionGroup":"cardFeedback","queryScope":"COLLECTION","fields":[{"fieldPath":"subject","order":"ASCENDING"},{"fieldPath":"rating","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]}
   ],
