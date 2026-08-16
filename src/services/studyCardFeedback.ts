@@ -54,6 +54,7 @@ export async function submitStudyCardFeedback(payload: StudyFeedbackPayload): Pr
   const comment = payload.comment?.trim().slice(0, 500) || '';
 
   const feedback: Record<string, unknown> = {
+    reportType: 'card_problem',
     cardId: card.id,
     bucketId,
     subject,
