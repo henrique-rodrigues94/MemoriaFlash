@@ -22,28 +22,40 @@ export function clearPendingReferralCode(): void { localStorage.removeItem(PENDI
 
 export interface ClaimReferralResult { success: boolean; message: string; rewardDays?: number; alreadyRewarded?: boolean; welcomeBonus?: number; }
 
-export async function ensureOwnReferralCodeRegistered(): Promise<string | null> {
+async function getIdToken(): Promise<string | null> {
   const user = auth.currentUser;
   if (!user || user.isAnonymous) return null;
+  return user.getIdToken();
+}
+
+export async function ensureOwnReferralCodeRegistered(): Promise<string | null> {
+  const idToken = await getIdToken();
+  if (!idToken) return null;
   try {
-    const idToken = await user.getIdToken();
     const res = await fetch('/api/referral/ensure-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) });
     if (!res.ok) return null;
     const data = await res.json();
     return typeof data?.code === 'string' && data.code ? data.code : null;
-  } catch (error) {
-    console.warn('[Referral] Não foi possível registrar o código no servidor:', error);
-    return null;
-  }
+  } catch (error) { console.warn('[Referral] Não foi possível registrar o código:', error); return null; }
+}
+
+export async function rotateOwnReferralCode(): Promise<string | null> {
+  const idToken = await getIdToken();
+  if (!idToken) return null;
+  try {
+    const res = await fetch('/api/referral/rotate-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || typeof data?.code !== 'string' || !data.code) return null;
+    return data.code;
+  } catch (error) { console.warn('[Referral] Não foi possível atualizar o código:', error); return null; }
 }
 
 export async function claimReferralCode(referralCode: string): Promise<ClaimReferralResult> {
   const code = referralCode.trim().toUpperCase();
   if (!code) return { success: false, message: 'Digite um código de indicação.' };
-  const user = auth.currentUser;
-  if (!user || user.isAnonymous) return { success: false, message: 'Entre na sua conta para resgatar um código.' };
+  const idToken = await getIdToken();
+  if (!idToken) return { success: false, message: 'Entre na sua conta para resgatar um código.' };
   try {
-    const idToken = await user.getIdToken();
     const res = await fetch('/api/referral/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ referralCode: code, idToken }) });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.success) return { success: true, message: data.message || 'Indicação registrada com sucesso.', rewardDays: data.rewardDays, alreadyRewarded: data.alreadyRewarded };

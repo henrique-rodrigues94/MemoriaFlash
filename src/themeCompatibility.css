@@ -1,0 +1,32 @@
+/* Compatibilidade visual entre componentes antigos e o tema atual. */
+.theme-light [class*="bg-[#051424]"],
+.theme-light [class*="bg-[#081522]"],
+.theme-light [class*="bg-[#0b1a2a]"],
+.theme-light [class*="bg-[#122131]"],
+.theme-light [class*="bg-[#0f172a]"] {
+  background-color: #ffffff !important;
+}
+
+.theme-light [class*="text-white"],
+.theme-light [class*="text-[#e2e8f0]"],
+.theme-light [class*="text-[#cbd5e1]"] {
+  color: #1a1f36 !important;
+}
+
+.theme-light [class*="border-slate-700"],
+.theme-light [class*="border-[#424754]"] {
+  border-color: #d9deec !important;
+}
+
+.theme-light .mf-feedback-modal { background: #ffffff !important; color: #1a1f36 !important; border-color: #d9deec !important; }
+.theme-light .mf-feedback-reason { background: #f7f8fc !important; color: #303750 !important; border-color: #d9deec !important; }
+.theme-light .mf-feedback-text { background: #ffffff !important; color: #1a1f36 !important; border-color: #d9deec !important; }
+.theme-light .mf-feedback-cancel { background: #eef0f8 !important; color: #303750 !important; border-color: #d9deec !important; }
+.theme-light .mf-feedback-sub, .theme-light .mf-feedback-success span { color: #66708d !important; }
+
+/* O anúncio sticky nunca deve cobrir a barra inferior. */
+.memoriaflash-admob-sticky { margin-bottom: 82px !important; }
+
+@media (max-width: 640px) {
+  .memoriaflash-admob-sticky { margin-bottom: 76px !important; }
+}

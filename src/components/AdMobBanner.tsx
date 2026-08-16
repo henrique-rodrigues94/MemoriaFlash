@@ -42,7 +42,8 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({ stats, isPro }) => {
       timers.forEach(timer => window.clearTimeout(timer));
       window.clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
-      if (Capacitor.isNativePlatform()) void hideAdMobBanner().catch(() => undefined);
+      // Não ocultamos aqui: React StrictMode executa cleanup/setup durante o mount
+      // e isso fazia o banner aparecer e desaparecer imediatamente.
     };
   }, [activePro]);
 
