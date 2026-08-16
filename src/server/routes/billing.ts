@@ -18,6 +18,14 @@ async function verifyRequestUser(idToken: string) {
   return adminAuth.verifyIdToken(idToken);
 }
 
+function assertAdminToken(req: any) {
+  const configured = process.env.ADMIN_TOKEN;
+  const supplied = req.headers['x-admin-token'];
+  if (!configured || typeof supplied !== 'string' || supplied !== configured) {
+    throw Object.assign(new Error('Não autorizado.'), { httpStatus: 401 });
+  }
+}
+
 async function deleteQueryInBatches(db: Firestore, query: Query) {
   while (true) {
     const snapshot = await query.limit(400).get();
@@ -48,12 +56,10 @@ async function deleteAccountData(uid: string) {
     await request.ref.delete();
   }
 
-  // The authenticated user's stats/preferences may be stored as singleton docs.
   await db.collection('userStats').doc(uid).delete().catch(() => undefined);
   await db.collection('notificationPrefs').doc(uid).delete().catch(() => undefined);
   await db.collection('referrals').doc(uid).delete().catch(() => undefined);
 
-  // Remove the Firebase identity last, after all user-owned data is gone.
   await adminAuth.deleteUser(uid);
 }
 
@@ -77,11 +83,7 @@ const publicDeletionRequestSchema = z.object({
   confirmation: z.literal('EXCLUIR MINHA CONTA'),
 });
 
-/**
- * Public fallback required by Google Play: users can request account/data
- * deletion even when they no longer have the app installed. The endpoint
- * intentionally does not reveal whether the email belongs to an account.
- */
+/** Public fallback required by Google Play when the app is not installed. */
 billingRouter.post('/account-deletion/request', async (req, res) => {
   const parsed = publicDeletionRequestSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -103,6 +105,57 @@ billingRouter.post('/account-deletion/request', async (req, res) => {
   } catch (error) {
     console.error('[billing/account-deletion] Erro ao registrar solicitação:', error);
     return res.status(500).json({ ok: false, error: 'Não foi possível registrar a solicitação.' });
+  }
+});
+
+billingRouter.get('/account-deletion/requests', async (req, res) => {
+  try {
+    assertAdminToken(req);
+    const db = getAdminFirestore();
+    if (!db) return res.status(503).json({ error: 'Firebase Admin não configurado.' });
+    const snapshot = await db.collection('accountDeletionRequests').where('status', '==', 'pending').limit(50).get();
+    return res.json({ requests: snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) });
+  } catch (error: any) {
+    return res.status(error?.httpStatus || 500).json({ error: error?.message || 'Falha ao listar solicitações.' });
+  }
+});
+
+billingRouter.post('/account-deletion/process', async (req, res) => {
+  try {
+    assertAdminToken(req);
+    const requestId = z.string().min(1).safeParse(req.body?.requestId);
+    if (!requestId.success) return res.status(400).json({ error: 'requestId é obrigatório.' });
+
+    const db = getAdminFirestore();
+    const adminAuth = getAdminAuth();
+    if (!db || !adminAuth) return res.status(503).json({ error: 'Firebase Admin não configurado.' });
+
+    const requestRef = db.collection('accountDeletionRequests').doc(requestId.data);
+    const requestSnapshot = await requestRef.get();
+    if (!requestSnapshot.exists) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+    const requestData = requestSnapshot.data() || {};
+    if (requestData.status !== 'pending') return res.status(409).json({ error: 'Solicitação já processada.' });
+
+    const email = typeof requestData.email === 'string' ? requestData.email : '';
+    if (!email) return res.status(422).json({ error: 'Solicitação sem e-mail válido.' });
+
+    let user;
+    try {
+      user = await adminAuth.getUserByEmail(email);
+    } catch (error: any) {
+      if (error?.code === 'auth/user-not-found') {
+        await requestRef.set({ status: 'not_found', processedAt: new Date().toISOString() }, { merge: true });
+        return res.json({ ok: true, status: 'not_found' });
+      }
+      throw error;
+    }
+
+    await deleteAccountData(user.uid);
+    await requestRef.set({ status: 'processed', processedAt: new Date().toISOString() }, { merge: true });
+    return res.json({ ok: true, status: 'processed' });
+  } catch (error: any) {
+    console.error('[billing/account-deletion/process] Erro:', error);
+    return res.status(error?.httpStatus || 500).json({ error: error?.message || 'Falha ao processar solicitação.' });
   }
 });
 
@@ -140,10 +193,7 @@ billingRouter.post('/verify-purchase', async (req, res) => {
       return res.status(403).json({ error: 'O produto da compra não corresponde ao produto solicitado.' });
     }
     if (!result.isActive) {
-      return res.status(402).json({
-        error: 'Assinatura não está ativa no Google Play.',
-        state: result.raw?.subscriptionState,
-      });
+      return res.status(402).json({ error: 'Assinatura não está ativa no Google Play.', state: result.raw?.subscriptionState });
     }
 
     if (result.needsAcknowledgement) await acknowledgeSubscriptionPurchase(purchaseToken, verifiedProductId);
@@ -158,17 +208,13 @@ billingRouter.post('/verify-purchase', async (req, res) => {
 billingRouter.post('/rtdn', async (req, res) => {
   const configuredToken = process.env.GOOGLE_PLAY_RTDN_TOKEN;
   if (!configuredToken) return res.status(503).json({ error: 'RTDN não configurado.' });
-
   const suppliedToken = typeof req.query.token === 'string' ? req.query.token : req.headers['x-rtdn-token'];
-  if (typeof suppliedToken !== 'string' || suppliedToken !== configuredToken) {
-    return res.status(401).json({ error: 'RTDN não autorizado.' });
-  }
+  if (typeof suppliedToken !== 'string' || suppliedToken !== configuredToken) return res.status(401).json({ error: 'RTDN não autorizado.' });
 
   try {
     const message = req.body?.message;
     const messageId = typeof message?.messageId === 'string' ? message.messageId : null;
     if (!message?.data || !messageId) return res.status(400).send();
-
     const db = getAdminFirestore();
     if (!db) return res.status(503).send();
 
@@ -184,20 +230,10 @@ billingRouter.post('/rtdn', async (req, res) => {
     }
 
     const result = await verifySubscriptionPurchase(subscriptionNotification.purchaseToken);
-    const snapshot = await db
-      .collection('userStats')
-      .where('playPurchaseToken', '==', subscriptionNotification.purchaseToken)
-      .limit(1)
-      .get();
-
+    const snapshot = await db.collection('userStats').where('playPurchaseToken', '==', subscriptionNotification.purchaseToken).limit(1).get();
     if (!snapshot.empty) {
       await snapshot.docs[0].ref.set(
-        {
-          isPro: result.isActive,
-          proPlanType: result.planType,
-          proExpiryDate: result.expiryTimeIso,
-          billingLastVerifiedAt: new Date().toISOString(),
-        },
+        { isPro: result.isActive, proPlanType: result.planType, proExpiryDate: result.expiryTimeIso, billingLastVerifiedAt: new Date().toISOString() },
         { merge: true },
       );
     }
@@ -212,9 +248,7 @@ billingRouter.post('/rtdn', async (req, res) => {
 
 billingRouter.get('/status', (_req, res) => {
   res.json({
-    configured:
-      !!getAndroidPackageName() &&
-      (!!process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON || !!process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_FILE),
+    configured: !!getAndroidPackageName() && (!!process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON || !!process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_FILE),
     rtdnConfigured: Boolean(process.env.GOOGLE_PLAY_RTDN_TOKEN),
   });
 });
