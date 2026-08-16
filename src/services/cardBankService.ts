@@ -11,15 +11,11 @@ const CARDS_CACHE_MS = 2 * 60 * 1000;
 
 function normalizeText(text: string): string { return (text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim(); }
 async function shortHash(text: string, len = 16): Promise<string> { const data = new TextEncoder().encode(text); const digest = await crypto.subtle.digest('SHA-1', data); return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, len); }
-async function bucketId(subject: string, topic: string, level: string, cardType = 'definition', subtopic = ''): Promise<string> { return shortHash(`${normalizeText(subject)}|${normalizeText(topic)}|${normalizeText(subtopic)}|${level}|${cardType}`); }
+// Mantém exatamente o identificador usado pelos buckets já existentes no Firebase.
+async function bucketId(subject: string, topic: string, level: string, cardType = 'definition'): Promise<string> { return shortHash(`${normalizeText(subject)}|${normalizeText(topic)}||${level}|${cardType}`); }
 function shuffle<T>(items: T[]): T[] { const copy = [...items]; for (let i = copy.length - 1; i > 0; i -= 1) { const j = Math.floor(Math.random() * (i + 1)); [copy[i], copy[j]] = [copy[j], copy[i]]; } return copy; }
 function statsCacheKey(subject: string, topics: string[], level: string, cardType: string): string { return `${normalizeText(subject)}|${[...topics].map(normalizeText).sort().join(',')}|${level}|${cardType}`; }
 
-/**
- * Um bucket existente com cards continua sendo aproveitável mesmo quando uma
- * versão antiga não tinha ttlAt. O TTL passa a controlar atualização, não a
- * apagar imediatamente um conteúdo que ainda é melhor que gerar IA do zero.
- */
 function bucketIsUsable(data: any): boolean {
   if (!Array.isArray(data?.cards) && Number(data?.cardCount || 0) <= 0) return false;
   const ttlAt = Number(data?.ttlAt || 0);
