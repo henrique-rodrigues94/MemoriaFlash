@@ -43,6 +43,8 @@ service cloud.firestore {
         && request.resource.data.index is int
         && request.resource.data.index>=0
         && request.resource.data.index<80
+        && request.resource.data.chars is int
+        && request.resource.data.chars==request.resource.data.text.size()
         && request.resource.data.sourceHash is string
         && request.resource.data.sourceHash==parent.source.sourceHash;
     }
