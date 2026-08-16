@@ -54,18 +54,11 @@ function getNextMidnightISO(timeZone: string, now = new Date()): string {
     if (part.type !== 'literal') acc[part.type] = part.value;
     return acc;
   }, {});
-  // This is only a UI hint. The authoritative reset is generationDay calculated
-  // on every request, so DST transitions cannot make the quota incorrect.
-  const tomorrowUTC = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day) + 1, 0, 0, 0));
-  return tomorrowUTC.toISOString();
+  // Informativo apenas: a autoridade do reset é `generationDay`, recalculado
+  // em cada requisição, o que também evita problemas de horário de verão.
+  return new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day) + 1)).toISOString();
 }
 
-/**
- * Free users receive a fresh quota of 200 AI cards every local calendar day.
- * PRO users have no quota. The daily counter is stored independently from the
- * historical `aiCardsGenerated` field so old accumulated counters no longer
- * consume today's allowance.
- */
 export async function authorizeGeneration(req: any, requestedCount: number): Promise<GenerationAuthorization> {
   const adminAuth = getAdminAuth();
   const db = getAdminFirestore();
@@ -86,33 +79,30 @@ export async function authorizeGeneration(req: any, requestedCount: number): Pro
   const dailyCounter = storedDay === generationDay ? Math.max(0, Number(data.aiCardsGeneratedToday) || 0) : 0;
   const remaining = isPro ? Number.POSITIVE_INFINITY : Math.max(0, FREE_DAILY_AI_CARD_LIMIT - dailyCounter);
 
+  // Persistimos a virada do dia antes da geração. O antigo contador
+  // `aiCardsGenerated` permanece histórico e não bloqueia mais usuários.
+  if (storedDay !== generationDay) {
+    await statsRef.set({
+      aiCardsGeneratedToday: 0,
+      aiCardsGenerationDay: generationDay,
+      aiCardsDailyLimit: FREE_DAILY_AI_CARD_LIMIT,
+      aiCardsDailyResetTimeZone: timeZone,
+      aiCardsGeneratedLastUpdatedAt: new Date().toISOString(),
+    }, { merge: true });
+  }
+
   if (!isPro && (requestedCount <= 0 || requestedCount > remaining)) {
     throw Object.assign(
       new Error(`Limite diário de 200 cards atingido. Você já gerou ${dailyCounter} card${dailyCounter === 1 ? '' : 's'} hoje e poderá gerar novamente após 00:00. Assine o PRO para gerar ilimitadamente.`),
-      {
-        httpStatus: 429,
-        code: 'GENERATION_DAILY_LIMIT_REACHED',
-        remaining,
-        generated: dailyCounter,
-        limit: FREE_DAILY_AI_CARD_LIMIT,
-        resetAt: getNextMidnightISO(timeZone),
-      },
+      { httpStatus: 429, code: 'GENERATION_DAILY_LIMIT_REACHED', remaining, generated: dailyCounter, limit: FREE_DAILY_AI_CARD_LIMIT, resetAt: getNextMidnightISO(timeZone) },
     );
   }
 
-  return {
-    uid,
-    isPro,
-    generated: dailyCounter,
-    firebaseCards: 0,
-    remaining,
-    generationDay,
-    resetAt: getNextMidnightISO(timeZone),
-  };
+  return { uid, isPro, generated: dailyCounter, firebaseCards: 0, remaining, generationDay, resetAt: getNextMidnightISO(timeZone) };
 }
 
 /** Registra somente os cards realmente devolvidos pela IA no contador do dia. */
-export async function recordGeneratedCards(uid: string, actualCount: number, generationDay: string): Promise<{ generated: number; remaining: number; generationDay: string }> {
+export async function recordGeneratedCards(uid: string, actualCount: number, generationDay?: string): Promise<{ generated: number; remaining: number; generationDay: string }> {
   const db = getAdminFirestore();
   if (!db) throw Object.assign(new Error('Firebase Admin indisponível.'), { httpStatus: 503 });
   const ref = db.collection('userStats').doc(uid);
@@ -123,7 +113,8 @@ export async function recordGeneratedCards(uid: string, actualCount: number, gen
     const data = snapshot.exists ? snapshot.data() || {} : {};
     const isPro = isProActive(data);
     const currentDay = typeof data.aiCardsGenerationDay === 'string' ? data.aiCardsGenerationDay : '';
-    const current = currentDay === generationDay ? Math.max(0, Number(data.aiCardsGeneratedToday) || 0) : 0;
+    const day = generationDay || currentDay || new Date().toISOString().slice(0, 10);
+    const current = currentDay === day ? Math.max(0, Number(data.aiCardsGeneratedToday) || 0) : 0;
     const next = current + increment;
 
     if (!isPro && next > FREE_DAILY_AI_CARD_LIMIT) {
@@ -132,15 +123,11 @@ export async function recordGeneratedCards(uid: string, actualCount: number, gen
 
     transaction.set(ref, {
       aiCardsGeneratedToday: next,
-      aiCardsGenerationDay: generationDay,
+      aiCardsGenerationDay: day,
       aiCardsDailyLimit: FREE_DAILY_AI_CARD_LIMIT,
       aiCardsGeneratedLastUpdatedAt: new Date().toISOString(),
     }, { merge: true });
 
-    return {
-      generated: next,
-      remaining: isPro ? Number.POSITIVE_INFINITY : Math.max(0, FREE_DAILY_AI_CARD_LIMIT - next),
-      generationDay,
-    };
+    return { generated: next, remaining: isPro ? Number.POSITIVE_INFINITY : Math.max(0, FREE_DAILY_AI_CARD_LIMIT - next), generationDay: day };
   });
 }
