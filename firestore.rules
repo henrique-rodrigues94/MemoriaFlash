@@ -9,8 +9,43 @@ service cloud.firestore {
     function validComment(){return !request.resource.data.keys().hasAny(['comment'])||(request.resource.data.comment is string&&request.resource.data.comment.size()<=500);}
     function validCardProblem(){return isSignedIn()&&request.resource.data.cardId is string&&request.resource.data.cardId.size()>0&&request.resource.data.userId is string&&request.resource.data.userId==request.auth.uid&&request.resource.data.reportType=='card_problem'&&(!request.resource.data.keys().hasAny(['reason'])||request.resource.data.reason in ['wrong_answer','bad_explanation','confusing_question','duplicate_content','outdated_content','other'])&&validComment();}
     function validRatingFeedback(){return isSignedIn()&&request.resource.data.cardId is string&&request.resource.data.rating in ['positive','negative']&&validComment();}
-    function validContentRequest(){return isSignedIn()&&request.resource.data.requestedBy==request.auth.uid&&request.resource.data.subject is string&&request.resource.data.subject.size()>=2&&request.resource.data.subject.size()<=180&&request.resource.data.status=='pending'&&request.resource.data.requestCount==1&&request.resource.data.attempts==0;}
-    function validSourceChunk(){return isSignedIn()&&request.resource.data.text is string&&request.resource.data.text.size()>0&&request.resource.data.text.size()<=12000&&request.resource.data.index is int&&request.resource.data.index>=0&&request.resource.data.index<80;}
+    function validContentRequest(){
+      return isSignedIn()
+        && request.resource.data.requestedBy==request.auth.uid
+        && request.resource.data.shareWithMemoriaFlash==true
+        && request.resource.data.subject is string
+        && request.resource.data.subject.size()>=2
+        && request.resource.data.subject.size()<=180
+        && request.resource.data.status=='pending'
+        && request.resource.data.requestCount==1
+        && request.resource.data.attempts==0
+        && request.resource.data.source is map
+        && request.resource.data.source.fileName is string
+        && request.resource.data.source.fileName.size()>0
+        && request.resource.data.source.fileName.size()<=180
+        && request.resource.data.source.mimeType in ['application/pdf','text/plain']
+        && request.resource.data.source.totalChars is int
+        && request.resource.data.source.totalChars>0
+        && request.resource.data.source.totalChars<=960000
+        && request.resource.data.source.chunkCount is int
+        && request.resource.data.source.chunkCount>0
+        && request.resource.data.source.chunkCount<=80
+        && request.resource.data.source.sourceHash is string
+        && request.resource.data.source.sourceHash.size()==64;
+    }
+    function validSourceChunk(){
+      let parent=get(/databases/$(database)/documents/contentRequests/$(id)).data;
+      return isSignedIn()
+        && parent.requestedBy==request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size()>0
+        && request.resource.data.text.size()<=12000
+        && request.resource.data.index is int
+        && request.resource.data.index>=0
+        && request.resource.data.index<80
+        && request.resource.data.sourceHash is string
+        && request.resource.data.sourceHash==parent.source.sourceHash;
+    }
 
     match /decks/{deckId}{
       allow read:if isSignedIn()&&resource.data.userId==request.auth.uid;
@@ -21,24 +56,19 @@ service cloud.firestore {
     match /classes/{classId}{allow read:if true;allow create:if isSignedIn()&&request.resource.data.teacherId==request.auth.uid;allow update,delete:if isSignedIn()&&resource.data.teacherId==request.auth.uid;}
     match /notificationPrefs/{uid}{allow read,write:if isOwner(uid);}
 
-    // Conteúdo compartilhado: leitura para usuários, escrita somente Admin SDK.
     match /subjects/{id}{allow read:if true;allow write:if false;}
     match /curricula/{id}{allow read:if true;allow write:if false;}
     match /cardBuckets/{id}{allow read:if true;allow write:if false;}
     match /contentIndex/{id}{allow read:if true;allow write:if false;}
     match /contentCatalog/{id}{allow read:if true;allow write:if false;}
 
-    // O usuário autenticado pode apenas ENFILEIRAR seu próprio pedido.
-    // O Agent/Admin SDK é o único responsável por alterar status, progresso e resultado.
     match /contentRequests/{id}{
       allow create:if validContentRequest();
       allow read:if isSignedIn()&&resource.data.requestedBy==request.auth.uid;
       allow update,delete:if false;
 
-      // Fonte do PDF/TXT em partes. O usuário só pode criar partes do próprio pedido;
-      // o Agent lê essas partes via Admin SDK e nunca as expõe a outros usuários.
       match /sourceChunks/{chunkId}{
-        allow create:if get(/databases/$(database)/documents/contentRequests/$(id)).data.requestedBy==request.auth.uid&&validSourceChunk();
+        allow create:if validSourceChunk();
         allow read:if get(/databases/$(database)/documents/contentRequests/$(id)).data.requestedBy==request.auth.uid;
         allow update,delete:if false;
       }
@@ -48,7 +78,6 @@ service cloud.firestore {
     match /agentErrors/{id}{allow read,write:if false;}
     match /aiCache/{id}{allow read,write:if false;}
 
-    // Feedback: o usuário pode criar, mas nunca alterar/apagar.
     match /cardFeedback/{id}{
       allow create:if validCardProblem()||validRatingFeedback();
       allow read,update,delete:if false;
