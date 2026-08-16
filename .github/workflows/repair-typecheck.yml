@@ -1,0 +1,58 @@
+name: Repair TypeScript preflight
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Apply deterministic typecheck repairs
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/components/StudioView.tsx')
+          s = p.read_text()
+          s = s.replace('const existingSubjects = Array.from(', 'const existingSubjects: string[] = Array.from(')
+          p.write_text(s)
+
+          p = Path('src/components/StudySessionView.tsx')
+          s = p.read_text()
+          old = "deck.cards.map(c => c.topic || c.subject || deck.category).filter(Boolean)"
+          new = "deck.cards.map(c => String(c.topic || c.subject || deck.category || '')).filter(Boolean)"
+          s = s.replace(old, new)
+          p.write_text(s)
+
+          p = Path('src/server/ai/tasks/generateFlashcards.ts')
+          s = p.read_text()
+          old = "const cards = rawCards.filter((card) => {"
+          new = "const cards: Array<Record<string, unknown> & { topic: string }> = rawCards.filter((card) => {"
+          s = s.replace(old, new)
+          p.write_text(s)
+          PY
+
+      - name: Verify TypeScript
+        run: npm ci && npm run typecheck
+
+      - name: Commit repairs and remove one-shot workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/repair-typecheck.yml
+          git add src/components/StudioView.tsx src/components/StudySessionView.tsx src/server/ai/tasks/generateFlashcards.ts
+          git commit -m 'fix: clear TypeScript release blockers'
+          git push
