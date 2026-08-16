@@ -26,6 +26,10 @@ As regras do Firestore protegem os campos de assinatura e contadores contra alte
 
 No Android, os lembretes usam `@capacitor/local-notifications` e são agendados como notificações recorrentes diárias. O usuário pode ativar/desativar o lembrete diário, alterar o horário e ativar/desativar o aviso de sequência em risco. O botão de teste agenda uma notificação imediata para validar a permissão do Android.
 
+## Exclusão de conta
+
+A exclusão autenticada está disponível dentro do aplicativo. Quando o app não estiver instalado, o usuário pode usar `public/delete-account.html` para solicitar a exclusão. Solicitações externas são armazenadas em `accountDeletionRequests` e podem ser processadas pelo administrador usando `ADMIN_TOKEN`.
+
 ## Desenvolvimento
 
 **Pré-requisito:** Node.js 22+
@@ -51,6 +55,12 @@ npm run typecheck
 npm run release:check
 ```
 
+Preflight final de produção:
+
+```bash
+RELEASE_PRODUCTION=true npm run release:check
+```
+
 ## Documentação
 
 - `docs/ADMOB_STRATEGY.md` — monetização atual.
@@ -61,9 +71,10 @@ npm run release:check
 - `docs/ANDROID_MONETIZATION_SETUP.md` — AdMob nativo + Google Play Billing no Android.
 - `docs/MONETIZATION_PRODUCTION_AUDIT.md` — auditoria de produção (AdMob/Billing).
 - `docs/PLAY_STORE_CHECKLIST.md` — checklist de publicação.
-- `docs/PLAY_STORE_DATA_SAFETY.md` — roteiro do formulário Data Safety.
+- `docs/PLAY_STORE_DATA_SAFETY.md` — preparação do Data Safety.
 - `docs/RELEASE_RUNBOOK.md` — procedimento de release.
-- `public/privacy.html` — política de privacidade pública do aplicativo.
+- `public/privacy.html` — política de privacidade pública.
+- `public/delete-account.html` — solicitação pública de exclusão de conta.
 
 ## Distribuição (Android)
 
@@ -86,9 +97,9 @@ adb devices
 adb install -r "./app/build/outputs/apk/debug/app-debug.apk"
 ```
 
-O CI valida automaticamente `typecheck`, testes, release preflight, build web e compilação Android. O workflow de release também compila um AAB não assinado para confirmar que o bundle de produção fecha corretamente.
+O CI valida automaticamente `typecheck`, testes, release preflight, build web e compilação Android. O workflow `.github/workflows/android-release.yml` permite gerar um AAB **assinado de produção** usando secrets do GitHub e uma keystore fora do repositório.
 
-> A integração de anúncios usa o SDK nativo real (`@capacitor-community/admob`) e compras via `@capgo/native-purchases`. Consulte a documentação de monetização para configurar IDs reais antes da publicação.
+> A integração de anúncios usa o SDK nativo real (`@capacitor-community/admob`) e compras via `@capgo/native-purchases`. Em produção, os IDs reais são obrigatórios e o build não deve usar IDs de teste.
 
 ## ☁️ Backend em produção (Render)
 
@@ -106,7 +117,9 @@ Configure no host os valores reais de:
 - `FIREBASE_PRIVATE_KEY`
 - `APP_URL`
 - `CORS_ORIGIN`
-- `GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_FILE` (se usar Play Billing)
-- `ADMIN_TOKEN` (opcional)
+- `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` ou `GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_FILE`
+- `GOOGLE_PLAY_RTDN_TOKEN`
+- `ANDROID_PACKAGE_NAME=com.memoriaflash.app`
+- `ADMIN_TOKEN`
 
-Depois do deploy, confirme `/api/health`, configure `VITE_API_BASE_URL` com a URL HTTPS real e gere o release Android.
+Depois do deploy, confirme `/api/health`, configure `VITE_API_BASE_URL` com a URL HTTPS real e execute o workflow de release após configurar os secrets de produção.
