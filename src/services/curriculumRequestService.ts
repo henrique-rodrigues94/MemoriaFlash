@@ -27,67 +27,74 @@ async function findUserRequests(uid: string) {
  * Solicita ao Content Agent que prepare a grade e complete os cards
  * compartilhados da matéria/nível. A solicitação é idempotente por usuário,
  * matéria, nível e status pendente/em processamento.
+ *
+ * Importante: esta preparação é complementar. A geração direta por IA não
+ * pode ficar bloqueada se o Content Agent/Firebase estiver indisponível.
  */
 export async function requestCurriculumPreparation(args: {
   subject: string;
   educationLevel: string;
 }): Promise<{ requestId: string; reused: boolean }> {
   const user = auth.currentUser;
-  if (!user) throw new Error('É necessário estar autenticado para solicitar conteúdo.');
+  if (!user) return { requestId: '', reused: false };
 
   const subject = args.subject.trim();
   const educationLevel = args.educationLevel.trim();
-  if (subject.length < 2) throw new Error('Informe a matéria ou assunto.');
-  if (!educationLevel) throw new Error('Informe o nível de ensino.');
+  if (subject.length < 2 || !educationLevel) return { requestId: '', reused: false };
 
-  const normalizedSubject = normalizeSubject(subject);
-  const existingDocs = await findUserRequests(user.uid);
-  const reusable = existingDocs.find((item) => {
-    const data = item.data();
-    const status = String(data?.status || '');
-    return String(data?.normalizedSubject || '') === normalizedSubject
-      && String(data?.educationLevel || '') === educationLevel
-      && ['pending', 'processing', 'analyzing', 'generating', 'validating'].includes(status);
-  });
-
-  if (reusable) {
-    await updateDoc(reusable.ref, {
-      requestCount: Number(reusable.data()?.requestCount || 0) + 1,
-      updatedAt: new Date().toISOString(),
+  try {
+    const normalizedSubject = normalizeSubject(subject);
+    const existingDocs = await findUserRequests(user.uid);
+    const reusable = existingDocs.find((item) => {
+      const data = item.data();
+      const status = String(data?.status || '');
+      return String(data?.normalizedSubject || '') === normalizedSubject
+        && String(data?.educationLevel || '') === educationLevel
+        && ['pending', 'processing', 'analyzing', 'generating', 'validating'].includes(status);
     });
-    return { requestId: reusable.id, reused: true };
+
+    if (reusable) {
+      await updateDoc(reusable.ref, {
+        requestCount: Number(reusable.data()?.requestCount || 0) + 1,
+        updatedAt: new Date().toISOString(),
+      });
+      return { requestId: reusable.id, reused: true };
+    }
+
+    const ref = doc(collection(db, 'contentRequests'));
+    const now = new Date().toISOString();
+    await setDoc(ref, {
+      subject,
+      requestedSubject: subject,
+      normalizedSubject,
+      subjectId: subjectId(subject) || ref.id,
+      educationLevel,
+      status: 'pending',
+      stage: 'queued',
+      priority: 5,
+      requestCount: 1,
+      attempts: 0,
+      requestedBy: user.uid,
+      requestedAt: now,
+      createdAt: now,
+      updatedAt: now,
+      shareWithMemoriaFlash: true,
+      source: null,
+      progress: {
+        levels: 0,
+        curriculaReady: 0,
+        leavesDiscovered: 0,
+        cardsGenerated: 0,
+        cardsApproved: 0,
+        cardsRejected: 0,
+      },
+    });
+    return { requestId: ref.id, reused: false };
+  } catch (error) {
+    // Não transformar falha do agente de conteúdo em falha da geração direta.
+    console.warn('[ContentAgent] Solicitação opcional indisponível:', error);
+    return { requestId: '', reused: false };
   }
-
-  const ref = doc(collection(db, 'contentRequests'));
-  const now = new Date().toISOString();
-  await setDoc(ref, {
-    subject,
-    requestedSubject: subject,
-    normalizedSubject,
-    subjectId: subjectId(subject) || ref.id,
-    educationLevel,
-    status: 'pending',
-    stage: 'queued',
-    priority: 5,
-    requestCount: 1,
-    attempts: 0,
-    requestedBy: user.uid,
-    requestedAt: now,
-    createdAt: now,
-    updatedAt: now,
-    shareWithMemoriaFlash: true,
-    source: null,
-    progress: {
-      levels: 0,
-      curriculaReady: 0,
-      leavesDiscovered: 0,
-      cardsGenerated: 0,
-      cardsApproved: 0,
-      cardsRejected: 0,
-    },
-  });
-
-  return { requestId: ref.id, reused: false };
 }
 
 export async function getLatestCurriculumPreparationRequest(args: {
