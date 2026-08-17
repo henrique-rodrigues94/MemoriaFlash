@@ -2,6 +2,7 @@
 // process.env.* no momento em que o módulo é avaliado.
 import 'dotenv/config';
 import express from 'express';
+import cors from 'cors';
 import path from 'path';
 import admin from 'firebase-admin';
 
@@ -29,6 +30,32 @@ import { getAdminFirestore } from './src/server/firebaseAdmin';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+
+// CORS_ORIGIN aceita uma lista separada por vírgulas. Sem essa configuração
+// em produção, o app nativo (Capacitor/CapacitorHttp) continua funcionando
+// normalmente (não é afetado por CORS), mas qualquer front-end web hospedado
+// em outro domínio (ex.: VITE_API_BASE_URL apontando para um domínio
+// diferente do site) teria as chamadas de API bloqueadas pelo navegador.
+const configuredOrigins = String(process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Requisições sem header Origin (apps nativos, curl, health checks) são liberadas.
+      if (!origin) return callback(null, true);
+      if (configuredOrigins.length === 0) {
+        // Nenhuma origem configurada: em desenvolvimento libera tudo; em
+        // produção nega por padrão até que CORS_ORIGIN seja definido.
+        return callback(null, process.env.NODE_ENV !== 'production');
+      }
+      if (configuredOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error(`Origem não permitida pelo CORS: ${origin}`));
+    },
+    credentials: true,
+  }),
+);
 
 app.use(express.json({ limit: '30mb' }));
 

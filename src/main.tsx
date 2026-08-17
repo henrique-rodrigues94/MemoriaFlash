@@ -7,7 +7,6 @@ import './index.css';
 import './themeCompatibility.css';
 import { initErrorLogger } from './lib/errorLogger';
 import { installCameraPlaybackFix } from './lib/cameraPlaybackFix';
-import { installStudyCardFeedbackOverlayV2 } from './services/studyCardFeedbackOverlay';
 import { initializeAdMob, requestAdMobConsent, installAdMobListeners } from './services/ads/adMobNative';
 import { auth, onAuthStateChanged } from './lib/firebase';
 
@@ -49,7 +48,9 @@ if (API_BASE_URL && typeof window !== 'undefined') {
 
 initErrorLogger();
 installCameraPlaybackFix();
-installStudyCardFeedbackOverlayV2();
+// O botão "Relatar problema" agora é renderizado nativamente pelo React
+// dentro de StudySessionView (fixo no topo, ao lado do botão Inverter),
+// em vez de injetado via DOM/MutationObserver.
 
 function AuthenticatedShell() {
   const [authResolved, setAuthResolved] = useState(false);

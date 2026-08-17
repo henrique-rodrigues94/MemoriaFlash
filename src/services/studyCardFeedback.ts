@@ -4,7 +4,14 @@ import { getStoredDecks } from './storage';
 import type { Flashcard } from '../types';
 
 export type StudyFeedbackReason = 'wrong_answer' | 'bad_explanation' | 'confusing_question' | 'duplicate_content' | 'outdated_content' | 'other';
-export interface StudyFeedbackPayload { reason: StudyFeedbackReason; comment?: string; }
+export interface StudyFeedbackPayload {
+  reason: StudyFeedbackReason;
+  comment?: string;
+  /** Card/context passed directly from the study screen state (preferred over DOM scraping). */
+  card?: Flashcard;
+  subject?: string;
+  deckId?: string;
+}
 
 function normalize(value: string): string {
   return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, ' ').trim();
@@ -42,7 +49,13 @@ export function getCurrentStudyCard(): { card: Flashcard; subject: string; deckI
 export async function submitStudyCardFeedback(payload: StudyFeedbackPayload): Promise<void> {
   const user = auth.currentUser;
   if (!user || user.isAnonymous) throw new Error('Faça login para enviar um feedback sobre este card.');
-  const context = findCardFromStudyDom();
+
+  // Prefer the card/context passed explicitly by the caller (from React state),
+  // since it's reliable in production. Only fall back to scraping the DOM
+  // (legacy behaviour) if the caller didn't provide it.
+  const context = payload.card
+    ? { card: payload.card, subject: payload.subject || payload.card.topic || 'MemoriaFlash', deckId: payload.deckId || '' }
+    : findCardFromStudyDom();
   if (!context) throw new Error('Não foi possível identificar o card atual. Tente novamente.');
 
   const { card, subject, deckId } = context;

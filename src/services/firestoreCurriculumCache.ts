@@ -8,12 +8,25 @@ export interface CachedSubjectLevel { level: EducationLevel; label: string; icon
 function normalizeText(text: string): string { return (text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim(); }
 async function shortHash(text: string): Promise<string> { const bytes = new TextEncoder().encode(text); const digest = await crypto.subtle.digest('SHA-1', bytes); return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 16); }
 function isValidTtl(ttlAt: unknown): boolean { return typeof ttlAt !== 'number' || ttlAt === 0 || ttlAt > Date.now(); }
+function sanitizeTopics(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const cleaned: string[] = [];
+  for (const item of value) {
+    if (typeof item === 'string' && item.trim().length > 0) cleaned.push(item.trim());
+  }
+  return Array.from(new Set(cleaned));
+}
+
 function sanitizeCategories(value: unknown): CachedCurriculumCategory[] {
   if (!Array.isArray(value)) return [];
-  return value.map((category: any) => ({
-    category: typeof category?.category === 'string' ? category.category.trim() : '',
-    topics: Array.isArray(category?.topics) ? Array.from(new Set(category.topics.filter((topic: unknown): topic is string => typeof topic === 'string' && topic.trim()).map((topic: string) => topic.trim()))) : [],
-  })).filter(category => category.category && category.topics.length > 0);
+  const result: CachedCurriculumCategory[] = [];
+  for (const raw of value) {
+    const category: any = raw;
+    const name = typeof category?.category === 'string' ? category.category.trim() : '';
+    const topics = sanitizeTopics(category?.topics);
+    if (name && topics.length > 0) result.push({ category: name, topics });
+  }
+  return result;
 }
 
 let subjectCatalogCache: { subjects: string[]; fetchedAt: number } | null = null;

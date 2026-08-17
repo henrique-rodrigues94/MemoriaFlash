@@ -66,6 +66,7 @@ if (production) {
     'VITE_PLAY_ANNUAL_PRODUCT_ID',
     'VITE_PLAY_ANNUAL_BASE_PLAN_ID',
     'VITE_API_BASE_URL',
+    'CORS_ORIGIN',
   ];
   for (const key of requiredProductionEnv) {
     if (!process.env[key]?.trim()) errors.push(`Variável de produção ausente: ${key}`);

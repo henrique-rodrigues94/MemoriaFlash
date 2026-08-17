@@ -47,8 +47,11 @@ export const StudioView: React.FC<StudioViewProps> = ({ decks, stats, onSaveNewD
   const allSelected = allSubtopics.length > 0 && selectedSubtopics.size === allSubtopics.length;
   const remaining = remainingAICards(stats);
   const dailyBudget = stats.isPro ? 1000 : Math.max(0, Math.min(200, remaining === Number.POSITIVE_INFINITY ? 200 : remaining));
-  const existingFronts = useMemo(() => new Set(decks.flatMap(deck => deck.cards.map(card => normalize(card.front))).filter(Boolean)), [decks]);
-  const quantityOptions = useMemo<Array<number | 'all'>>(() => [25, 50, 100, 'all'].filter(option => option === 'all' || dailyBudget >= option || stats.isPro), [dailyBudget, stats.isPro]);
+  const existingFronts = useMemo<Set<string>>(() => new Set(decks.flatMap(deck => deck.cards.map(card => normalize(card.front))).filter(Boolean)), [decks]);
+  const quantityOptions = useMemo<Array<number | 'all'>>(() => {
+    const options: Array<number | 'all'> = [25, 50, 100, 'all'];
+    return options.filter(option => option === 'all' || dailyBudget >= option || stats.isPro);
+  }, [dailyBudget, stats.isPro]);
 
   useEffect(() => {
     if (subject.trim().length < 2) { setDetectedLevels([]); setLevelCurricula(new Map()); setSelectedSubtopics(new Set()); setExpanded(new Set()); setSubjectSuggestions([]); setShowSuggestions(false); setBankReady(0); setBankMissing(0); return; }
@@ -100,12 +103,12 @@ export const StudioView: React.FC<StudioViewProps> = ({ decks, stats, onSaveNewD
     if (!normalizedSubject) return setError('Informe a MATÉRIA / ASSUNTO.');
     if (!selectedSubtopics.size) return setError('Selecione pelo menos um tópico ou subtópico.');
     if (dailyBudget <= 0) return setError('Você atingiu o limite diário de 200 cards. Amanhã poderá continuar de onde parou.');
-    const selected = Array.from(selectedSubtopics);
+    const selected: string[] = Array.from(selectedSubtopics);
     const target = cardCount === 'all' ? dailyBudget : Math.min(cardCount, dailyBudget);
     setLoading(true);
     try {
       const shared = await fetchSharedCards(normalizedSubject, selectedBankTopics, educationLevel, target);
-      const known = new Set(existingFronts); const cards: Flashcard[] = [];
+      const known: Set<string> = new Set(existingFronts); const cards: Flashcard[] = [];
       for (const card of shared) {
         const key = normalize(card.front);
         if (!key || known.has(key)) continue;
@@ -118,7 +121,8 @@ export const StudioView: React.FC<StudioViewProps> = ({ decks, stats, onSaveNewD
       while (remainingTarget > 0 && rounds < 20) {
         rounds += 1;
         const batch = Math.min(100, remainingTarget);
-        const generated = await generateAICards(normalizedSubject, selected, batch, educationLevel, Array.from(known));
+        const knownFronts: string[] = Array.from(known);
+        const generated = await generateAICards(normalizedSubject, selected, batch, educationLevel, knownFronts);
         if (!generated.length) break;
         let added = 0;
         for (const card of generated) { const key = normalize(card.front); if (!key || known.has(key)) continue; known.add(key); cards.push(card); added += 1; }

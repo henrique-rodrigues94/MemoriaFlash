@@ -17,11 +17,22 @@ import {
   ChevronRight,
   Zap,
   BookOpen,
+  Flag,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Deck, Flashcard, RatingGrade } from '../types';
 import { calculateSM2, getDueCardCount, computeDeckMastery } from '../services/srsEngine';
 import { SupportedLanguage, translations } from '../lib/i18n';
+import { submitStudyCardFeedback, StudyFeedbackReason } from '../services/studyCardFeedback';
+
+const REPORT_REASONS: Array<{ value: StudyFeedbackReason; label: string }> = [
+  { value: 'wrong_answer', label: 'Resposta errada' },
+  { value: 'bad_explanation', label: 'Explicação incompleta ou errada' },
+  { value: 'confusing_question', label: 'Pergunta confusa' },
+  { value: 'duplicate_content', label: 'Conteúdo duplicado' },
+  { value: 'outdated_content', label: 'Conteúdo desatualizado' },
+  { value: 'other', label: 'Outro problema' },
+];
 
 // ─── Font size helper ─────────────────────────────────────────────────────────
 
@@ -134,6 +145,43 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   const currentCard = rawCard && invertCards
     ? { ...rawCard, front: rawCard.back, back: rawCard.front }
     : rawCard;
+
+  // ── Relatar problema no card ────────────────────────────────────────────
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState<StudyFeedbackReason | null>(null);
+  const [reportComment, setReportComment] = useState('');
+  const [reportSending, setReportSending] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportSuccess, setReportSuccess] = useState(false);
+
+  const openReportModal = useCallback(() => {
+    setReportReason(null);
+    setReportComment('');
+    setReportError(null);
+    setReportSuccess(false);
+    setShowReportModal(true);
+  }, []);
+
+  const handleSendReport = useCallback(async () => {
+    if (!reportReason || !rawCard) return;
+    setReportSending(true);
+    setReportError(null);
+    try {
+      await submitStudyCardFeedback({
+        reason: reportReason,
+        comment: reportComment,
+        card: rawCard,
+        subject: deck.category || deck.title,
+        deckId: deck.id,
+      });
+      setReportSuccess(true);
+      window.setTimeout(() => setShowReportModal(false), 1400);
+    } catch (err: any) {
+      setReportError(err?.message || 'Não foi possível enviar o feedback.');
+    } finally {
+      setReportSending(false);
+    }
+  }, [reportReason, reportComment, rawCard, deck.category, deck.title, deck.id]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
@@ -543,6 +591,67 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
         </div>
       )}
 
+      {/* Relatar problema modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-sm bg-[#0b1a2a] border border-rose-500/30 rounded-3xl p-6 space-y-4 shadow-2xl">
+            {reportSuccess ? (
+              <div className="text-center py-3">
+                <p className="text-base font-extrabold text-white">✓ Feedback enviado</p>
+                <p className="text-xs text-slate-400 mt-1">Obrigado. O problema foi registrado para revisão do conteúdo.</p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">Relatar problema neste card</h3>
+                  <p className="text-[11px] text-slate-400 mt-1">O card atual, matéria, tópico e nível serão enviados junto com seu relato para correção.</p>
+                </div>
+                <div className="grid gap-2">
+                  {REPORT_REASONS.map(reason => (
+                    <button
+                      key={reason.value}
+                      type="button"
+                      onClick={() => setReportReason(reason.value)}
+                      className={`w-full py-2.5 px-3 text-left rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                        reportReason === reason.value
+                          ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
+                          : 'bg-[#122131] border-slate-700/40 text-slate-300'
+                      }`}
+                    >
+                      {reason.label}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  value={reportComment}
+                  onChange={e => setReportComment(e.target.value.slice(0, 500))}
+                  placeholder="Explique o problema (opcional)..."
+                  className="w-full min-h-[80px] rounded-xl border border-slate-700/40 bg-[#081522] text-slate-200 p-3 text-xs outline-none resize-vertical"
+                />
+                {reportError && <p className="text-[11px] text-rose-400">{reportError}</p>}
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowReportModal(false)}
+                    className="flex-1 py-2.5 rounded-xl bg-[#122131] text-slate-300 text-xs font-bold border border-slate-700 hover:bg-[#1c2b3c] transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!reportReason || reportSending}
+                    onClick={() => void handleSendReport()}
+                    className="flex-1 py-2.5 rounded-xl bg-rose-500/20 text-rose-300 text-xs font-bold border border-rose-500/30 hover:bg-rose-500/30 disabled:opacity-40 transition-all cursor-pointer"
+                  >
+                    {reportSending ? 'Enviando...' : 'Enviar feedback'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-2.5 shrink-0 pt-2">
         <div className="flex items-center justify-between">
@@ -564,19 +673,34 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
             )}
           </div>
 
-          {/* Invert button */}
-          <button
-            type="button"
-            onClick={() => { setInvertCards(prev => !prev); setIsFlipped(false); }}
-            className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              invertCards
-                ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
-                : 'bg-[#122131] border-slate-700/40 text-slate-500 hover:border-violet-500/40 hover:text-violet-300'
-            }`}
-          >
-            <RotateCw className="w-4 h-4" />
-            <span className="hidden sm:inline text-[11px]">{invertCards ? 'Invertido' : 'Inverter'}</span>
-          </button>
+          {/* Ações fixas no topo: relatar problema + inverter pergunta/resposta */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={openReportModal}
+              title="Relatar problema neste card"
+              aria-label="Relatar problema neste card"
+              className="p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 bg-[#122131] border-slate-700/40 text-slate-500 hover:border-rose-500/40 hover:text-rose-300"
+            >
+              <Flag className="w-4 h-4" />
+              <span className="hidden sm:inline text-[11px]">Relatar</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setInvertCards(prev => !prev); setIsFlipped(false); }}
+              title="Inverter pergunta e resposta do card"
+              aria-label={invertCards ? 'Cartão invertido: pergunta e resposta trocadas. Toque para voltar ao normal' : 'Inverter pergunta e resposta do card'}
+              className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                invertCards
+                  ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
+                  : 'bg-[#122131] border-slate-700/40 text-slate-500 hover:border-violet-500/40 hover:text-violet-300'
+              }`}
+            >
+              <RotateCw className="w-4 h-4" />
+              <span className="hidden sm:inline text-[11px]">{invertCards ? 'Invertido' : 'Inverter'}</span>
+            </button>
+          </div>
         </div>
 
         {/* Progress */}

@@ -72,7 +72,7 @@ Idioma: ${langInstruction}. Priorize cobertura completa, não quantidade mínima
   const categories: CurriculumCategory[] = Array.isArray((data as any)?.categories)
     ? (data as any).categories.map((c: any) => ({
         category: String(c?.category || '').trim(),
-        topics: Array.from(new Set(Array.isArray(c?.topics) ? c.topics.filter((t: unknown): t is string => typeof t === 'string' && t.trim()).map((t: string) => t.trim()) : [])),
+        topics: Array.from(new Set(Array.isArray(c?.topics) ? c.topics.filter((t: unknown): t is string => typeof t === 'string' && t.trim().length > 0).map((t: string) => t.trim()) : [])),
       })).filter((c: CurriculumCategory) => c.category && c.topics.length)
     : [];
   if (!categories.length) throw new Error('IA não retornou categorias válidas para o currículo.');
