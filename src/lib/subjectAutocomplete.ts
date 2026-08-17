@@ -23,7 +23,7 @@ void warmSubjectCatalog().then(async () => {
 }).catch(() => undefined);
 
 export function getCuratedSubjectSuggestions(query: string): string[] {
-  const q = normalize(query); if (q.length < 2) return [];
+  const q = normalize(query); if (q.length < 3) return [];
   const firestoreMatches = firestoreSubjects.filter(item => normalize(item).includes(q));
   const curated: string[] = [];
   for (const [broadTerm, variants] of Object.entries(SUBJECT_VARIANTS)) if (broadTerm.startsWith(q) || q.startsWith(broadTerm) || q.includes(broadTerm)) curated.push(...variants);
