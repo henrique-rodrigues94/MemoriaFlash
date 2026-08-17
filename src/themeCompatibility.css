@@ -1,32 +1,72 @@
 /* Compatibilidade visual entre componentes antigos e o tema atual. */
+
+/* Alguns componentes antigos usam tokens de fundo escuro diretamente. O tema
+   claro deve vencer esses tokens, inclusive nas versões /90, /95 etc. */
 .theme-light [class*="bg-[#051424]"],
 .theme-light [class*="bg-[#081522]"],
 .theme-light [class*="bg-[#0b1a2a]"],
+.theme-light [class*="bg-[#0c1e30]"],
 .theme-light [class*="bg-[#122131]"],
-.theme-light [class*="bg-[#0f172a]"] {
+.theme-light [class*="bg-[#0f172a]"],
+.theme-light [class*="bg-slate-900"],
+.theme-light [class*="bg-slate-950"] {
   background-color: #ffffff !important;
 }
 
 .theme-light [class*="text-white"],
 .theme-light [class*="text-[#e2e8f0]"],
-.theme-light [class*="text-[#cbd5e1]"] {
+.theme-light [class*="text-[#d4e4fa]"],
+.theme-light [class*="text-[#cbd5e1]"],
+.theme-light [class*="text-slate-100"],
+.theme-light [class*="text-slate-200"] {
   color: #1a1f36 !important;
 }
 
+.theme-light [class*="text-slate-300"] { color: #303750 !important; }
+.theme-light [class*="text-slate-400"] { color: #5a6380 !important; }
+.theme-light [class*="text-slate-500"] { color: #66708d !important; }
+
 .theme-light [class*="border-slate-700"],
+.theme-light [class*="border-slate-800"],
 .theme-light [class*="border-[#424754]"] {
   border-color: #d9deec !important;
 }
 
-.theme-light .mf-feedback-modal { background: #ffffff !important; color: #1a1f36 !important; border-color: #d9deec !important; }
-.theme-light .mf-feedback-reason { background: #f7f8fc !important; color: #303750 !important; border-color: #d9deec !important; }
-.theme-light .mf-feedback-text { background: #ffffff !important; color: #1a1f36 !important; border-color: #d9deec !important; }
-.theme-light .mf-feedback-cancel { background: #eef0f8 !important; color: #303750 !important; border-color: #d9deec !important; }
-.theme-light .mf-feedback-sub, .theme-light .mf-feedback-success span { color: #66708d !important; }
+.theme-light .mf-feedback-modal,
+.theme-light .mf-feedback-v2-modal {
+  background: #ffffff !important;
+  color: #1a1f36 !important;
+  border-color: #d9deec !important;
+}
+.theme-light .mf-feedback-reason,
+.theme-light .mf-feedback-v2-reason {
+  background: #f7f8fc !important;
+  color: #303750 !important;
+  border-color: #d9deec !important;
+}
+.theme-light .mf-feedback-text,
+.theme-light .mf-feedback-v2-text {
+  background: #ffffff !important;
+  color: #1a1f36 !important;
+  border-color: #d9deec !important;
+}
+.theme-light .mf-feedback-cancel,
+.theme-light .mf-feedback-v2-cancel {
+  background: #eef0f8 !important;
+  color: #303750 !important;
+  border-color: #d9deec !important;
+}
+.theme-light .mf-feedback-sub,
+.theme-light .mf-feedback-success span,
+.theme-light .mf-feedback-v2-sub,
+.theme-light .mf-feedback-v2-success span {
+  color: #66708d !important;
+}
 
-/* O anúncio sticky nunca deve cobrir a barra inferior. */
-.memoriaflash-admob-sticky { margin-bottom: 82px !important; }
+/* O anúncio nativo é uma camada sobre o WebView; este espaço é criado pelo
+   componente AdMobBanner para impedir que conteúdo rolável fique por baixo dele. */
+.memoriaflash-admob-reserved-space { min-height: 142px; }
 
 @media (max-width: 640px) {
-  .memoriaflash-admob-sticky { margin-bottom: 76px !important; }
+  .memoriaflash-admob-reserved-space { min-height: 142px; }
 }
