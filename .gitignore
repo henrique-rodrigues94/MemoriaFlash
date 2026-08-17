@@ -46,6 +46,10 @@ pnpm-debug.log*
 Thumbs.db
 Desktop.ini
 
+# Arquivos temporários locais
+tmp-noop.txt
+tmp-*
+
 # Editor
 .vscode/*
 !.vscode/extensions.json
