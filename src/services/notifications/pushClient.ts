@@ -38,6 +38,9 @@ async function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = NA
   return Promise.race([promise, new Promise<T>((_, reject) => { timer = setTimeout(() => reject(new Error(`${label} demorou. Verifique as permissões do Android e tente novamente.`)), timeoutMs); })]).finally(() => { if (timer) clearTimeout(timer); });
 }
 
+// Exportado apenas para teste unitário do comportamento de timeout (ver pushClient.test.ts).
+export const __testables = { withTimeout, NATIVE_OPERATION_TIMEOUT_MS, FIRESTORE_OPERATION_TIMEOUT_MS, PERMISSION_REQUEST_TIMEOUT_MS };
+
 export async function getNotificationPrefs(): Promise<NotificationPrefs> {
   const user = await withTimeout(ensureAuthenticated(), 'Autenticação');
   try {

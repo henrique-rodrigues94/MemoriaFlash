@@ -181,4 +181,9 @@ describe('toNewFlashcards', () => {
     );
     expect(flashcards[0].id).not.toBe(flashcards[1].id);
   });
+
+  it('marca cards importados de arquivos externos como source "manual" — nunca podem ser relatados/compartilhados como conteúdo de IA', () => {
+    const flashcards = toNewFlashcards([{ front: 'A', back: 'B' }], 'Geral');
+    expect(flashcards[0].source).toBe('manual');
+  });
 });
