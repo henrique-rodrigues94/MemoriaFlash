@@ -71,6 +71,7 @@ export const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
       // título do deck e fragmentar o filtro de tópicos.
       subject: deck.category,
       difficulty: 'medium',
+      source: 'manual',
       reps: 0,
       interval: 0,
       efactor: 2.5,

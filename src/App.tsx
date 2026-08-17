@@ -348,6 +348,7 @@ export function App() {
       back: card.back,
       topic: targetDeck.category,
       difficulty: 'medium' as const,
+      source: 'manual' as const,
       reps: 0,
       interval: 0,
       efactor: 2.5,
