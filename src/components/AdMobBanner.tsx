@@ -11,6 +11,15 @@ interface AdMobBannerProps {
   isPro?: boolean;
   currentLanguage?: any;
   sticky?: boolean;
+  /**
+   * O banner do AdMob é uma View nativa do Android renderizada por cima do
+   * WebView — CSS z-index não tem nenhum efeito sobre ela. Isso significa
+   * que, se algum modal HTML (indicação, assinatura, importar/exportar,
+   * notificações, idioma, etc.) estiver aberto por cima da bottom nav, o
+   * anúncio nativo pode ficar visualmente grudado sobre o modal e atrapalhar
+   * a interação. Passe `hidden` sempre que qualquer modal estiver aberto.
+   */
+  hidden?: boolean;
 }
 
 function isProActive(stats: UserStats, isPro?: boolean): boolean {
@@ -32,8 +41,9 @@ function isProActive(stats: UserStats, isPro?: boolean): boolean {
 let bannerLifecycleToken = 0;
 let pendingHideTimer: ReturnType<typeof setTimeout> | undefined;
 
-export const AdMobBanner: React.FC<AdMobBannerProps> = ({ stats, isPro }) => {
+export const AdMobBanner: React.FC<AdMobBannerProps> = ({ stats, isPro, hidden }) => {
   const activePro = isProActive(stats, isPro);
+  const shouldHide = activePro || Boolean(hidden);
 
   useEffect(() => {
     const token = ++bannerLifecycleToken;
@@ -42,7 +52,7 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({ stats, isPro }) => {
       pendingHideTimer = undefined;
     }
 
-    if (activePro || !Capacitor.isNativePlatform()) {
+    if (shouldHide || !Capacitor.isNativePlatform()) {
       void hideAdMobBanner().catch(() => undefined);
       return () => undefined;
     }
@@ -92,11 +102,12 @@ export const AdMobBanner: React.FC<AdMobBannerProps> = ({ stats, isPro }) => {
         }
       }, 150);
     };
-  }, [activePro]);
+  }, [shouldHide]);
 
-  if (activePro || !Capacitor.isNativePlatform()) return null;
+  if (shouldHide || !Capacitor.isNativePlatform()) return null;
 
-  // O banner nativo fica acima da navegação inferior (margin nativa = 78px).
-  // Esta reserva impede que o último conteúdo rolável fique atrás do anúncio.
-  return <div className="memoriaflash-admob-reserved-space h-[142px] sm:h-[150px] shrink-0" aria-hidden="true" />;
+  // O banner nativo fica colado imediatamente acima da bottom nav (64px de
+  // altura, margin nativa = 64px). A reserva de espaço abaixo evita que o
+  // último conteúdo rolável da tela fique escondido atrás do anúncio.
+  return <div className="memoriaflash-admob-reserved-space h-[128px] sm:h-[136px] shrink-0" aria-hidden="true" />;
 };

@@ -478,6 +478,10 @@ export function toNewFlashcards(cards: ImportedCard[], fallbackSubject: string):
     topic: c.topic || undefined,
     subject: c.subject || fallbackSubject,
     explanation: c.explanation || undefined,
+    // Cards importados de arquivos externos (Anki/CSV/Quizlet/backup) não
+    // passaram pelo pipeline de IA do MemoriaFlash, então não podem ser
+    // relatados para curadoria nem compartilhados no banco entre usuários.
+    source: 'manual',
     reps: c.srs?.reps ?? 0,
     interval: c.srs?.interval ?? 0,
     efactor: c.srs?.efactor ?? 2.5,

@@ -323,10 +323,16 @@ export const StatsView: React.FC<StatsViewProps> = ({ stats, decks }) => {
             ))}
           </div>
 
-          {dueToday === 0 && (
+          {dueToday === 0 && totalCardsAllDecks > 0 && (
             <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
               <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
               Nenhum cartão vencido hoje — você está em dia com suas revisões! 🎉
+            </div>
+          )}
+          {totalCardsAllDecks === 0 && (
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-[#0b1a2a] border border-slate-700/40 text-xs text-slate-400">
+              <BarChart2 className="w-4 h-4 flex-shrink-0" />
+              Crie seu primeiro baralho para começar a ver sua previsão de revisões aqui.
             </div>
           )}
         </div>

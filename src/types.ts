@@ -5,6 +5,11 @@ export interface Flashcard {
   difficulty?: 'easy' | 'medium' | 'hard' | 'expert'; explanation?: string; curiosity?: string;
   // Metadados de origem usados pelo sistema de feedback/curadoria. São opcionais
   // para manter compatibilidade com decks antigos importados/localmente.
+  // Origem do card: cards manuais nunca passam pelo backend de IA, então nunca
+  // entram no banco compartilhado (cardBuckets) nem podem ser "relatados" para
+  // curadoria de conteúdo gerado por IA. Cards sem "source" são decks antigos
+  // (anteriores a este campo) gerados pela IA — tratados como 'ai' por padrão.
+  source?: 'ai' | 'manual';
   bucketId?: string; cardContentType?: string; educationLevel?: 'fundamental' | 'medio' | 'faculdade' | 'concurso' | 'tecnico';
   reps: number; interval: number; efactor: number; dueDate: string; lastReviewed?: string;
 }

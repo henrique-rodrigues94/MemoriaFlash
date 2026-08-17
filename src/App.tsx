@@ -128,6 +128,22 @@ export function App() {
   // Deck cujos campos devem ser pré-preenchidos no gerador da aba Cards
   const [deckToPopulate, setDeckToPopulate] = useState<Deck | null>(null);
 
+  // Todos os modais/overlays HTML da tela. O banner nativo do AdMob é uma
+  // View Android desenhada por cima do WebView (CSS não a afeta), então
+  // precisa ser escondido explicitamente sempre que qualquer um destes
+  // estiver aberto — senão o anúncio fica visualmente grudado sobre o modal.
+  const anyModalOpen =
+    showAdMobModal ||
+    showInterstitial ||
+    showSubscriptionModal ||
+    showAuthModal ||
+    showReferralModal ||
+    showImportExportModal ||
+    showNotificationsModal ||
+    showLanguageModal ||
+    showAdvancedCardGenerator ||
+    Boolean(managedDeck);
+
   useEffect(() => {
     document.documentElement.classList.toggle('theme-light', theme === 'light');
     document.documentElement.dataset.theme = theme;
@@ -462,6 +478,7 @@ export function App() {
                 isPro={stats.isPro}
                 currentLanguage={currentLanguage}
                 sticky
+                hidden={anyModalOpen}
                 onOpenAdMob={() => setShowAdMobModal(true)}
                 onOpenSubscription={() => setShowSubscriptionModal(true)}
                 onOpenReferral={() => setShowReferralModal(true)}

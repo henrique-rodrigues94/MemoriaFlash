@@ -18,7 +18,15 @@ const DEFAULT_PREFS: NotificationPrefs = { tokens: [], dailyReminderEnabled: fal
 const NATIVE_DAILY_REMINDER_ID = 42001;
 const NATIVE_STREAK_REMINDER_ID = 42003;
 const NATIVE_TEST_NOTIFICATION_ID = 42002;
-const NATIVE_OPERATION_TIMEOUT_MS = 5000;
+// Timeout padrão para operações rápidas locais (ex.: verificar permissão já concedida).
+const NATIVE_OPERATION_TIMEOUT_MS = 8000;
+// Operações de rede (Firestore) podem demorar mais em conexões ruins.
+const FIRESTORE_OPERATION_TIMEOUT_MS = 15000;
+// A solicitação de permissão pausa o app enquanto o usuário decide no diálogo
+// nativo do Android — não é uma operação "travada", é uma espera pelo
+// usuário. Um timeout curto aqui derrubava lembretes válidos só porque a
+// pessoa demorou alguns segundos para tocar em "Permitir".
+const PERMISSION_REQUEST_TIMEOUT_MS = 60000;
 
 function prefsDocRef(uid: string) { return doc(db, 'notificationPrefs', uid); }
 function isNativeApp() { return Capacitor.isNativePlatform(); }
@@ -33,7 +41,7 @@ async function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = NA
 export async function getNotificationPrefs(): Promise<NotificationPrefs> {
   const user = await withTimeout(ensureAuthenticated(), 'Autenticação');
   try {
-    const snap = await withTimeout(getDoc(prefsDocRef(user.uid)), 'Carregamento dos lembretes');
+    const snap = await withTimeout(getDoc(prefsDocRef(user.uid)), 'Carregamento dos lembretes', FIRESTORE_OPERATION_TIMEOUT_MS);
     return snap.exists() ? { ...DEFAULT_PREFS, ...(snap.data() as Partial<NotificationPrefs>) } : { ...DEFAULT_PREFS };
   } catch (err) {
     console.warn('Falha ao carregar preferências de notificação:', err);
@@ -48,7 +56,8 @@ async function getMessagingSafe(): Promise<Messaging | null> { if (isNativeApp()
 async function ensureNativeNotificationPermission(): Promise<boolean> {
   const current = await withTimeout(LocalNotifications.checkPermissions(), 'Verificação da permissão');
   if (current.display === 'granted') return true;
-  const requested = await withTimeout(LocalNotifications.requestPermissions(), 'Solicitação da permissão');
+  // Timeout maior: esta chamada aguarda o usuário responder ao diálogo nativo.
+  const requested = await withTimeout(LocalNotifications.requestPermissions(), 'Solicitação da permissão', PERMISSION_REQUEST_TIMEOUT_MS);
   return requested.display === 'granted';
 }
 async function cancelNativeNotifications(ids: number[]) { try { await withTimeout(LocalNotifications.cancel({ notifications: ids.map(id => ({ id })) }), 'Cancelamento dos lembretes'); } catch (err) { console.warn('[Notifications] cancel failed', err); } }
@@ -70,7 +79,7 @@ export async function enableDailyReminders(reminderHourLocal: number): Promise<E
       const result = await scheduleNativeDailyReminder(hour); if (!result.success) return result;
       const user = await withTimeout(ensureAuthenticated(), 'Autenticação'); const existing = await getNotificationPrefs();
       if (existing.streakReminderEnabled) { try { await scheduleNativeStreakReminder(hour); } catch (err) { console.warn('[Notifications] streak schedule failed', err); } }
-      try { await withTimeout(setDoc(prefsDocRef(user.uid), { ...existing, dailyReminderEnabled: true, reminderHourLocal: hour, reminderHourUTC: localHourToUTCHour(hour), updatedAt: Date.now() }, { merge: true }), 'Salvamento das preferências'); } catch (err) { console.warn('[Notifications] prefs save failed', err); }
+      try { await withTimeout(setDoc(prefsDocRef(user.uid), { ...existing, dailyReminderEnabled: true, reminderHourLocal: hour, reminderHourUTC: localHourToUTCHour(hour), updatedAt: Date.now() }, { merge: true }), 'Salvamento das preferências', FIRESTORE_OPERATION_TIMEOUT_MS); } catch (err) { console.warn('[Notifications] prefs save failed', err); }
       return result;
     }
     const messaging = await getMessagingSafe(); if (!messaging) return { success: false, message: 'Notificações push não são suportadas neste navegador.' };
@@ -84,7 +93,7 @@ export async function enableDailyReminders(reminderHourLocal: number): Promise<E
 }
 
 export async function disableDailyReminders(): Promise<EnablePushResult> {
-  try { if (isNativeApp()) await cancelNativeNotifications([NATIVE_DAILY_REMINDER_ID]); const user = await withTimeout(ensureAuthenticated(), 'Autenticação'); const existing = await getNotificationPrefs(); await withTimeout(setDoc(prefsDocRef(user.uid), { ...existing, dailyReminderEnabled: false, updatedAt: Date.now() }, { merge: true }), 'Salvamento das preferências'); return { success: true, message: 'Lembretes diários desativados.' }; }
+  try { if (isNativeApp()) await cancelNativeNotifications([NATIVE_DAILY_REMINDER_ID]); const user = await withTimeout(ensureAuthenticated(), 'Autenticação'); const existing = await getNotificationPrefs(); await withTimeout(setDoc(prefsDocRef(user.uid), { ...existing, dailyReminderEnabled: false, updatedAt: Date.now() }, { merge: true }), 'Salvamento das preferências', FIRESTORE_OPERATION_TIMEOUT_MS); return { success: true, message: 'Lembretes diários desativados.' }; }
   catch (err: any) { return { success: false, message: err?.message || 'Não foi possível desativar os lembretes.' }; }
 }
 
@@ -95,7 +104,7 @@ export async function updateStreakReminderPref(enabled: boolean): Promise<Enable
       if (enabled) { if (!(await ensureNativeNotificationPermission())) return { success: false, message: 'Permissão de notificações negada. Ative as notificações do MemoriaFlash nas configurações do Android.' }; await scheduleNativeStreakReminder(existing.reminderHourLocal); }
       else await cancelNativeNotifications([NATIVE_STREAK_REMINDER_ID]);
     }
-    await withTimeout(setDoc(prefsDocRef(user.uid), { ...existing, streakReminderEnabled: enabled, updatedAt: Date.now() }, { merge: true }), 'Salvamento das preferências');
+    await withTimeout(setDoc(prefsDocRef(user.uid), { ...existing, streakReminderEnabled: enabled, updatedAt: Date.now() }, { merge: true }), 'Salvamento das preferências', FIRESTORE_OPERATION_TIMEOUT_MS);
     return { success: true, message: enabled ? 'Aviso de sequência em risco ativado.' : 'Aviso de sequência em risco desativado.' };
   } catch (err: any) { return { success: false, message: err?.message || 'Não foi possível atualizar o aviso de sequência.' }; }
 }

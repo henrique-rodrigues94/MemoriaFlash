@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   X,
   Download,
@@ -56,7 +56,30 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({ decks, onC
 
   const decksWithCards = decks.filter((d) => d.cards.length > 0);
 
+  // Os decks podem chegar de forma assíncrona depois que o modal já está
+  // montado (ex.: sincronização com Firebase ainda em andamento). Sem isso,
+  // "selectedDeckId"/"targetExistingDeckId" ficavam presos em '' ou em um
+  // deck que não existe mais (ex.: foi excluído em outra aba), quebrando o
+  // formulário silenciosamente.
+  useEffect(() => {
+    if (selectedDeckId !== '__all__' && !decks.some((d) => d.id === selectedDeckId)) {
+      setSelectedDeckId(decks[0]?.id || '__all__');
+    }
+  }, [decks, selectedDeckId]);
+  useEffect(() => {
+    if (!decks.some((d) => d.id === targetExistingDeckId)) {
+      setTargetExistingDeckId(decks[0]?.id || '');
+    }
+  }, [decks, targetExistingDeckId]);
+
+  // O que a exportação realmente vai gerar com a seleção atual — usado para
+  // não permitir baixar (ou tentar mesclar em) um arquivo vazio sem avisar.
+  const exportHasCards = selectedDeckId === '__all__'
+    ? decksWithCards.length > 0
+    : (decks.find((d) => d.id === selectedDeckId)?.cards.length || 0) > 0;
+
   const handleExport = () => {
+    if (!exportHasCards) return;
     if (selectedDeckId === '__all__') {
       const { content, filename, mime } = exportAllDecksAsJSON(decksWithCards);
       downloadTextFile(filename, content, mime);
@@ -217,9 +240,16 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({ decks, onC
               </div>
             )}
 
+            {selectedDeckId !== '__all__' && !exportHasCards && (
+              <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>Este deck ainda não tem nenhum card. Adicione cards antes de exportar.</span>
+              </div>
+            )}
+
             <button
               onClick={handleExport}
-              disabled={decks.length === 0}
+              disabled={!exportHasCards}
               className="w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-sm shadow-lg flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Download className="w-4 h-4" /> Baixar Arquivo
@@ -300,7 +330,7 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({ decks, onC
                   </button>
                   <button
                     onClick={() => setImportMode('merge')}
-                    disabled={decksWithCards.length === 0 && decks.length === 0}
+                    disabled={decks.length === 0}
                     className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                       importMode === 'merge' ? 'bg-blue-600 text-white shadow' : 'text-[#8c91a0] hover:text-white'
                     }`}

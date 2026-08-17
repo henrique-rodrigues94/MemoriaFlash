@@ -57,6 +57,7 @@ export async function submitStudyCardFeedback(payload: StudyFeedbackPayload): Pr
     ? { card: payload.card, subject: payload.subject || payload.card.topic || 'MemoriaFlash', deckId: payload.deckId || '' }
     : findCardFromStudyDom();
   if (!context) throw new Error('Não foi possível identificar o card atual. Tente novamente.');
+  if (context.card.source === 'manual') throw new Error('Cards criados manualmente não podem ser relatados — o relato serve para curadoria de conteúdo gerado por IA.');
 
   const { card, subject, deckId } = context;
   const now = new Date().toISOString();

@@ -42,7 +42,7 @@ export async function showFreeUserBanner(): Promise<void> {
   await initializeAdMob();
   await requestAdMobConsent();
   // A margem deixa a barra inferior do aplicativo totalmente livre para toque.
-  await withTimeout(AdMob.showBanner({ adId: config.bannerAdUnitId, adSize: BannerAdSize.ADAPTIVE_BANNER, position: BannerAdPosition.BOTTOM_CENTER, margin: 78 }), 'Exibição do banner');
+  await withTimeout(AdMob.showBanner({ adId: config.bannerAdUnitId, adSize: BannerAdSize.ADAPTIVE_BANNER, position: BannerAdPosition.BOTTOM_CENTER, margin: 64 }), 'Exibição do banner');
 }
 
 export async function hideAdMobBanner(): Promise<void> { if (!isNativeAndroid()) return; try { await withTimeout(AdMob.hideBanner(), 'Ocultação do banner'); } catch (error) { console.warn('[AdMob] hideBanner:', error); } }

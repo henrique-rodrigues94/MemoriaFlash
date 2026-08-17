@@ -155,15 +155,16 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
   const [reportSuccess, setReportSuccess] = useState(false);
 
   const openReportModal = useCallback(() => {
+    if (rawCard?.source === 'manual') return;
     setReportReason(null);
     setReportComment('');
     setReportError(null);
     setReportSuccess(false);
     setShowReportModal(true);
-  }, []);
+  }, [rawCard]);
 
   const handleSendReport = useCallback(async () => {
-    if (!reportReason || !rawCard) return;
+    if (!reportReason || !rawCard || rawCard.source === 'manual') return;
     setReportSending(true);
     setReportError(null);
     try {
@@ -677,10 +678,15 @@ export const StudySessionView: React.FC<StudySessionViewProps> = ({
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={openReportModal}
-              title="Relatar problema neste card"
-              aria-label="Relatar problema neste card"
-              className="p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 bg-[#122131] border-slate-700/40 text-slate-500 hover:border-rose-500/40 hover:text-rose-300"
+              onClick={rawCard?.source === 'manual' ? undefined : openReportModal}
+              disabled={rawCard?.source === 'manual'}
+              title={rawCard?.source === 'manual' ? 'Relatar problema disponível apenas para cards gerados por IA' : 'Relatar problema neste card'}
+              aria-label={rawCard?.source === 'manual' ? 'Relatar problema indisponível: este card foi criado manualmente' : 'Relatar problema neste card'}
+              className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
+                rawCard?.source === 'manual'
+                  ? 'bg-[#122131] border-slate-800/40 text-slate-700 cursor-not-allowed opacity-50'
+                  : 'bg-[#122131] border-slate-700/40 text-slate-500 hover:border-rose-500/40 hover:text-rose-300 cursor-pointer'
+              }`}
             >
               <Flag className="w-4 h-4" />
               <span className="hidden sm:inline text-[11px]">Relatar</span>

@@ -115,6 +115,7 @@ export const generateAICards = async (
       explanation: item.explanation || '',
       curiosity: item.curiosity || '',
       difficulty: (item.difficulty as Flashcard['difficulty']) || 'medium',
+      source: 'ai',
       bucketId: item.bucketId || undefined,
       cardContentType: item.cardContentType || cardContentType,
       educationLevel: item.educationLevel || educationLevel,

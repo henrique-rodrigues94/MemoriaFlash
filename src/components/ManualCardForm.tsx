@@ -44,6 +44,7 @@ export const ManualCardForm: React.FC<ManualCardFormProps> = ({ existingDecks, s
       front: front.trim(),
       back: back.trim(),
       difficulty: 'medium',
+      source: 'manual',
       reps: 0,
       interval: 0,
       efactor: 2.5,
