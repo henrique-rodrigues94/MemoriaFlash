@@ -41,5 +41,4 @@ export interface UserStats {
   referralCode?: string; referredByCode?: string; referralCount?: number; referralProDaysEarned?: number;
 }
 
-export interface QuizQuestion { question: string; options: string[]; correctIndex: number; explanation: string; }
 export type ActiveTab = 'home' | 'explore' | 'quiz' | 'scanner' | 'cards' | 'stats' | 'profile' | 'create';

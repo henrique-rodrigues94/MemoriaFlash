@@ -9,10 +9,6 @@ import admin from 'firebase-admin';
 import { aiOrchestrator } from './src/server/ai';
 import { generateFlashcardsTask } from './src/server/ai/tasks/generateFlashcards';
 import { suggestTopicsTask } from './src/server/ai/tasks/suggestTopics';
-import { quizDiagnosticTask } from './src/server/ai/tasks/quizDiagnostic';
-import { voiceTutorTask } from './src/server/ai/tasks/voiceTutor';
-import { generateQuizTask } from './src/server/ai/tasks/generateQuiz';
-import { recoveryPlanTask } from './src/server/ai/tasks/recoveryPlan';
 import { scannerAnalyzeTask } from './src/server/ai/tasks/scannerAnalyze';
 import { extractTextFromImages, getOCRStatus } from './src/server/ocr/ocrService';
 import { generateCurriculumTask, CurriculumCategory } from './src/server/ai/tasks/generateCurriculum';
@@ -232,21 +228,6 @@ app.post('/api/ai/reset-cooldowns', (req, res) => {
   res.json({ ok: true, status: aiOrchestrator.getStatus() });
 });
 
-app.post('/api/gemini/quiz-diagnostic', async (req, res) => {
-  try { const { topic } = req.body; if (!topic) return res.status(400).json({ error: 'Topic is required' }); return res.json(await quizDiagnosticTask(req.body)); }
-  catch (error: any) { console.error('Error in quiz diagnostic:', error); return res.status(500).json({ error: error.message || 'Quiz diagnostic failed' }); }
-});
-
-app.post('/api/gemini/voice-tutor', async (req, res) => {
-  try { const { question } = req.body; if (!question) return res.status(400).json({ error: 'Question is required' }); return res.json(await voiceTutorTask(req.body)); }
-  catch (error: any) { console.error('Error in voice-tutor:', error); return res.status(500).json({ error: error.message || 'Voice tutor failed' }); }
-});
-
-app.post('/api/gemini/generate-quiz', async (req, res) => {
-  try { return res.json(await generateQuizTask(req.body)); }
-  catch (error: any) { console.error('Error generating quiz:', error); return res.status(500).json({ error: error.message || 'Quiz generation failed' }); }
-});
-
 app.post('/api/gemini/scanner-analyze', async (req, res) => {
   try {
     const { images = [], texts = [], subjectHint = '', language = 'pt' } = req.body;
@@ -306,11 +287,6 @@ app.post('/api/gemini/scanner-process', async (req, res) => {
     console.error('[Scanner] Error processing scanner:', error);
     return res.status(error?.httpStatus || 500).json({ error: error?.message || 'Falha ao processar o scanner.', code: error?.code, remaining: error?.remaining, generated: error?.generated, limit: error?.limit });
   }
-});
-
-app.post('/api/gemini/recovery-plan', async (req, res) => {
-  try { return res.json(await recoveryPlanTask(req.body)); }
-  catch (error: any) { console.error('Error generating recovery plan:', error); return res.status(500).json({ error: error.message || 'Recovery plan generation failed' }); }
 });
 
 async function startServer() {

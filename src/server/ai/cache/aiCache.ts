@@ -10,10 +10,9 @@ import { getAdminFirestore } from '../../firebaseAdmin';
 // cache, sem gastar uma segunda chamada de API.
 //
 // Só é aplicado a tarefas de conteúdo GENÉRICO/reutilizável (flashcards,
-// tópicos sugeridos, quiz, plano de recuperação). Tarefas que dependem de
-// contexto pessoal do usuário (diagnóstico de erros do quiz, respostas do
-// tutor de voz) NÃO passam por aqui — cachear essas poderia vazar/entregar
-// uma análise de OUTRO usuário.
+// tópicos sugeridos). Tarefas que dependem de contexto pessoal do usuário
+// NÃO devem passar por aqui — cachear essas poderia vazar/entregar uma
+// análise de OUTRO usuário.
 //
 // Se o Firebase Admin SDK não estiver configurado, o cache é simplesmente
 // ignorado (a IA é chamada normalmente) — nunca quebra o app.
@@ -112,6 +111,4 @@ export async function withCache<T extends object>(
 export const CACHE_TTL = {
   FLASHCARDS: 30 * 24 * 60 * 60 * 1000, // 30 dias — conteúdo educacional muda pouco
   TOPICS: 30 * 24 * 60 * 60 * 1000,
-  QUIZ: 14 * 24 * 60 * 60 * 1000,
-  RECOVERY_PLAN: 7 * 24 * 60 * 60 * 1000,
 } as const;

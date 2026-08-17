@@ -22,12 +22,12 @@ describe('computeCacheKey — normalização', () => {
 
   it('gera chaves DIFERENTES para tarefas (taskId) diferentes, mesmo com o mesmo payload', () => {
     const a = computeCacheKey('generateFlashcards', { prompt: 'x' });
-    const b = computeCacheKey('generateQuiz', { prompt: 'x' });
+    const b = computeCacheKey('suggestTopics', { prompt: 'x' });
     expect(a).not.toBe(b);
   });
 
   it('a chave inclui o taskId como prefixo (facilita depuração no console do Firestore)', () => {
-    expect(computeCacheKey('recoveryPlan', { weakTopics: ['a'] })).toMatch(/^recoveryPlan_/);
+    expect(computeCacheKey('suggestTopics', { title: 'a' })).toMatch(/^suggestTopics_/);
   });
 });
 

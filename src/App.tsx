@@ -338,31 +338,6 @@ export function App() {
     void deleteDeckFromFirestore(deckId);
   };
 
-  const handleAddCardToDeck = (deckId: string, card: { front: string; back: string }) => {
-    const targetDeck = decks.find((d) => d.id === deckId);
-    if (!targetDeck) return;
-
-    const newCard = {
-      id: `card-voice-${Date.now()}`,
-      front: card.front,
-      back: card.back,
-      topic: targetDeck.category,
-      difficulty: 'medium' as const,
-      source: 'manual' as const,
-      reps: 0,
-      interval: 0,
-      efactor: 2.5,
-      dueDate: new Date().toISOString(),
-    };
-
-    const updatedDeck: Deck = {
-      ...targetDeck,
-      cards: [...targetDeck.cards, newCard],
-    };
-
-    handleSaveDeck(updatedDeck);
-  };
-
   const isLightTheme = theme === 'light';
 
   return (
