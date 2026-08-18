@@ -74,14 +74,42 @@ export async function saveCardBucket(subject: string, topic: string, level: Educ
 
 export async function getBucketStats(subject: string, topics: string[], level: EducationLevel, cardType: CardContentType = 'definition'): Promise<Array<{ topic: string; cardCount: number; stale: boolean; bucketId: string }>> {
   const db = getAdminFirestore(); if (!db || topics.length === 0) return [];
-  return Promise.all(topics.map(async topic => {
-    try { const id = bucketId(subject, topic, level, cardType); const snap = await db.collection('cardBuckets').doc(id).get(); if (!snap.exists) return { topic, cardCount: 0, stale: true, bucketId: id }; const doc = snap.data() as CardBucketDoc; return { topic, cardCount: doc.cardCount ?? (doc.cards?.length ?? 0), stale: isExpired(doc.ttlAt), bucketId: id }; }
-    catch { return { topic, cardCount: 0, stale: true, bucketId: '' }; }
-  }));
+  try {
+    // getAll() faz UMA chamada em lote (batchGet) para todos os documentos,
+    // em vez de N idas e vindas separadas ao Firestore (Promise.all de N
+    // .get() individuais). Isso reduz drasticamente a latência quando o
+    // currículo tem muitos tópicos.
+    const ids = topics.map(topic => bucketId(subject, topic, level, cardType));
+    const refs = ids.map(id => db.collection('cardBuckets').doc(id));
+    const snaps = await db.getAll(...refs);
+    return snaps.map((snap, i) => {
+      const topic = topics[i];
+      const id = ids[i];
+      if (!snap.exists) return { topic, cardCount: 0, stale: true, bucketId: id };
+      const doc = snap.data() as CardBucketDoc;
+      return { topic, cardCount: doc.cardCount ?? (doc.cards?.length ?? 0), stale: isExpired(doc.ttlAt), bucketId: id };
+    });
+  } catch (err: any) {
+    console.warn('[db] getBucketStats error:', err?.message);
+    return topics.map(topic => ({ topic, cardCount: 0, stale: true, bucketId: bucketId(subject, topic, level, cardType) }));
+  }
 }
 
 export async function prefetchCardBuckets(subject: string, topics: string[], level: EducationLevel, cardType: CardContentType): Promise<Map<string, { cards: BankCard[]; stale: boolean }>> {
   const db = getAdminFirestore(); const result = new Map<string, { cards: BankCard[]; stale: boolean }>(); if (!db || topics.length === 0) return result;
-  await Promise.all(topics.map(async topic => { const id = bucketId(subject, topic, level, cardType); try { const snap = await db.collection('cardBuckets').doc(id).get(); if (!snap.exists) { result.set(id, { cards: [], stale: true }); return; } const doc = snap.data() as CardBucketDoc; result.set(id, { cards: Array.isArray(doc.cards) ? doc.cards : [], stale: isExpired(doc.ttlAt) }); } catch { result.set(id, { cards: [], stale: true }); } }));
+  try {
+    const ids = topics.map(topic => bucketId(subject, topic, level, cardType));
+    const refs = ids.map(id => db.collection('cardBuckets').doc(id));
+    const snaps = await db.getAll(...refs);
+    snaps.forEach((snap, i) => {
+      const id = ids[i];
+      if (!snap.exists) { result.set(id, { cards: [], stale: true }); return; }
+      const doc = snap.data() as CardBucketDoc;
+      result.set(id, { cards: Array.isArray(doc.cards) ? doc.cards : [], stale: isExpired(doc.ttlAt) });
+    });
+  } catch (err: any) {
+    console.warn('[db] prefetchCardBuckets error:', err?.message);
+    topics.forEach(topic => result.set(bucketId(subject, topic, level, cardType), { cards: [], stale: true }));
+  }
   return result;
 }

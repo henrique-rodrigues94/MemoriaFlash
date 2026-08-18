@@ -6,6 +6,7 @@
 // - o servidor gera e persiste o resultado no Firestore para reutilização.
 
 import { EducationLevel } from '../lib/educationLevels';
+import { fetchWithTimeout } from '../lib/fetchWithTimeout';
 import { CurriculumCategory, fetchCurriculum } from './curriculumService';
 import { getCachedSubjectLevels } from './firestoreCurriculumCache';
 
@@ -98,7 +99,7 @@ export async function identifySubjectLevels(subject: string): Promise<SubjectLev
 
   // 2. Cache miss: somente agora o servidor pode consultar/usar IA.
   try {
-    const res = await fetch(`/api/subject-levels?subject=${encodeURIComponent(normalizedSubject)}`);
+    const res = await fetchWithTimeout(`/api/subject-levels?subject=${encodeURIComponent(normalizedSubject)}`, {}, 30_000);
     if (!res.ok) return null;
 
     const data = await res.json();

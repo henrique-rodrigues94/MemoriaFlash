@@ -3,6 +3,7 @@ import { AlertCircle, BookOpen, Camera, Check, CheckCircle2, ChevronDown, Chevro
 import { Deck, UserStats } from '../types';
 import { ECONOMY } from '../services/economy/economyConstants';
 import { auth, ensureAuthenticated } from '../lib/firebase';
+import { fetchWithTimeout } from '../lib/fetchWithTimeout';
 import { enqueueDocumentContent } from '../services/contentRequestService';
 
 interface Item { id: string; type: 'image' | 'document'; name: string; file: File; previewUrl?: string; base64?: string; }
@@ -164,7 +165,7 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
         }
       }
       setProcessing('IA identificando matéria e tópicos…');
-      const res = await fetch('/api/gemini/scanner-analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ images, texts, subjectHint: subject.trim(), language: 'pt' }) });
+      const res = await fetchWithTimeout('/api/gemini/scanner-analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ images, texts, subjectHint: subject.trim(), language: 'pt' }) }, 60_000);
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || `Erro do servidor (${res.status}).`);
       if (!data?.subject || !Array.isArray(data.topics) || !data.topics.length) throw new Error('A IA não encontrou tópicos suficientes. Envie conteúdo mais legível ou uma foto melhor.');
@@ -212,7 +213,7 @@ export function ScannerView({ onSaveNewDeck, stats, onDeductCredit, onOpenAdMob 
         if (failedCount > 0) setShareMessage(prev => `${prev}${prev ? ' ' : ''}${failedCount} documento(s) não puderam ser enviados para a fila; a geração do seu deck continuará normalmente.`);
       }
 
-      const res = await fetch('/api/gemini/scanner-process', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ images: [], texts: [], subject: subject.trim() || analysis.subject, count: totalCards, selectedTopics: topicsWithCounts.map(t => t.title), topicsWithCounts, extractedContent: analysis.extractedContent }) });
+      const res = await fetchWithTimeout('/api/gemini/scanner-process', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ images: [], texts: [], subject: subject.trim() || analysis.subject, count: totalCards, selectedTopics: topicsWithCounts.map(t => t.title), topicsWithCounts, extractedContent: analysis.extractedContent }) }, 120_000);
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || `Erro do servidor (${res.status}).`);
       const raw = Array.isArray(data) ? data : Array.isArray(data?.cards) ? data.cards : Array.isArray(data?.flashcards) ? data.flashcards : [];

@@ -7,6 +7,7 @@
 // for realmente novo, gera via IA e persiste para os próximos usuários.
 
 import { EducationLevel } from '../lib/educationLevels';
+import { fetchWithTimeout } from '../lib/fetchWithTimeout';
 import { getCachedCurriculum } from './firestoreCurriculumCache';
 
 export interface CurriculumCategory {
@@ -99,9 +100,9 @@ export async function fetchCurriculum(
       subject: normalizedSubject,
       level: educationLevel,
     });
-    const res = await fetch(`/api/curriculum?${params}`, {
+    const res = await fetchWithTimeout(`/api/curriculum?${params}`, {
       headers: { 'Content-Type': 'application/json' },
-    });
+    }, 45_000);
 
     if (!res.ok) {
       console.warn('[curriculumService] server returned', res.status);

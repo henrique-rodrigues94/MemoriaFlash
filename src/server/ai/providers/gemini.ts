@@ -36,6 +36,13 @@ function getMaxTokens(params: GenerateJSONParams): number {
     ?? (parseInt(process.env.GEMINI_MAX_OUTPUT_TOKENS || '0') || DEFAULT_MAX_TOKENS);
 }
 
+// Timeout padrão para a chamada ao Gemini. Sem isso, uma resposta que trava
+// (rede lenta, proxy, hiccup da API do Google) nunca resolve nem rejeita a
+// Promise, e como o Gemini é o PRIMEIRO provedor tentado, o fallback para os
+// demais nunca é acionado — o usuário fica com o "gerando..." travado pra
+// sempre. Os demais providers (DeepSeek, OpenAI, etc.) já usam AbortController.
+const DEFAULT_TIMEOUT_MS = 30000;
+
 function classifyError(err: any): AIProviderError {
   const msg    = err?.message || String(err);
   // O SDK pode encapsular o erro HTTP como texto JSON em `message`. Extrair
@@ -63,6 +70,11 @@ export const geminiProvider: AIProvider = {
 
   async generateJSON(params: GenerateJSONParams): Promise<unknown> {
     const ai = getClient();
+    const controller = new AbortController();
+    const timeoutMs = params.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let aborted = false;
+    controller.signal.addEventListener('abort', () => { aborted = true; });
 
     try {
       const config: Record<string, unknown> = {
@@ -70,6 +82,7 @@ export const geminiProvider: AIProvider = {
         responseMimeType: 'application/json',
         maxOutputTokens: getMaxTokens(params),
         temperature: params.temperature ?? 0.7,
+        abortSignal: controller.signal,
       };
 
       // Structured output nativo — garante schema sem depender do parsing
@@ -90,7 +103,12 @@ export const geminiProvider: AIProvider = {
       return JSON.parse(text);
     } catch (err: any) {
       if (err instanceof AIProviderError) throw err;
+      if (aborted || err?.name === 'AbortError') {
+        throw new AIProviderError(`Gemini: timeout (${timeoutMs}ms)`, 'gemini');
+      }
       throw classifyError(err);
+    } finally {
+      clearTimeout(timer);
     }
   },
 };

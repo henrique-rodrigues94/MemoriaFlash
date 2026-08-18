@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, orderBy, query, setDoc, where } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
 function normalizeSubject(value: string): string {
@@ -15,12 +15,23 @@ function subjectId(value: string): string {
   return normalizeSubject(value).replace(/\s+/g, '-').slice(0, 100);
 }
 
-async function findUserRequests(uid: string) {
+/**
+ * Busca a solicitação mais recente do usuário para essa matéria/nível usando
+ * uma consulta indexada (requestedBy + normalizedSubject + educationLevel +
+ * updatedAt) em vez de trazer TODAS as solicitações do usuário e filtrar no
+ * cliente. Isso mantém a leitura rápida mesmo depois de o usuário acumular
+ * centenas de solicitações ao longo do tempo.
+ */
+async function findLatestUserRequest(uid: string, normalizedSubject: string, educationLevel: string) {
   const snapshot = await getDocs(query(
     collection(db, 'contentRequests'),
     where('requestedBy', '==', uid),
+    where('normalizedSubject', '==', normalizedSubject),
+    where('educationLevel', '==', educationLevel),
+    orderBy('updatedAt', 'desc'),
+    limit(1),
   ));
-  return snapshot.docs;
+  return snapshot.docs[0] ?? null;
 }
 
 /**
@@ -44,20 +55,14 @@ export async function requestCurriculumPreparation(args: {
 
   try {
     const normalizedSubject = normalizeSubject(subject);
-    const existingDocs = await findUserRequests(user.uid);
-    const reusable = existingDocs.find((item) => {
-      const data = item.data();
-      const status = String(data?.status || '');
-      return String(data?.normalizedSubject || '') === normalizedSubject
-        && String(data?.educationLevel || '') === educationLevel
-        && ['pending', 'processing', 'analyzing', 'generating', 'validating'].includes(status);
-    });
+    const reusable = await findLatestUserRequest(user.uid, normalizedSubject, educationLevel);
+    const reusableStatus = reusable ? String(reusable.data()?.status || '') : '';
+    const isReusable = reusable && ['pending', 'processing', 'analyzing', 'generating', 'validating'].includes(reusableStatus);
 
-    if (reusable) {
-      await updateDoc(reusable.ref, {
-        requestCount: Number(reusable.data()?.requestCount || 0) + 1,
-        updatedAt: new Date().toISOString(),
-      });
+    if (isReusable && reusable) {
+      // As regras do Firestore não permitem update de contentRequests pelo
+      // cliente (só o Content Agent, via Admin SDK, pode avançar o status).
+      // Reaproveitamos a solicitação existente sem tentar escrever nela.
       return { requestId: reusable.id, reused: true };
     }
 
@@ -104,14 +109,7 @@ export async function getLatestCurriculumPreparationRequest(args: {
   const user = auth.currentUser;
   if (!user) return null;
   const normalizedSubject = normalizeSubject(args.subject);
-  const docs = await findUserRequests(user.uid);
-  const matches = docs.filter(docSnapshot => {
-    const data = docSnapshot.data();
-    return String(data?.normalizedSubject || '') === normalizedSubject
-      && String(data?.educationLevel || '') === args.educationLevel;
-  });
-  if (matches.length === 0) return null;
-  const sorted = [...matches].sort((a, b) => String(b.data()?.updatedAt || '').localeCompare(String(a.data()?.updatedAt || '')));
-  const data = sorted[0].data();
-  return { id: sorted[0].id, ...data };
+  const latest = await findLatestUserRequest(user.uid, normalizedSubject, args.educationLevel);
+  if (!latest) return null;
+  return { id: latest.id, ...latest.data() };
 }

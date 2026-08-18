@@ -1,6 +1,7 @@
 import { Flashcard } from '../types';
 import { EducationLevel } from './educationLevels';
 import { auth, ensureAuthenticated } from './firebase';
+import { fetchWithTimeout } from './fetchWithTimeout';
 
 export type { EducationLevel };
 
@@ -16,6 +17,13 @@ export interface GenerationUsage {
 function publishGenerationUsage(usage: GenerationUsage): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('memoriaflash:generation-usage', { detail: usage }));
 }
+
+/**
+ * Geração de flashcards pode envolver fallback entre até 3 provedores de IA
+ * no backend (Gemini → DeepSeek → OpenAI), cada um com seu próprio timeout e
+ * até 2 retries com backoff. Damos margem suficiente para esse pior caso.
+ */
+const GENERATION_TIMEOUT_MS = 120_000;
 
 /**
  * Render Free pode ficar alguns minutos sem receber tráfego e entrar em sleep.
@@ -40,7 +48,7 @@ export const fetchAITopicSuggestions = async (subject: string, educationLevel: E
   if (!subject.trim()) return [];
   await ensureApiReady();
   try {
-    const res = await fetch('/api/gemini/suggest-topics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: subject, language: 'pt', educationLevel }) });
+    const res = await fetchWithTimeout('/api/gemini/suggest-topics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: subject, language: 'pt', educationLevel }) }, 30_000);
     if (!res.ok) throw new Error('Não há servidor de IA disponível no momento. Tente novamente mais tarde.');
     const data = await res.json();
     return Array.isArray(data.topics) ? data.topics : [];
@@ -68,7 +76,7 @@ export const generateAICards = async (
   await ensureApiReady();
 
   try {
-    const res = await fetch('/api/gemini/generate-flashcards', {
+    const res = await fetchWithTimeout('/api/gemini/generate-flashcards', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -76,7 +84,7 @@ export const generateAICards = async (
         'X-Timezone': timeZone,
       },
       body: JSON.stringify({ prompt: subject, count, language: 'pt', difficulty: 'medium', selectedTopics: topics, educationLevel, existingFronts, cardContentType }),
-    });
+    }, GENERATION_TIMEOUT_MS);
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const limitMessage = data?.code === 'GENERATION_DAILY_LIMIT_REACHED'

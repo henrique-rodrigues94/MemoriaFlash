@@ -1,4 +1,5 @@
 import { db, doc, getDoc } from '../lib/firebase';
+import { collection, documentId, getDocs, query, where } from 'firebase/firestore';
 
 export interface BankTopicStat { bucketId: string; subject: string; topic: string; educationLevel: string; difficulty: string; cardCount: number; updatedAt: string; isStale: boolean; }
 export interface BankAvailability { available: BankTopicStat[]; needsGeneration: BankTopicStat[]; totalReadyCards: number; }
@@ -22,6 +23,32 @@ function bucketIsUsable(data: any): boolean {
   return ttlAt === 0 || Date.now() <= ttlAt;
 }
 
+/**
+ * Busca vários documentos de `cardBuckets` por ID em UMA consulta por lote de
+ * até 10 IDs (limite do operador `in` do Firestore), em vez de uma leitura
+ * individual por tópico. Para uma grade com 20 tópicos isso troca 20
+ * round-trips por apenas 2 — resposta bem mais rápida no app.
+ */
+async function fetchBucketDocsByIds(ids: string[]): Promise<Map<string, any>> {
+  const result = new Map<string, any>();
+  const uniqueIds = Array.from(new Set(ids));
+  const chunks: string[][] = [];
+  for (let i = 0; i < uniqueIds.length; i += 10) chunks.push(uniqueIds.slice(i, i + 10));
+  await Promise.all(chunks.map(async chunk => {
+    try {
+      const snapshot = await getDocs(query(collection(db, 'cardBuckets'), where(documentId(), 'in', chunk)));
+      snapshot.forEach(docSnap => result.set(docSnap.id, docSnap.data()));
+    } catch {
+      // Fallback: se a consulta em lote falhar (ex: regra/índice), tenta
+      // leitura individual para não derrubar a experiência do usuário.
+      await Promise.all(chunk.map(async id => {
+        try { const snap = await getDoc(doc(db, 'cardBuckets', id)); if (snap.exists()) result.set(id, snap.data()); } catch { /* ignora */ }
+      }));
+    }
+  }));
+  return result;
+}
+
 export async function queryBankAvailability(subject: string, topics: string[], educationLevel: string, cardType = 'definition'): Promise<BankAvailability> {
   const empty: BankAvailability = { available: [], needsGeneration: [], totalReadyCards: 0 };
   if (!subject.trim() || topics.length === 0) return empty;
@@ -30,19 +57,16 @@ export async function queryBankAvailability(subject: string, topics: string[], e
   if (cached && Date.now() - cached.fetchedAt < STATS_CACHE_MS) return classifyStats(cached.data);
   try {
     const uniqueTopics = Array.from(new Set(topics.map(t => t.trim()).filter(Boolean)));
-    const stats = await Promise.all(uniqueTopics.map(async (topic): Promise<BankTopicStat> => {
-      const id = await bucketId(subject, topic, educationLevel, cardType);
-      try {
-        const snapshot = await getDoc(doc(db, 'cardBuckets', id));
-        if (!snapshot.exists()) return { bucketId: id, subject, topic, educationLevel, difficulty: cardType, cardCount: 0, updatedAt: '', isStale: true };
-        const data = snapshot.data() as any;
-        const cardCount = Number(data?.cardCount ?? data?.cards?.length ?? 0);
-        const usable = bucketIsUsable(data);
-        return { bucketId: id, subject: String(data?.subject || subject), topic, educationLevel: String(data?.level || educationLevel), difficulty: String(data?.cardType || cardType), cardCount, updatedAt: String(data?.updatedAt || ''), isStale: !usable };
-      } catch {
-        return { bucketId: id, subject, topic, educationLevel, difficulty: cardType, cardCount: 0, updatedAt: '', isStale: true };
-      }
-    }));
+    const ids = await Promise.all(uniqueTopics.map(topic => bucketId(subject, topic, educationLevel, cardType)));
+    const docs = await fetchBucketDocsByIds(ids);
+    const stats: BankTopicStat[] = uniqueTopics.map((topic, i) => {
+      const id = ids[i];
+      const data = docs.get(id);
+      if (!data) return { bucketId: id, subject, topic, educationLevel, difficulty: cardType, cardCount: 0, updatedAt: '', isStale: true };
+      const cardCount = Number(data?.cardCount ?? data?.cards?.length ?? 0);
+      const usable = bucketIsUsable(data);
+      return { bucketId: id, subject: String(data?.subject || subject), topic, educationLevel: String(data?.level || educationLevel), difficulty: String(data?.cardType || cardType), cardCount, updatedAt: String(data?.updatedAt || ''), isStale: !usable };
+    });
     statsCache.set(cacheKey, { data: stats, fetchedAt: Date.now() });
     return classifyStats(stats);
   } catch { return empty; }
@@ -54,21 +78,26 @@ export async function fetchSharedCards(subject: string, topics: string[], educat
   const cached = cardsCache.get(cacheKey);
   if (cached && Date.now() - cached.fetchedAt < CARDS_CACHE_MS) return shuffle(cached.data).slice(0, limit);
   const uniqueTopics = Array.from(new Set(topics.map(t => t.trim()).filter(Boolean)));
-  const buckets = await Promise.all(uniqueTopics.map(async topic => {
-    const id = await bucketId(subject, topic, educationLevel, cardType);
-    try {
-      const snapshot = await getDoc(doc(db, 'cardBuckets', id));
-      if (!snapshot.exists()) return [] as SharedBankCard[];
-      const data = snapshot.data() as any;
-      if (!bucketIsUsable(data) || !Array.isArray(data?.cards)) return [] as SharedBankCard[];
-      return data.cards.map((card: any) => ({
-        id: String(card.id), front: String(card.front || ''), back: String(card.back || ''), explanation: card.explanation || '', topic: String(card.topic || topic),
-        subtopic: card.subtopic || undefined, difficulty: card.difficulty || 'medium', bucketId: id, subject: String(data?.subject || subject), educationLevel: String(data?.level || educationLevel), cardContentType: cardType,
-      })).filter((card: SharedBankCard) => card.front && card.back);
-    } catch { return [] as SharedBankCard[]; }
-  }));
+  const ids = await Promise.all(uniqueTopics.map(topic => bucketId(subject, topic, educationLevel, cardType)));
+  const docs = await fetchBucketDocsByIds(ids);
   const dedup = new Map<string, SharedBankCard>();
-  for (const card of buckets.flat()) { const key = normalizeText(card.front); if (key && !dedup.has(key)) dedup.set(key, card); }
+  uniqueTopics.forEach((topic, i) => {
+    const id = ids[i];
+    const data = docs.get(id);
+    if (!data || !bucketIsUsable(data) || !Array.isArray(data?.cards)) return;
+    for (const card of data.cards) {
+      const front = String(card?.front || '');
+      const back = String(card?.back || '');
+      if (!front || !back) continue;
+      const key = normalizeText(front);
+      if (key && !dedup.has(key)) {
+        dedup.set(key, {
+          id: String(card.id), front, back, explanation: card.explanation || '', topic: String(card.topic || topic),
+          subtopic: card.subtopic || undefined, difficulty: card.difficulty || 'medium', bucketId: id, subject: String(data?.subject || subject), educationLevel: String(data?.level || educationLevel), cardContentType: cardType,
+        });
+      }
+    }
+  });
   const all = Array.from(dedup.values());
   cardsCache.set(cacheKey, { data: all, fetchedAt: Date.now() });
   return shuffle(all).slice(0, limit);

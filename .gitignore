@@ -50,6 +50,10 @@ Desktop.ini
 tmp-noop.txt
 tmp-*
 
+# Arquivos de diff/patch aplicados manualmente (não devem ser versionados)
+*.diff
+*.patch
+
 # Editor
 .vscode/*
 !.vscode/extensions.json
