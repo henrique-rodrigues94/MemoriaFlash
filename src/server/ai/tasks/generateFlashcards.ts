@@ -1,7 +1,7 @@
 import { Type } from '@google/genai';
 import { aiOrchestrator } from '../index';
 import { extractArrayField } from '../jsonUtils';
-import { getCardBucket, saveCardBucket, prefetchCardBuckets, BankCard, CardContentType } from '../../db/db';
+import { saveCardBucket, prefetchCardBuckets, BankCard, CardContentType } from '../../db/db';
 import { bucketId } from '../../db/firestoreSchema';
 import { updateContentCatalogFromBucket } from '../../db/contentCatalog';
 
@@ -257,16 +257,23 @@ export async function generateFlashcardsTask(args: {
 
     if (useBank && providerUsed !== 'bank-stale-fallback' && generated.length > 0) {
       await saveCardBucket(prompt, slot.topicLabel, educationLevel, cardContentType as CardContentType, generated, providerUsed);
-      const stats = await getCardBucket(prompt, slot.topicLabel, educationLevel, cardContentType as CardContentType, 0);
-      const catalogCount = stats.cards.length;
-      await updateContentCatalogFromBucket({
+      // NOTA DE PERFORMANCE: `contentCatalog` é escrito aqui mas hoje não é
+      // lido por nenhuma tela do app (só existe como cache interno para uma
+      // futura tela de "conteúdo disponível"). Antes isso era `await`ado de
+      // forma síncrona — 1 leitura extra do bucket + 3 round-trips dentro de
+      // `updateContentCatalogFromBucket` — atrasando a resposta ao usuário
+      // para atualizar algo que ninguém consulta ainda. Agora roda em segundo
+      // plano (fire-and-forget) e usamos a contagem que já temos em memória
+      // em vez de reler o bucket que acabamos de salvar.
+      const catalogCount = bankCards.length + generated.length;
+      updateContentCatalogFromBucket({
         subject: prompt,
         topic: slot.topicLabel,
         level: educationLevel,
         cardType: cardContentType as CardContentType,
         cardCount: catalogCount,
         updatedAt: new Date().toISOString(),
-      });
+      }).catch(err => console.warn('[generateFlashcards] Falha ao atualizar contentCatalog (não bloqueia a resposta):', err?.message));
     }
   }
 
