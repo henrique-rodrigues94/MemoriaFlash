@@ -1,9 +1,13 @@
-# MemoriaFlash — checklist de publicação
+# MemoriaFlash — checklist de publicação Play Store
+
+> Auditoria técnica revisada em 20/08/2026. O código está preparado para Capacitor/Android, mas itens que dependem de conta Google Play, Firebase/AdMob de produção, aparelho físico ou configuração externa permanecem pendentes até serem executados de fato.
 
 ## 1. Aplicativo
 
 - [x] React/Vite build configurado
 - [x] Capacitor Android versionado
+- [x] `appId` Android `com.memoriaflash.app`
+- [x] `webDir` do Capacitor apontando para `dist`
 - [x] Login Google
 - [x] Firebase Authentication
 - [x] Firestore
@@ -18,8 +22,31 @@
 - [x] Página pública de solicitação de exclusão fora do app
 - [x] Processamento administrativo das solicitações externas de exclusão
 - [x] Política de privacidade pública com link para exclusão
+- [x] Gate de autenticação impede uso sem conta autenticada
+- [x] Sincronização de baralhos/estatísticas com Firestore
 
-## 2. Segurança e backend
+## 2. Android / Capacitor
+
+- [x] Capacitor Android 8.x
+- [x] `minSdkVersion = 24`
+- [x] `compileSdkVersion = 36`
+- [x] `targetSdkVersion = 36`
+- [x] Activity principal `exported=true`
+- [x] INTERNET
+- [x] CAMERA
+- [x] FileProvider não exportado
+- [x] App ID do AdMob no Manifest
+- [x] Backup Android desativado (`allowBackup=false`) para reduzir risco de cópia de dados pessoais
+- [x] Assinatura Release parametrizada por secrets
+- [x] `versionCode` e `versionName` parametrizados no Gradle
+- [x] Workflow Release gera `VERSION_CODE` único por execução
+- [x] Workflow Release valida `signingReport`
+- [x] Workflow Release gera AAB assinado
+- [x] Workflow candidate gera AAB assinado para homologação
+
+O Google Play passa a exigir API 36+ para novos apps e atualizações a partir de 31/08/2026; o projeto já está em API 36. urlRequisito oficial de target API do Google Playhttps://developer.android.com/google/play/requirements/target-sdk
+
+## 3. Segurança e backend
 
 - [x] Contadores de IA protegidos no backend/Firestore Rules
 - [x] `contentRequests` protegidos por proprietário
@@ -38,47 +65,39 @@
 - [x] Checklist de Data Safety documentado
 - [x] Runbook de release documentado
 - [x] CI configurado para Node.js 22
-- [x] Testes unitários alinhados aos contratos atuais do app
-- [x] Suite de testes atualizada para o modelo sem rewarded ads/créditos
-- [x] Cenário de reset de cooldown do AIOrchestrator coberto
-- [x] CI confirma typecheck, testes, release preflight e build de produção
+- [x] Typecheck/testes/build no pipeline
 - [x] Preflight de produção valida HTTPS, IDs de AdMob, produtos Play e RTDN
+- [x] Preflight exige `VERSION_CODE` e `VERSION_NAME` em produção
 
-### Validações externas obrigatórias antes da publicação
+### Pendências externas obrigatórias
 
 - [ ] Confirmar backend HTTPS de produção e `/api/health`
 - [ ] Testar rate limiting em produção
 - [ ] Testar regras Firestore no projeto de produção
-- [ ] Revisar variáveis de produção no host/CI
-- [ ] Confirmar Firebase Project usado pelo APK/AAB de produção
+- [ ] Revisar todas as variáveis de produção no host/CI
+- [ ] Confirmar Firebase Project usado pelo AAB de produção
 
-## 3. Homologação Android
+## 4. Homologação Android
 
-- [x] `npm ci` — CI
-- [x] `npm run typecheck` — CI
-- [x] `npm run test` — CI
-- [x] `npm run build` — CI
-- [x] `npm run android:sync` — CI
-- [x] Compilação do APK debug — CI
-- [x] Compilação do AAB Release candidato — workflow `release-candidate.yml`
-- [x] Configuração de assinatura Release implementada
-- [x] Workflow manual para AAB Release assinado implementado
-- [x] Sync de produção impede IDs AdMob de teste
-
-### Para você testar agora
-
-1. Abra **GitHub → MemoriaFlash → Actions**.
-2. Execute **release-candidate** manualmente.
-3. Aguarde o workflow terminar.
-4. Baixe o artifact `memoriaflash-release-candidate`.
-5. Use o AAB no fluxo de teste interno/fechado do Google Play quando estiver com assinatura de produção configurada.
+- [x] `npm ci`
+- [x] `npm run typecheck`
+- [x] `npm test`
+- [x] `npm run build`
+- [x] `npm run android:sync`
+- [x] Compilação Android automatizada
+- [x] AAB Release candidato automatizado
+- [x] AAB candidato agora é assinado
+- [x] AAB de produção assinado automatizado
+- [x] Verificação de assinatura via `signingReport`
+- [x] IDs AdMob de teste separados do workflow de produção
 
 ### Testes físicos / serviços externos
 
 - [ ] `npm run android:sync:prod` com variáveis reais
-- [ ] Gerar AAB Release assinado com keystore de produção
-- [ ] Instalar/testar release em aparelho físico
+- [ ] Gerar AAB Release assinado com keystore de produção no workflow
+- [ ] Instalar release em aparelho físico
 - [ ] Login Google em release
+- [ ] Login Google após reinstalação
 - [ ] Scanner/câmera
 - [ ] PDF/TXT
 - [ ] PDF grande dentro do limite de conteúdo
@@ -98,15 +117,20 @@
 - [ ] Recuperação após perda de conexão
 - [ ] Encerramento/reabertura do app
 - [ ] Reinicialização do aparelho e persistência das preferências
+- [ ] Notificações locais e permissão Android 13+
+- [ ] Tema claro/escuro nas telas principais
+- [ ] Banner AdMob não sobrepor navegação/modais
+- [ ] Banner AdMob ausente durante estudo
+- [ ] Botão de relato de problema fixo no topo do card
 
-## 4. Google Play Console
+## 5. Google Play Console
 
 - [ ] Nome, descrição e categoria
 - [ ] Ícone 512x512
 - [ ] Screenshots de celular
 - [ ] Screenshots de tablet, se aplicável
 - [ ] Feature graphic
-- [ ] Publicar `public/privacy.html` em URL HTTPS estável
+- [ ] URL HTTPS pública para `public/privacy.html`
 - [x] Roteiro Data Safety documentado
 - [ ] Formulário Data Safety preenchido com a versão final
 - [ ] Classificação indicativa
@@ -117,23 +141,28 @@
 - [ ] Service Account vinculada e permissões concedidas
 - [ ] RTDN/Pub/Sub configurado com segredo
 - [ ] Teste interno
-- [ ] Teste fechado
+- [ ] Teste fechado, se exigido pela conta
 - [ ] AAB assinado enviado
+- [ ] Pré-lançamento aprovado
 - [ ] Produção
+- [ ] Verificação de desenvolvedor Android conferida no Play Console antes de 30/09/2026
 
-## 5. AdMob
+## 6. AdMob
 
 - [x] Integração nativa real
-- [x] Banner/interstitial/rewarded implementados
-- [x] Produção não cai silenciosamente em IDs de teste
+- [x] Banner/interstitial/rewarded implementados no código
+- [x] Produção não deve usar IDs de teste
+- [x] Preflight de produção bloqueia `VITE_ADMOB_USE_TEST_IDS=true`
 - [ ] App criado no AdMob
 - [ ] Ad units reais criados
 - [ ] Privacy & Messaging configurado
 - [ ] Consentimento validado em dispositivo
 - [ ] Ad Inspector validado
 - [ ] `app-ads.txt` publicado e verificado
+- [ ] Testar banner fora da tela de estudo
+- [ ] Testar banner sem sobreposição de abas/painéis
 
-## 6. MemoriaFlashAgent / conteúdo
+## 7. MemoriaFlashAgent / conteúdo
 
 - [x] Mobile funciona sem o Agent
 - [x] Feedback do Mobile entra no Firestore
@@ -147,11 +176,29 @@
 - [ ] Executar primeira auditoria real do banco de produção
 - [ ] Revisar cobertura e lacunas antes da publicação
 
-## 7. Documentação
+## 8. Documentação
 
-- `docs/PLAY_STORE_DATA_SAFETY.md`
-- `docs/RELEASE_RUNBOOK.md`
-- `docs/MONETIZATION_PRODUCTION_AUDIT.md`
-- `public/privacy.html`
-- `public/delete-account.html`
-- `MemoriaFlashAgent/docs/PRODUCTION_CHECKLIST.md`
+- [x] `docs/PLAY_STORE_DATA_SAFETY.md`
+- [x] `docs/RELEASE_RUNBOOK.md`
+- [x] `docs/MONETIZATION_PRODUCTION_AUDIT.md`
+- [x] `public/privacy.html`
+- [x] `public/delete-account.html`
+- [x] Checklist de produção do MemoriaFlashAgent
+
+## 9. Bloqueadores reais para publicar
+
+O código e o pipeline Android estão preparados, mas a publicação **não deve ser marcada como concluída** enquanto estes itens não forem executados:
+
+1. configurar e validar secrets de produção;
+2. gerar AAB assinado pelo workflow;
+3. testar o AAB em aparelho físico;
+4. configurar produtos/base plans do Google Play;
+5. configurar RTDN/Service Account;
+6. validar Billing real no teste interno;
+7. configurar AdMob/Privacy & Messaging/app-ads.txt;
+8. preencher Data Safety e demais formulários do Play Console;
+9. publicar política de privacidade em URL HTTPS estável;
+10. realizar teste interno/fechado e corrigir qualquer falha encontrada;
+11. conferir a verificação de desenvolvedor Android para distribuição no Brasil.
+
+O status acima é deliberadamente conservador: itens externos só são marcados como concluídos depois de uma execução real, não apenas porque existe código para eles.
