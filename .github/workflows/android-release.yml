@@ -11,6 +11,8 @@ jobs:
     env:
       VITE_APP_ENV: production
       NODE_ENV: production
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: 1.0.${{ github.run_number }}
       VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
       VITE_ADMOB_APP_ID: ${{ secrets.VITE_ADMOB_APP_ID }}
       VITE_ADMOB_BANNER_AD_UNIT_ID: ${{ secrets.VITE_ADMOB_BANNER_AD_UNIT_ID }}
@@ -69,16 +71,17 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build signed release AAB
+      - name: Verify Android release configuration
         working-directory: android
         run: |
           chmod +x ./gradlew
-          ./gradlew bundleRelease --no-daemon
+          ./gradlew :app:signingReport --no-daemon
+          ./gradlew :app:bundleRelease --no-daemon
 
       - name: Verify AAB exists
         run: test -s android/app/build/outputs/bundle/release/app-release.aab
 
-      - name: Upload signed AAB
+      - name: Upload signed release AAB
         uses: actions/upload-artifact@v4
         with:
           name: memoriaflash-production-aab
