@@ -10,6 +10,14 @@ jobs:
   android-release-candidate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: 1.0.${{ github.run_number }}-rc
+      VITE_ADMOB_USE_TEST_IDS: 'true'
+      MEMORIAFLASH_KEYSTORE_PATH: ${{ github.workspace }}/android/release-keystore.jks
+      MEMORIAFLASH_KEYSTORE_PASSWORD: ${{ secrets.MEMORIAFLASH_KEYSTORE_PASSWORD }}
+      MEMORIAFLASH_KEY_ALIAS: ${{ secrets.MEMORIAFLASH_KEY_ALIAS }}
+      MEMORIAFLASH_KEY_PASSWORD: ${{ secrets.MEMORIAFLASH_KEY_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,6 +49,18 @@ jobs:
       - name: Release preflight
         run: npm run release:check
 
+      - name: Preparar keystore de release
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64" || (echo 'ANDROID_KEYSTORE_BASE64 ausente. Configure a assinatura antes do teste interno.' && exit 1)
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/release-keystore.jks
+          test -s android/release-keystore.jks
+          test -n "$MEMORIAFLASH_KEYSTORE_PASSWORD"
+          test -n "$MEMORIAFLASH_KEY_ALIAS"
+          test -n "$MEMORIAFLASH_KEY_PASSWORD"
+
       - name: Build web + backend
         run: npm run build
         env:
@@ -48,12 +68,16 @@ jobs:
 
       - name: Sincronizar Android
         run: npm run android:sync
-        env:
-          VITE_ADMOB_USE_TEST_IDS: 'true'
 
-      - name: Gerar AAB Release candidato
+      - name: Gerar AAB Release assinado para homologação
         working-directory: android
-        run: ./gradlew bundleRelease --no-daemon
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app:signingReport --no-daemon
+          ./gradlew :app:bundleRelease --no-daemon
+
+      - name: Validar AAB
+        run: test -s android/app/build/outputs/bundle/release/app-release.aab
 
       - name: Publicar AAB candidato
         uses: actions/upload-artifact@v4
