@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const root = process.cwd();
 const production = process.env.RELEASE_PRODUCTION === 'true';
+const errors = [];
 const requiredFiles = [
   'capacitor.config.ts',
   'android/app/build.gradle',
@@ -16,7 +17,6 @@ const requiredFiles = [
   'src/services/accountDeletionService.ts',
 ];
 
-const errors = [];
 for (const file of requiredFiles) {
   if (!fs.existsSync(path.join(root, file))) errors.push(`Arquivo obrigatório ausente: ${file}`);
 }
@@ -26,22 +26,27 @@ if (!/^\d+\.\d+\.\d+$/.test(packageJson.version)) errors.push(`Versão inválida
 
 const capacitor = fs.readFileSync(path.join(root, 'capacitor.config.ts'), 'utf8');
 if (!capacitor.includes("appId: 'com.memoriaflash.app'")) errors.push('applicationId/appId inesperado.');
+if (!capacitor.includes("webDir: 'dist'")) errors.push('webDir do Capacitor deve ser dist.');
 
 const gradle = fs.readFileSync(path.join(root, 'android/app/build.gradle'), 'utf8');
 if (!gradle.includes('applicationId "com.memoriaflash.app"')) errors.push('applicationId Android inesperado.');
-if (!/versionCode\s+\d+/.test(gradle)) errors.push('versionCode Android ausente ou inválido.');
-if (!gradle.includes('signingConfigs') || !gradle.includes('MEMORIAFLASH_KEYSTORE_PATH')) {
-  errors.push('Configuração de assinatura de release ausente.');
-}
+if (!gradle.includes('versionCode releaseVersionCode')) errors.push('versionCode Android não está ligado à configuração de release.');
+if (!gradle.includes('versionName releaseVersionName')) errors.push('versionName Android não está ligado à configuração de release.');
+if (!gradle.includes('signingConfigs') || !gradle.includes('MEMORIAFLASH_KEYSTORE_PATH')) errors.push('Configuração de assinatura de release ausente.');
 
 const variables = fs.readFileSync(path.join(root, 'android/variables.gradle'), 'utf8');
 const targetMatch = variables.match(/targetSdkVersion\s*=\s*(\d+)/);
+const compileMatch = variables.match(/compileSdkVersion\s*=\s*(\d+)/);
+const minMatch = variables.match(/minSdkVersion\s*=\s*(\d+)/);
 if (!targetMatch || Number(targetMatch[1]) < 36) errors.push('targetSdkVersion deve ser 36 ou superior para o release atual.');
+if (!compileMatch || Number(compileMatch[1]) < Number(targetMatch?.[1] || 0)) errors.push('compileSdkVersion deve ser igual ou superior ao targetSdkVersion.');
+if (!minMatch || Number(minMatch[1]) < 23) errors.push('minSdkVersion inválido.');
 
 const manifest = fs.readFileSync(path.join(root, 'android/app/src/main/AndroidManifest.xml'), 'utf8');
 if (!manifest.includes('android.permission.INTERNET')) errors.push('Permissão INTERNET ausente.');
 if (!manifest.includes('android.permission.CAMERA')) errors.push('Permissão CAMERA ausente.');
 if (!manifest.includes('com.google.android.gms.ads.APPLICATION_ID')) errors.push('Configuração do App ID do AdMob ausente no Manifest.');
+if (manifest.includes('android:allowBackup="true"')) errors.push('android:allowBackup=true não é permitido no release por causa dos dados pessoais da conta.');
 
 const privacy = fs.readFileSync(path.join(root, 'public/privacy.html'), 'utf8');
 if (!privacy.includes('Política de Privacidade')) errors.push('Página de política de privacidade inválida.');
@@ -55,6 +60,7 @@ if (!deletionPage.includes('/api/billing/account-deletion/request')) errors.push
 
 const adMob = fs.readFileSync(path.join(root, 'src/lib/adMobConfig.ts'), 'utf8');
 if (!adMob.includes('isProductionBuild') || !adMob.includes('isNative')) errors.push('Proteção de IDs de teste do AdMob não configurada.');
+
 if (production) {
   const requiredProductionEnv = [
     'VITE_ADMOB_APP_ID',
@@ -67,13 +73,17 @@ if (production) {
     'VITE_PLAY_ANNUAL_BASE_PLAN_ID',
     'VITE_API_BASE_URL',
     'CORS_ORIGIN',
+    'GOOGLE_PLAY_RTDN_TOKEN',
+    'VERSION_CODE',
+    'VERSION_NAME',
   ];
   for (const key of requiredProductionEnv) {
     if (!process.env[key]?.trim()) errors.push(`Variável de produção ausente: ${key}`);
   }
+  const versionCode = Number(process.env.VERSION_CODE || 0);
+  if (!Number.isInteger(versionCode) || versionCode < 1) errors.push('VERSION_CODE deve ser um inteiro positivo.');
   if (process.env.VITE_ADMOB_USE_TEST_IDS === 'true') errors.push('VITE_ADMOB_USE_TEST_IDS=true não pode ser usado em produção.');
   if (process.env.VITE_API_BASE_URL && !process.env.VITE_API_BASE_URL.startsWith('https://')) errors.push('VITE_API_BASE_URL de produção deve usar HTTPS.');
-  if (!process.env.GOOGLE_PLAY_RTDN_TOKEN?.trim()) errors.push('GOOGLE_PLAY_RTDN_TOKEN ausente para produção.');
 }
 
 if (errors.length) {
@@ -84,7 +94,7 @@ if (errors.length) {
 
 console.log(`Release check: OK — MemoriaFlash ${packageJson.version}`);
 if (production) {
-  console.log('Preflight de produção validado: configuração de AdMob/Billing/API e assinatura declaradas.');
+  console.log(`Preflight de produção validado: Android API 36+, assinatura, versionCode=${process.env.VERSION_CODE}, AdMob/Billing/API e exclusão de conta.`);
 } else {
   console.log('Preflight padrão validado. Use RELEASE_PRODUCTION=true para validar credenciais/configuração final.');
 }
