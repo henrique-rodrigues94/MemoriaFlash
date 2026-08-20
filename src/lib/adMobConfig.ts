@@ -1,7 +1,8 @@
 import { Capacitor } from '@capacitor/core';
 
 const DEFAULT_TEST_ADMOB_CONFIG = {
-  // IDs oficiais de demonstração do Google. Usados SOMENTE para testes.
+  // IDs oficiais de demonstração do Google. Só podem ser usados quando
+  // VITE_ADMOB_USE_TEST_IDS=true. Nunca são selecionados silenciosamente.
   appId: 'ca-app-pub-3940256099942544~3347511713',
   bannerAdUnitId: 'ca-app-pub-3940256099942544/6300978111',
   interstitialAdUnitId: 'ca-app-pub-3940256099942544/1033173712',
@@ -21,13 +22,9 @@ export function getAdMobConfig() {
     env.VITE_ADMOB_REWARDED_AD_UNIT_ID,
   );
 
-  // Produção Web nunca cai silenciosamente nos IDs de teste. Já um APK/AAB
-  // nativo pode usar os IDs oficiais de demonstração quando os IDs reais não
-  // estiverem configurados. O gate de release (RELEASE_PRODUCTION=true)
-  // continua exigindo os IDs reais antes de uma publicação de produção.
-  // Isso permite gerar um APK local com `npm run build` e testar o AdMob sem
-  // que o build Vite em modo production desative os anúncios de homologação.
-  const isUsingTestIds = forceTestIds || (!hasProductionIds && (!isProductionBuild || isNative));
+  // Test IDs são opt-in. Isso evita que um build de produção nativo sem
+  // configuração de produção publique silenciosamente os IDs de demonstração.
+  const isUsingTestIds = forceTestIds;
   const source = isUsingTestIds
     ? DEFAULT_TEST_ADMOB_CONFIG
     : {
