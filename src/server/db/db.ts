@@ -13,9 +13,14 @@ import {
 export type { BankCard, EducationLevel, CardContentType };
 export type { SubjectDoc, CurriculumDoc, CardBucketDoc };
 
-export async function getSubjectLevels(subject: string): Promise<{ data: SubjectDoc; fromCache: true } | null> {
+export async function getSubjectLevels(subject: string, allowExpired = false): Promise<{ data: SubjectDoc; fromCache: true; stale?: boolean } | null> {
   const db = getAdminFirestore(); if (!db) return null;
-  try { const snap = await db.collection('subjects').doc(subjectId(subject)).get(); if (!snap.exists) return null; const doc = snap.data() as SubjectDoc; if (isExpired(doc.ttlAt)) return null; return { data: doc, fromCache: true }; }
+  try {
+    const snap = await db.collection('subjects').doc(subjectId(subject)).get(); if (!snap.exists) return null;
+    const doc = snap.data() as SubjectDoc; const stale = isExpired(doc.ttlAt);
+    if (stale && !allowExpired) return null;
+    return { data: doc, fromCache: true, stale };
+  }
   catch (err: any) { console.warn('[db] getSubjectLevels error:', err?.message); return null; }
 }
 
@@ -25,9 +30,14 @@ export async function saveSubjectLevels(subject: string, levels: SubjectDoc['lev
   catch (err: any) { console.warn('[db] saveSubjectLevels error:', err?.message); }
 }
 
-export async function getCurriculum(subject: string, level: EducationLevel): Promise<{ data: CurriculumDoc; fromCache: true } | null> {
+export async function getCurriculum(subject: string, level: EducationLevel, allowExpired = false): Promise<{ data: CurriculumDoc; fromCache: true; stale?: boolean } | null> {
   const db = getAdminFirestore(); if (!db) return null;
-  try { const snap = await db.collection('curricula').doc(curriculumId(subject, level)).get(); if (!snap.exists) return null; const doc = snap.data() as CurriculumDoc; if (isExpired(doc.ttlAt)) return null; return { data: doc, fromCache: true }; }
+  try {
+    const snap = await db.collection('curricula').doc(curriculumId(subject, level)).get(); if (!snap.exists) return null;
+    const doc = snap.data() as CurriculumDoc; const stale = isExpired(doc.ttlAt);
+    if (stale && !allowExpired) return null;
+    return { data: doc, fromCache: true, stale };
+  }
   catch (err: any) { console.warn('[db] getCurriculum error:', err?.message); return null; }
 }
 

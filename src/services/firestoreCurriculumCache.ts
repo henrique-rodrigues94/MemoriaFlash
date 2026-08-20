@@ -54,8 +54,11 @@ export async function getCachedCurriculum(subject: string, level: EducationLevel
   try {
     const id = await shortHash(`${normalized}|${level}`); const snapshot = await getDoc(doc(db, 'curricula', id)); if (!snapshot.exists()) return null;
     const data = snapshot.data() as any; const categories = sanitizeCategories(data?.categories);
-    // Currículo sem version 2 é legado e precisa passar pelo servidor para ser regenerado sem limites.
-    if (Number(data?.version || 0) !== 2 || !isValidTtl(data?.ttlAt) || categories.length === 0) return null;
+    // Currículos legados (version != 2) ainda são exibidos diretamente do Firestore:
+    // é melhor mostrar um currículo desatualizado do que nenhum, especialmente se a
+    // IA estiver indisponível. O servidor continua tentando migrar para v2 em segundo
+    // plano quando possível.
+    if (!isValidTtl(data?.ttlAt) || categories.length === 0) return null;
     return { subject: typeof data.subject === 'string' ? data.subject : subject.trim(), level, categories, totalTopics: Number(data?.totalTopics || categories.reduce((total, category) => total + category.topics.length, 0)), totalSubtopics: Number(data?.totalSubtopics || categories.reduce((total, category) => total + category.topics.length, 0)), version: 2, updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : undefined, ttlAt: data.ttlAt, providerUsed: typeof data.providerUsed === 'string' ? data.providerUsed : undefined };
   } catch (error) { console.warn('[firestoreCurriculumCache] curriculum read failed:', error); return null; }
 }

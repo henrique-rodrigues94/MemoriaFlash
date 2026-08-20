@@ -68,18 +68,6 @@ Idioma: ${langInstruction}. Priorize cobertura completa, não quantidade mínima
     return { categories: cached.data.categories, providerUsed: 'db-cache', cacheHit: true };
   }
 
-<<<<<<< Updated upstream
-  const { data, providerUsed } = await aiOrchestrator.generateJSON({ systemPrompt, userPrompt, schemaHint: '{ "categories": [{ "category": string, "topics": string[] }] }', geminiSchema });
-  const categories: CurriculumCategory[] = Array.isArray((data as any)?.categories)
-    ? (data as any).categories.map((c: any) => ({
-        category: String(c?.category || '').trim(),
-        topics: Array.from(new Set(Array.isArray(c?.topics) ? c.topics.filter((t: unknown): t is string => typeof t === 'string' && t.trim().length > 0).map((t: string) => t.trim()) : [])),
-      })).filter((c: CurriculumCategory) => c.category && c.topics.length)
-    : [];
-  if (!categories.length) throw new Error('IA não retornou categorias válidas para o currículo.');
-  await saveCurriculum(subject, educationLevel, categories, providerUsed);
-  return { categories, providerUsed, cacheHit: false };
-=======
   try {
     const { data, providerUsed } = await aiOrchestrator.generateJSON({ systemPrompt, userPrompt, schemaHint: '{ "categories": [{ "category": string, "topics": string[] }] }', geminiSchema });
     const categories: CurriculumCategory[] = Array.isArray((data as any)?.categories)
@@ -103,5 +91,4 @@ Idioma: ${langInstruction}. Priorize cobertura completa, não quantidade mínima
     }
     throw err;
   }
->>>>>>> Stashed changes
 }

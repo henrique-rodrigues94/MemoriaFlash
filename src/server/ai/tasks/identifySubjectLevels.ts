@@ -123,38 +123,56 @@ Ordene do maior priority (1) para o menor. Inclua apenas níveis genuinamente re
     return { levels, subjectNormalized: cached.data.subject, providerUsed: 'db-cache' };
   }
 
-  // 2. Não tem no banco — gera via IA
-  const { data, providerUsed } = await aiOrchestrator.generateJSON({
-    systemPrompt,
-    userPrompt,
-    schemaHint: `{ "subjectNormalized": string, "levels": [{ "level": EducationLevel, "priority": number, "reason": string }] }`,
-    geminiSchema,
-  });
+  // 2. Não tem no banco (ou expirou) — gera via IA
+  try {
+    const { data, providerUsed } = await aiOrchestrator.generateJSON({
+      systemPrompt,
+      userPrompt,
+      schemaHint: `{ "subjectNormalized": string, "levels": [{ "level": EducationLevel, "priority": number, "reason": string }] }`,
+      geminiSchema,
+    });
 
-  const raw = data as any;
-  const rawLevels: Array<{ level: string; priority: number; reason: string }> =
-    Array.isArray(raw?.levels) ? raw.levels : [];
+    const raw = data as any;
+    const rawLevels: Array<{ level: string; priority: number; reason: string }> =
+      Array.isArray(raw?.levels) ? raw.levels : [];
 
-  const validLevels = rawLevels
-    .filter(l => ALL_LEVELS.includes(l.level as EducationLevel))
-    .sort((a, b) => a.priority - b.priority);
+    const validLevels = rawLevels
+      .filter(l => ALL_LEVELS.includes(l.level as EducationLevel))
+      .sort((a, b) => a.priority - b.priority);
 
-  const finalLevels = validLevels.length > 0
-    ? validLevels
-    : [{ level: 'faculdade' as EducationLevel, priority: 1, reason: 'nível padrão' }];
+    const finalLevels = validLevels.length > 0
+      ? validLevels
+      : [{ level: 'faculdade' as EducationLevel, priority: 1, reason: 'nível padrão' }];
 
-  const subjectNormalized = (raw?.subjectNormalized as string) || subject;
+    const subjectNormalized = (raw?.subjectNormalized as string) || subject;
 
-  // 3. Salva no banco para próximas requisições (assíncrono, não bloqueia)
-  saveSubjectLevels(subject, finalLevels as any, providerUsed).catch(() => {});
+    // 3. Salva no banco para próximas requisições (assíncrono, não bloqueia)
+    saveSubjectLevels(subject, finalLevels as any, providerUsed).catch(() => {});
 
-  const levels: SubjectLevelInfo[] = finalLevels.map((l: any) => ({
-    level: l.level as EducationLevel,
-    label: LEVEL_META[l.level as EducationLevel]?.label ?? l.level,
-    icon:  LEVEL_META[l.level as EducationLevel]?.icon ?? '📚',
-    reason: l.reason ?? '',
-    priority: l.priority ?? 2,
-  }));
+    const levels: SubjectLevelInfo[] = finalLevels.map((l: any) => ({
+      level: l.level as EducationLevel,
+      label: LEVEL_META[l.level as EducationLevel]?.label ?? l.level,
+      icon:  LEVEL_META[l.level as EducationLevel]?.icon ?? '📚',
+      reason: l.reason ?? '',
+      priority: l.priority ?? 2,
+    }));
 
-  return { levels, subjectNormalized, providerUsed };
+    return { levels, subjectNormalized, providerUsed };
+  } catch (err) {
+    // A IA falhou. Antes de propagar o erro, tentamos usar um registro expirado do
+    // Firestore como fallback — melhor mostrar níveis desatualizados do que nada.
+    const stale = await getSubjectLevels(subject, true);
+    if (stale) {
+      console.warn('[identifySubjectLevelsTask] IA indisponível, usando níveis expirados do Firestore:', (err as any)?.message);
+      const levels: SubjectLevelInfo[] = stale.data.levels.map((l: any) => ({
+        level: l.level as EducationLevel,
+        label: LEVEL_META[l.level as EducationLevel]?.label ?? l.level,
+        icon:  LEVEL_META[l.level as EducationLevel]?.icon ?? '📚',
+        reason: l.reason ?? '',
+        priority: l.priority ?? 2,
+      }));
+      return { levels, subjectNormalized: stale.data.subject, providerUsed: 'db-cache-fallback' };
+    }
+    throw err;
+  }
 }

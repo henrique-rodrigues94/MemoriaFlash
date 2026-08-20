@@ -255,11 +255,7 @@ export async function generateFlashcardsTask(args: {
     providersUsed.add(providerUsed);
     allCards.push(...generated);
 
-<<<<<<< Updated upstream
-    if (useBank && generated.length > 0) {
-=======
     if (useBank && providerUsed !== 'bank-stale-fallback' && generated.length > 0) {
->>>>>>> Stashed changes
       await saveCardBucket(prompt, slot.topicLabel, educationLevel, cardContentType as CardContentType, generated, providerUsed);
       const stats = await getCardBucket(prompt, slot.topicLabel, educationLevel, cardContentType as CardContentType, 0);
       const catalogCount = stats.cards.length;
