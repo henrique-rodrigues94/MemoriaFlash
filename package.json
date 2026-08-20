@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "release:check": "node scripts/release-check.mjs",
+    "play:store:audit": "node scripts/play-store-audit.mjs",
     "android:sync": "npx cap sync android && node scripts/configure-android-admob.mjs",
     "android:sync:prod": "npx cap sync android && node scripts/configure-android-admob.mjs --production"
   },
