@@ -68,6 +68,7 @@ Idioma: ${langInstruction}. Priorize cobertura completa, não quantidade mínima
     return { categories: cached.data.categories, providerUsed: 'db-cache', cacheHit: true };
   }
 
+<<<<<<< Updated upstream
   const { data, providerUsed } = await aiOrchestrator.generateJSON({ systemPrompt, userPrompt, schemaHint: '{ "categories": [{ "category": string, "topics": string[] }] }', geminiSchema });
   const categories: CurriculumCategory[] = Array.isArray((data as any)?.categories)
     ? (data as any).categories.map((c: any) => ({
@@ -78,4 +79,29 @@ Idioma: ${langInstruction}. Priorize cobertura completa, não quantidade mínima
   if (!categories.length) throw new Error('IA não retornou categorias válidas para o currículo.');
   await saveCurriculum(subject, educationLevel, categories, providerUsed);
   return { categories, providerUsed, cacheHit: false };
+=======
+  try {
+    const { data, providerUsed } = await aiOrchestrator.generateJSON({ systemPrompt, userPrompt, schemaHint: '{ "categories": [{ "category": string, "topics": string[] }] }', geminiSchema });
+    const categories: CurriculumCategory[] = Array.isArray((data as any)?.categories)
+      ? (data as any).categories.map((c: any) => ({
+          category: String(c?.category || '').trim(),
+          topics: Array.from(new Set(Array.isArray(c?.topics) ? c.topics.filter((t: unknown): t is string => typeof t === 'string' && t.trim().length > 0).map((t: string) => t.trim()) : [])),
+        })).filter((c: CurriculumCategory) => c.category && c.topics.length)
+      : [];
+    if (!categories.length) throw new Error('IA não retornou categorias válidas para o currículo.');
+    await saveCurriculum(subject, educationLevel, categories, providerUsed);
+    return { categories, providerUsed, cacheHit: false };
+  } catch (err) {
+    // A IA falhou (provedor indisponível, limite atingido, etc). Antes de propagar o
+    // erro, tentamos qualquer currículo já salvo no Firestore — legado (version != 2)
+    // ou até expirado (ttlAt vencido) — como último recurso, já que ter algo do banco
+    // é sempre melhor que uma tela vazia para o usuário.
+    const fallback = cached ?? (await getCurriculum(subject, educationLevel, true));
+    if (fallback && fallback.data.categories?.length) {
+      console.warn('[generateCurriculumTask] IA indisponível, usando currículo do Firestore como fallback:', (err as any)?.message);
+      return { categories: fallback.data.categories, providerUsed: fallback.data.providerUsed ? `${fallback.data.providerUsed}-fallback` : 'db-cache-fallback', cacheHit: true };
+    }
+    throw err;
+  }
+>>>>>>> Stashed changes
 }

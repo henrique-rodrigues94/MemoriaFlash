@@ -224,21 +224,42 @@ export async function generateFlashcardsTask(args: {
     const shortfall = slot.count - bankCards.length;
     if (shortfall <= 0) continue;
 
-    const { cards: generated, providerUsed } = await generateCardsForTopic({
-      subject: prompt,
-      topicLabel: slot.topicLabel,
-      isSpecificTopic: slot.isSpecificTopic,
-      count: shortfall,
-      language,
-      difficulty,
-      educationLevel,
-      cardTypeInstruction,
-    });
-    aiGenerated += generated.length;
+    let generated: BankCard[] = [];
+    let providerUsed = 'bank';
+    try {
+      const result = await generateCardsForTopic({
+        subject: prompt,
+        topicLabel: slot.topicLabel,
+        isSpecificTopic: slot.isSpecificTopic,
+        count: shortfall,
+        language,
+        difficulty,
+        educationLevel,
+        cardTypeInstruction,
+      });
+      generated = result.cards;
+      providerUsed = result.providerUsed;
+    } catch (err) {
+      // A IA falhou (provedor indisponível, limite atingido, etc). Se o bucket
+      // estava marcado como "stale" mas ainda tem cards salvos, usamos esses
+      // cards desatualizados como fallback em vez de falhar a geração inteira —
+      // melhor entregar conteúdo antigo do que nenhum conteúdo.
+      const staleFallback = bankResult.stale ? bankResult.cards.filter(c => !bankCards.includes(c)).slice(0, shortfall) : [];
+      if (staleFallback.length === 0) throw err;
+      console.warn(`[generateFlashcards] IA indisponível para "${slot.topicLabel}", usando ${staleFallback.length} card(s) desatualizado(s) do banco:`, (err as any)?.message);
+      generated = staleFallback;
+      providerUsed = 'bank-stale-fallback';
+    }
+    aiGenerated += providerUsed === 'bank-stale-fallback' ? 0 : generated.length;
+    bankHits += providerUsed === 'bank-stale-fallback' ? generated.length : 0;
     providersUsed.add(providerUsed);
     allCards.push(...generated);
 
+<<<<<<< Updated upstream
     if (useBank && generated.length > 0) {
+=======
+    if (useBank && providerUsed !== 'bank-stale-fallback' && generated.length > 0) {
+>>>>>>> Stashed changes
       await saveCardBucket(prompt, slot.topicLabel, educationLevel, cardContentType as CardContentType, generated, providerUsed);
       const stats = await getCardBucket(prompt, slot.topicLabel, educationLevel, cardContentType as CardContentType, 0);
       const catalogCount = stats.cards.length;
