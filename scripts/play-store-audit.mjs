@@ -97,15 +97,25 @@ walk(path.join(root, 'src'));
 walk(path.join(root, 'public'));
 
 for (const file of sourceFiles) {
+  const relative = path.relative(root, file).replaceAll('\\', '/');
+  const basename = path.basename(file);
+  // Testes e fixtures podem conter IDs oficiais de demonstração do Google.
+  // Eles não entram no bundle de produção e não devem bloquear o preflight.
+  if (/\.test\.[^.]+$|\.spec\.[^.]+$|__tests__|__fixtures__/.test(relative)) continue;
+
   const content = fs.readFileSync(file, 'utf8');
-  const relative = path.relative(root, file);
+  // adMobConfig mantém os IDs oficiais de demonstração como fallback explícito
+  // para desenvolvimento/homologação. O próprio módulo exige opt-in via
+  // VITE_ADMOB_USE_TEST_IDS; a auditoria verifica essa regra separadamente.
+  if (relative === 'src/lib/adMobConfig.ts') continue;
   if (/ca-app-pub-3940256099942544/.test(content)) fail(`ID de teste AdMob encontrado no código publicado: ${relative}`);
   if (/https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(content)) fail(`URL localhost encontrada no código publicado: ${relative}`);
   if (/AIza[0-9A-Za-z_-]{20,}/.test(content)) warn(`Possível API key Firebase hardcoded encontrada em ${relative}; confirme que é uma configuração pública e que regras/backend protegem os dados.`);
 }
 
 const adMobConfig = exists('src/lib/adMobConfig.ts') ? read('src/lib/adMobConfig.ts') : '';
-if (!adMobConfig.includes('isProductionBuild') || !adMobConfig.includes('isNative')) fail('Proteção de IDs de teste/produção do AdMob não configurada.');
+if (!adMobConfig.includes('VITE_ADMOB_USE_TEST_IDS') || !adMobConfig.includes('isProductionBuild') || !adMobConfig.includes('isNative')) fail('Proteção de IDs de teste/produção do AdMob não configurada.');
+if (!adMobConfig.includes('const isUsingTestIds = forceTestIds;')) fail('IDs de teste do AdMob precisam ser opt-in explícito.');
 
 const versionCode = Number(process.env.VERSION_CODE || 0);
 if (production) {
