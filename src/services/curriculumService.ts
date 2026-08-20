@@ -100,9 +100,15 @@ export async function fetchCurriculum(
       subject: normalizedSubject,
       level: educationLevel,
     });
+    // 130s: cobre o pior caso do backend, que tenta até 3 provedores de IA em
+    // sequência antes de cair no fallback do Firestore (Gemini ~30s + DeepSeek
+    // ~60s + OpenAI ~25s de timeout cada, quando um provedor está lento/
+    // degradado em vez de simplesmente offline). Um timeout menor no cliente
+    // abortava a requisição antes do backend conseguir responder, mesmo
+    // quando o fallback do Firestore acabaria funcionando.
     const res = await fetchWithTimeout(`/api/curriculum?${params}`, {
       headers: { 'Content-Type': 'application/json' },
-    }, 45_000);
+    }, 130_000);
 
     if (!res.ok) {
       console.warn('[curriculumService] server returned', res.status);

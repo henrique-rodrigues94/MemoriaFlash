@@ -72,7 +72,7 @@ function publishVerifiedCurriculumLevels(
 
 /**
  * Identifica os níveis usando Firestore primeiro.
- * A IA só entra no fluxo quando a matéria ainda não foi cadastrada.
+ * A IA só entra no fluxo quando a matéria ainda não está cadastrada.
  */
 export async function identifySubjectLevels(subject: string): Promise<SubjectLevelsResult | null> {
   if (!subject.trim() || subject.trim().length < 2) return null;
@@ -99,7 +99,11 @@ export async function identifySubjectLevels(subject: string): Promise<SubjectLev
 
   // 2. Cache miss: somente agora o servidor pode consultar/usar IA.
   try {
-    const res = await fetchWithTimeout(`/api/subject-levels?subject=${encodeURIComponent(normalizedSubject)}`, {}, 30_000);
+    // Mesmo raciocínio do curriculumService: o backend pode tentar até 3
+    // provedores de IA em sequência (até ~115s no pior caso) antes de cair no
+    // fallback do Firestore, então o timeout do cliente precisa ser generoso
+    // o bastante para não abortar antes disso.
+    const res = await fetchWithTimeout(`/api/subject-levels?subject=${encodeURIComponent(normalizedSubject)}`, {}, 130_000);
     if (!res.ok) return null;
 
     const data = await res.json();
