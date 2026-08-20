@@ -14,6 +14,7 @@ jobs:
       VERSION_CODE: ${{ github.run_number }}
       VERSION_NAME: 1.0.${{ github.run_number }}
       VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+      CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
       VITE_ADMOB_APP_ID: ${{ secrets.VITE_ADMOB_APP_ID }}
       VITE_ADMOB_BANNER_AD_UNIT_ID: ${{ secrets.VITE_ADMOB_BANNER_AD_UNIT_ID }}
       VITE_ADMOB_INTERSTITIAL_AD_UNIT_ID: ${{ secrets.VITE_ADMOB_INTERSTITIAL_AD_UNIT_ID }}
@@ -55,6 +56,9 @@ jobs:
 
       - name: Release production preflight
         run: RELEASE_PRODUCTION=true npm run release:check
+
+      - name: Play Store / Capacitor structural audit
+        run: RELEASE_PRODUCTION=true npm run play:store:audit
 
       - name: Build web with production configuration
         run: npm run build
